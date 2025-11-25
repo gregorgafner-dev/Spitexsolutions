@@ -39,6 +39,13 @@ export default async function MessagesPage() {
     },
   })
 
+  // Serialisiere Date-Objekte zu Strings für die Client-Komponente
+  const serializedMessages = messages.map(message => ({
+    ...message,
+    createdAt: message.createdAt.toISOString(),
+    updatedAt: message.updatedAt.toISOString(),
+  }))
+
   const unreadCount = messages.filter(m => !m.read).length
 
   return (
@@ -60,7 +67,7 @@ export default async function MessagesPage() {
           </div>
         </div>
 
-        <MessageList initialMessages={messages} />
+        <MessageList initialMessages={serializedMessages} />
       </div>
     </div>
   )
