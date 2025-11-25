@@ -476,7 +476,7 @@ export default function TimeTrackingPage() {
       console.log('loadEntriesForDate - Geladene Blöcke:', {
         currentBlocks: currentBlocks.length,
         nextBlocks: nextBlocks.length,
-        allBlocks: allBlocks.length,
+        allBlocksCount: allBlocks.length,
         allBlocks: allBlocks.map(b => ({ id: b.id, startTime: b.startTime, endTime: b.endTime }))
       })
       
