@@ -285,7 +285,7 @@ export default function CalculationsPage() {
               <CardContent>
                 {results.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-8">
-                    Wählen Sie einen Zeitraum und Mitarbeiter aus, dann klicken Sie auf "Berechnung ziehen"
+                    Wählen Sie einen Zeitraum und Mitarbeiter aus, dann klicken Sie auf &quot;Berechnung ziehen&quot;
                   </p>
                 ) : (
                   <div className="space-y-3">
