@@ -148,7 +148,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       console.log('Admin: Geladene Blöcke', { 
         currentBlocks: currentBlocks.length, 
         nextBlocks: nextBlocks.length, 
-        allBlocks: allBlocks.length,
+        allBlocksCount: allBlocks.length,
         allBlocks 
       })
       
