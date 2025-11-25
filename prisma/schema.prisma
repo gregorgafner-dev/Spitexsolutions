@@ -1,0 +1,190 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          String    @default("EMPLOYEE") // ADMIN or EMPLOYEE
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  employee      Employee?
+  admin         Admin?
+
+  @@map("users")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admins")
+}
+
+model Employee {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  employmentType  String   // "MONTHLY_SALARY" or "HOURLY_WAGE"
+  pensum          Float    // 0 - 100 (z.B. 50 = 50%)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeEntries     TimeEntry[]
+  scheduleEntries ScheduleEntry[]
+  monthlyBalances MonthlyBalance[]
+  vacations       Vacation[]
+  vacationBalances VacationBalance[]
+  messages        Message[]
+
+  @@map("employees")
+}
+
+model TimeEntry {
+  id          String    @id @default(cuid())
+  employeeId  String
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime?
+  breakMinutes Int       @default(0) // Pause in Minuten
+  surchargeHours Float   @default(0) // Zeitzuschlag für Sonn-/Feiertage (10%)
+  entryType   String    @default("WORK") // WORK, SICK, TRAINING, SLEEP, SLEEP_INTERRUPTION
+  sleepInterruptionMinutes Int @default(0) // Unterbrechungen während des Schlafens in Minuten (nur bei Nachtdienst)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("time_entries")
+  @@index([employeeId, date])
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  // Beschreibung des Dienstes (z.B. "Büro" für BÜ)
+  duration    Int      // Dauer in Minuten
+  color       String   // Hex-Farbe
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scheduleEntries ScheduleEntry[]
+
+  @@map("services")
+}
+
+model ScheduleEntry {
+  id          String    @id @default(cuid())
+  employeeId  String
+  serviceId   String
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("schedule_entries")
+  @@index([employeeId, date])
+}
+
+model MonthlyBalance {
+  id              String   @id @default(cuid())
+  employeeId      String
+  year            Int
+  month           Int      // 1-12
+  targetHours     Float    // Soll-Stunden für diesen Monat
+  actualHours     Float    @default(0) // Tatsächlich gearbeitete Stunden
+  surchargeHours  Float    @default(0) // Zeitzuschlag für Sonn-/Feiertage (10%)
+  plannedHours    Float    @default(0) // Geplante Stunden
+  balance         Float    @default(0) // Saldo (actual - target)
+  previousBalance Float    @default(0) // Vortrag vom Vormonat
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, year, month])
+  @@map("monthly_balances")
+  @@index([employeeId, year, month])
+}
+
+model WorkTimeConfig {
+  id              String   @id @default(cuid())
+  year            Int      @unique
+  weeklyHours     Float    // Soll-Stunden pro Woche für Kanton Zug
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("work_time_configs")
+}
+
+model Vacation {
+  id          String    @id @default(cuid())
+  employeeId String
+  startDate   DateTime
+  endDate     DateTime
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("vacations")
+  @@index([employeeId, startDate])
+}
+
+model VacationBalance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  year        Int
+  totalDays   Float    // Gesamter Ferienanspruch in Tagen (z.B. 25)
+  usedDays    Float    @default(0) // Verbrauchte Ferientage
+  startDate   DateTime? // Null wenn ganzjährig, sonst Eintrittsdatum
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, year])
+  @@map("vacation_balances")
+  @@index([employeeId, year])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  employeeId  String
+  topic       String   // "FERIENANTRAG", "FREIWUNSCH", "ZEITERFASSUNG"
+  subject     String
+  message     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+  @@index([employeeId, createdAt])
+  @@index([read, createdAt])
+}
+

@@ -1,0 +1,1 @@
+INSERT INTO users VALUES('cmi8r1m280000cvtthrfxqbn7','admin@example.com','$2a$10$i5CZLo9WxJ8cN0WFOPDfOOpyc7MedVYBz93PWBDxKQNxFIkXD15CG','Admin','istrator','ADMIN',1763722846448,1763722846448);
