@@ -73,7 +73,7 @@ export default async function AdminDashboard() {
     }
 
     // Prüfe jedes Datum
-    for (const [dateKey, dayEntries] of entriesByDate.entries()) {
+    for (const [dateKey, dayEntries] of Array.from(entriesByDate.entries())) {
       const date = parseISO(dateKey)
       
       // Filtere nur WORK-Einträge
