@@ -4,8 +4,8 @@ import { Logo } from '@/components/logo'
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-lg w-full bg-white rounded-lg shadow-lg p-8 md:p-12 overflow-visible">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="max-w-lg w-full bg-white rounded-xl shadow-2xl p-8 md:p-12 overflow-visible border-0">
         <div className="mb-8 overflow-visible">
           <Logo className="mb-6" />
           <p className="text-center text-gray-600 mt-6">

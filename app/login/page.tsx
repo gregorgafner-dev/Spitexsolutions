@@ -71,8 +71,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Card className="w-full max-w-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <Card className="w-full max-w-lg shadow-2xl border-0">
         <CardHeader>
           <div className="mb-6 flex justify-center">
             <Logo className="mb-4" showTagline={true} />

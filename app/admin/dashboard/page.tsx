@@ -5,8 +5,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, Calendar, Settings, Plane, FileText, Clock, Calculator, MessageSquare, AlertTriangle } from 'lucide-react'
-import { SignOutButton } from '@/components/signout-button'
-import { Logo } from '@/components/logo'
 import { calculateWorkHours } from '@/lib/calculations'
 import { format, parseISO, isSameDay } from 'date-fns'
 
@@ -173,19 +171,15 @@ export default async function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-full bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div className="flex-1">
-            <Logo className="mb-4" showTagline={false} />
-            <h1 className="text-2xl font-semibold text-gray-900 mt-2">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Willkommen, {session.user.name}
-            </p>
-          </div>
-          <SignOutButton />
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Dashboard
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Willkommen zurück, {session.user.name}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

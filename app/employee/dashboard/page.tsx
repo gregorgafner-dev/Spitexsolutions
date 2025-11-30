@@ -6,8 +6,6 @@ import { de } from 'date-fns/locale'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { SignOutButton } from '@/components/signout-button'
-import { Logo } from '@/components/logo'
 import { User } from 'lucide-react'
 export default async function EmployeeDashboard() {
   const session = await getSession()
@@ -65,19 +63,15 @@ export default async function EmployeeDashboard() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-full bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div className="flex-1">
-            <Logo className="mb-4" showTagline={false} />
-            <h1 className="text-2xl font-semibold text-gray-900 mt-2">
-              Willkommen, {employee.user.firstName} {employee.user.lastName}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              {format(now, "EEEE, d. MMMM yyyy", { locale: de })}
-            </p>
-          </div>
-          <SignOutButton />
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Willkommen, {employee.user.firstName} {employee.user.lastName}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {format(now, "EEEE, d. MMMM yyyy", { locale: de })}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

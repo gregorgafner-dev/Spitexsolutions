@@ -23,3 +23,6 @@ console.log('\n✅ Feiertage werden in der Berechnung berücksichtigt!')
 
 
 
+
+
+
