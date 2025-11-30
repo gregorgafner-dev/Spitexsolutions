@@ -9,7 +9,12 @@ export default withAuth(
     const path = req.nextUrl.pathname
 
     // Public routes - allow access without redirect
-    if (path === '/' || path === '/login' || path === '/admin/login') {
+    if (path === '/' || 
+        path === '/login' || 
+        path === '/admin/login' ||
+        path === '/test-simple' ||
+        path === '/login-test' ||
+        path === '/test-db') {
       return NextResponse.next()
     }
 
@@ -36,7 +41,12 @@ export default withAuth(
         const path = req.nextUrl.pathname
         
         // Public routes - always allow
-        if (path === '/' || path === '/login' || path === '/admin/login') {
+        if (path === '/' || 
+            path === '/login' || 
+            path === '/admin/login' ||
+            path === '/test-simple' ||
+            path === '/login-test' ||
+            path === '/test-db') {
           return true
         }
 
