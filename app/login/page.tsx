@@ -54,9 +54,9 @@ export default function LoginPage() {
 
       if (result?.ok) {
         console.log('[Login] Login erfolgreich, leite weiter...')
-        router.push('/employee/dashboard')
-        router.refresh()
-        // Navigation erfolgt, loading wird in finally zurückgesetzt
+        // Warte kurz, damit die Session gesetzt wird
+        await new Promise(resolve => setTimeout(resolve, 100))
+        window.location.href = '/employee/dashboard'
       } else {
         console.log('[Login] Login fehlgeschlagen, kein ok-Status')
         setError('Login fehlgeschlagen. Bitte versuchen Sie es erneut.')
