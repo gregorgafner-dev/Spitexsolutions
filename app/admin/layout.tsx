@@ -1,19 +1,21 @@
-import { AdminSidebar } from '@/components/admin/admin-sidebar'
-import { getSession } from '@/lib/get-session'
-import { redirect } from 'next/navigation'
+'use client'
 
-export default async function AdminLayout({
+import { usePathname } from 'next/navigation'
+import { AdminSidebar } from '@/components/admin/admin-sidebar'
+
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const session = await getSession()
+  const pathname = usePathname()
   
-  // Wenn keine Session oder nicht Admin: zur Login-Seite weiterleiten
-  if (!session || session.user.role !== 'ADMIN') {
-    redirect('/admin/login')
+  // Für Login-Seite: kein Layout, kein Redirect - einfach die Seite rendern
+  if (pathname === '/admin/login') {
+    return <>{children}</>
   }
 
+  // Für alle anderen Admin-Seiten: Layout mit Sidebar
   return (
     <div className="flex h-screen bg-gray-50">
       <AdminSidebar />
