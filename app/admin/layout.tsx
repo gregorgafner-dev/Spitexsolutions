@@ -9,6 +9,7 @@ export default async function AdminLayout({
 }) {
   const session = await getSession()
   
+  // Wenn keine Session oder nicht Admin: zur Login-Seite weiterleiten
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/admin/login')
   }
