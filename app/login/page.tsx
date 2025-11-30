@@ -20,16 +20,20 @@ export default function LoginPage() {
 
   // Stelle sicher, dass loading beim Mount zurückgesetzt wird
   useEffect(() => {
+    console.log('[Login] Komponente wurde geladen (Mounted)')
     setLoading(false)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[Login] handleSubmit aufgerufen')
     setError('')
     setLoading(true)
 
     try {
       console.log('[Login] Starte Login-Versuch für:', email)
+      console.log('[Login] Email vorhanden:', !!email)
+      console.log('[Login] Password vorhanden:', !!password)
       
       // Timeout nach 10 Sekunden
       const timeoutPromise = new Promise((_, reject) => {
@@ -125,7 +129,12 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={loading}
+              onClick={() => console.log('[Login] Button geklickt')}
+            >
               {loading ? 'Anmelden...' : 'Anmelden'}
             </Button>
           </form>
