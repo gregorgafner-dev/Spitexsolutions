@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'
+import { useEffect, useState } from 'react'
 
 export default function AdminLayout({
   children,
@@ -9,9 +10,14 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
   
-  // Für Login-Seite: kein Layout, kein Redirect - einfach die Seite rendern
-  if (pathname === '/admin/login') {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  // Während des ersten Renders oder auf Login-Seite: kein Layout
+  if (!mounted || pathname === '/admin/login') {
     return <>{children}</>
   }
 
