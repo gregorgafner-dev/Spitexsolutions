@@ -68,7 +68,7 @@ export default function DebugPage() {
         <h2>Anweisungen:</h2>
         <ol>
           <li>Öffnen Sie die Browser-Konsole (F12)</li>
-          <li>Klicken Sie auf "Test Login"</li>
+          <li>Klicken Sie auf &quot;Test Login&quot;</li>
           <li>Prüfen Sie die Console-Logs</li>
           <li>Prüfen Sie das Result oben</li>
         </ol>
@@ -76,4 +76,8 @@ export default function DebugPage() {
     </div>
   )
 }
+
+
+
+
 
