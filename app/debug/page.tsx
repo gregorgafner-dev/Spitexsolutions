@@ -6,6 +6,20 @@ import { signIn } from 'next-auth/react'
 export default function DebugPage() {
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [apiTest, setApiTest] = useState<any>(null)
+
+  const testApiRoute = async () => {
+    setApiTest(null)
+    try {
+      const response = await fetch('/api/auth/providers')
+      const data = await response.json()
+      setApiTest({ status: response.status, data })
+      console.log('[DEBUG] API Test Result:', { status: response.status, data })
+    } catch (error) {
+      console.error('[DEBUG] API Test Error:', error)
+      setApiTest({ error: error instanceof Error ? error.message : 'Unknown error' })
+    }
+  }
 
   const testLogin = async () => {
     setLoading(true)
@@ -33,22 +47,54 @@ export default function DebugPage() {
   return (
     <div style={{ padding: '40px', fontFamily: 'monospace' }}>
       <h1>Debug Page</h1>
-      <button 
-        onClick={testLogin}
-        disabled={loading}
-        style={{
-          padding: '10px 20px',
-          fontSize: '16px',
-          backgroundColor: '#0070f3',
-          color: 'white',
-          border: 'none',
+      
+      <div style={{ marginBottom: '20px' }}>
+        <button 
+          onClick={testApiRoute}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            backgroundColor: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            marginRight: '10px'
+          }}
+        >
+          Test API Route
+        </button>
+        
+        <button 
+          onClick={testLogin}
+          disabled={loading}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            backgroundColor: '#0070f3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {loading ? 'Testing...' : 'Test Login'}
+        </button>
+      </div>
+      
+      {apiTest && (
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#e7f3ff',
           borderRadius: '4px',
-          cursor: loading ? 'not-allowed' : 'pointer',
           marginBottom: '20px'
-        }}
-      >
-        {loading ? 'Testing...' : 'Test Login'}
-      </button>
+        }}>
+          <h2>API Route Test:</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(apiTest, null, 2)}
+          </pre>
+        </div>
+      )}
       
       {result && (
         <div style={{

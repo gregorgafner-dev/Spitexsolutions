@@ -40,15 +40,19 @@ export default function LoginPage() {
         setTimeout(() => reject(new Error('Login-Timeout: Die Anfrage hat zu lange gedauert')), 10000)
       })
 
+      console.log('[Login] Rufe signIn auf...')
+      
       const signInPromise = signIn('credentials', {
         email,
         password,
         redirect: false,
+        callbackUrl: '/employee/dashboard',
       })
 
       const result = await Promise.race([signInPromise, timeoutPromise]) as any
 
       console.log('[Login] Ergebnis:', result)
+      console.log('[Login] Ergebnis-Details:', JSON.stringify(result, null, 2))
 
       if (result?.error) {
         console.error('Login-Fehler:', result.error)
