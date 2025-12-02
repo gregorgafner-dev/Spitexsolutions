@@ -114,8 +114,8 @@ export function AdminSidebar() {
           <div className="flex-shrink-0 flex border-t border-slate-700 p-4">
             <div className="flex-shrink-0 w-full">
               <SignOutButton 
-                className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-700" 
-                variant="ghost"
+                className="w-full justify-start text-white bg-red-600 hover:bg-red-700 hover:text-white border-0" 
+                variant="default"
                 showIcon={true}
               />
             </div>
