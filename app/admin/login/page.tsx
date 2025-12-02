@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,9 +55,20 @@ export default function AdminLoginPage() {
 
       if (result?.ok) {
         console.log('[Admin Login] Login erfolgreich, leite weiter...')
-        // Warte kurz, damit die Session gesetzt wird
-        await new Promise(resolve => setTimeout(resolve, 100))
-        window.location.href = '/admin/dashboard'
+        // Warte kurz und aktualisiere die Session
+        await new Promise(resolve => setTimeout(resolve, 300))
+        const session = await getSession()
+        console.log('[Admin Login] Session nach Login:', session)
+        
+        if (session) {
+          // Verwende router.push für client-side navigation
+          router.push('/admin/dashboard')
+          router.refresh() // Aktualisiere die Route
+        } else {
+          // Fallback: Falls Session nicht gesetzt, verwende window.location
+          console.warn('[Admin Login] Session nicht gesetzt, verwende window.location')
+          window.location.href = '/admin/dashboard'
+        }
       } else {
         console.log('[Admin Login] Login fehlgeschlagen, kein ok-Status')
         setError('Login fehlgeschlagen. Bitte versuchen Sie es erneut.')

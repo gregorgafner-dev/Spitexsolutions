@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,9 +62,20 @@ export default function LoginPage() {
 
       if (result?.ok) {
         console.log('[Login] Login erfolgreich, leite weiter...')
-        // Warte kurz, damit die Session gesetzt wird
-        await new Promise(resolve => setTimeout(resolve, 100))
-        window.location.href = '/employee/dashboard'
+        // Warte kurz und aktualisiere die Session
+        await new Promise(resolve => setTimeout(resolve, 300))
+        const session = await getSession()
+        console.log('[Login] Session nach Login:', session)
+        
+        if (session) {
+          // Verwende router.push für client-side navigation
+          router.push('/employee/dashboard')
+          router.refresh() // Aktualisiere die Route
+        } else {
+          // Fallback: Falls Session nicht gesetzt, verwende window.location
+          console.warn('[Login] Session nicht gesetzt, verwende window.location')
+          window.location.href = '/employee/dashboard'
+        }
       } else {
         console.log('[Login] Login fehlgeschlagen, kein ok-Status')
         setError('Login fehlgeschlagen. Bitte versuchen Sie es erneut.')
