@@ -19,16 +19,65 @@ export async function GET(request: NextRequest) {
     const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
     const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
 
+    // Definiere die gewünschte Reihenfolge der Mitarbeiter (nach Vorname)
+    // Die Sortierung funktioniert auch mit Teilnamen (z.B. "Anna" passt zu "Anna Joelle")
+    const employeeOrder = [
+      'Samantha',
+      'Adelina',
+      'Almina',
+      'Katja',
+      'Barbara',
+      'Anna', // Passt zu "Anna Joelle"
+      'Yvonne',
+      'Sebastian',
+      'Gyler',
+      'Mareen',
+      'Brigitte',
+    ]
+
     // Hole alle Mitarbeiter
-    const employees = await prisma.employee.findMany({
+    const employeesData = await prisma.employee.findMany({
       include: {
         user: true,
       },
-      orderBy: {
-        user: {
-          lastName: 'asc',
-        },
-      },
+    })
+
+    // Sortiere Mitarbeiter nach der definierten Reihenfolge
+    const employees = employeesData.sort((a, b) => {
+      const firstNameA = a.user.firstName
+      const firstNameB = b.user.firstName
+      
+      // Finde Index basierend auf exaktem Match oder Teilstring
+      const findIndex = (name: string) => {
+        // Exakter Match
+        const exactIndex = employeeOrder.indexOf(name)
+        if (exactIndex !== -1) return exactIndex
+        
+        // Teilstring-Match (z.B. "Anna" passt zu "Anna Joelle")
+        for (let i = 0; i < employeeOrder.length; i++) {
+          if (name.startsWith(employeeOrder[i]) || employeeOrder[i].startsWith(name)) {
+            return i
+          }
+        }
+        return -1
+      }
+      
+      const indexA = findIndex(firstNameA)
+      const indexB = findIndex(firstNameB)
+      
+      // Wenn beide in der Liste sind, sortiere nach Index
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB
+      }
+      
+      // Wenn nur A in der Liste ist, kommt A zuerst
+      if (indexA !== -1) return -1
+      
+      // Wenn nur B in der Liste ist, kommt B zuerst
+      if (indexB !== -1) return 1
+      
+      // Wenn keiner in der Liste ist, sortiere alphabetisch nach Nachname
+      return a.user.lastName.localeCompare(b.user.lastName)
     })
 
     // Hole alle Services
