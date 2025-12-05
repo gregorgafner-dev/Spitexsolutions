@@ -254,9 +254,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const startHour = startTime.getHours()
         const startDate = new Date(startTime)
         const entryDate = new Date(e.date)
+        entryDate.setHours(0, 0, 0, 0)
         // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        const isTimeOnNextDay = startDate.getDate() > entryDate.getDate() || 
-                                (startDate.getDate() === entryDate.getDate() && startHour < 8)
+        // startDate ist die tatsächliche Zeit (z.B. 3.12. 06:01), entryDate ist das Buchungsdatum (z.B. 2.12.)
+        const isTimeOnNextDay = startDate.getTime() > entryDate.getTime() && startHour < 8
         // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
         return startHour < 8 && isTimeOnNextDay
       })
@@ -301,9 +302,11 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const startTimeStr = format(startTime, 'HH:mm')
         const startDate = new Date(startTime)
         const entryDate = new Date(e.date)
+        entryDate.setHours(0, 0, 0, 0)
         // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        const isTimeOnNextDay = startDate.getDate() > entryDate.getDate() || 
-                                (startDate.getDate() === entryDate.getDate() && startTimeStr === '00:00')
+        // startDate ist die tatsächliche Zeit (z.B. 3.12. 00:00), entryDate ist das Buchungsdatum (z.B. 2.12.)
+        const isTimeOnNextDay = startDate.getTime() > entryDate.getTime() || 
+                                (startTimeStr === '00:00' && startDate.getDate() !== entryDate.getDate())
         return startTimeStr === '00:00' && isTimeOnNextDay
       })
       
@@ -1100,7 +1103,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                           </div>
                           {/* Zeige Schlafenszeit und Unterbrechungen nur wenn Nachtdienst-Einträge vorhanden */}
                           {(() => {
-                            const hasSleepEntries = dayEntries.some(e => e.entryType === 'SLEEP')
                             // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
                             // Für die Anzeige: Am aktuellen Tag zeigen wir die Unterbrechungen vom Folgetag (wo sie gebucht sind)
                             // Am Folgetag zeigen wir die Unterbrechungen, die dort gebucht sind
@@ -1111,7 +1113,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                             const interruptionEntry = interruptionEntryNext || interruptionEntryCurrent
                             const interruptionHours = (interruptionEntry?.sleepInterruptionMinutes || 0) / 60
                             const sleepHours = getSleepHoursForDate(day)
-                            if (hasSleepEntries || interruptionHours > 0) {
+                            // WICHTIG: Verwende sleepHours statt hasSleepEntries, da getSleepHoursForDate bereits prüft,
+                            // ob SLEEP-Einträge vorhanden sind (auch bei Ein-Tag-Buchung)
+                            if (sleepHours > 0 || interruptionHours > 0) {
                               // Konvertiere Stunden in Stunden:Minuten Format für bessere Lesbarkeit
                               const sleepMinutes = Math.round(sleepHours * 60)
                               const sleepHoursDisplay = Math.floor(sleepMinutes / 60)
