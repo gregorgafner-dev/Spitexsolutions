@@ -902,7 +902,13 @@ export default function TimeTrackingPage() {
   }
 
   const getSurchargeHoursForDate = (date: Date) => {
-    const dayEntries = getEntriesForDate(date).filter(e => e.endTime !== null)
+    // WICHTIG: Nur WORK, SICK und TRAINING Einträge haben Surcharge
+    // SLEEP und SLEEP_INTERRUPTION haben keine Surcharge
+    const dayEntries = getEntriesForDate(date).filter(e => 
+      e.endTime !== null && 
+      e.entryType !== 'SLEEP' && 
+      e.entryType !== 'SLEEP_INTERRUPTION'
+    )
     return dayEntries.reduce((total, entry) => {
       return total + (entry.surchargeHours || 0)
     }, 0)
