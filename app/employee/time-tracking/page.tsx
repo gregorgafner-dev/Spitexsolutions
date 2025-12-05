@@ -663,9 +663,10 @@ export default function TimeTrackingPage() {
         const startHour = startTime.getHours()
         const startDate = new Date(startTime)
         const entryDate = new Date(e.date)
+        entryDate.setHours(0, 0, 0, 0)
         // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        const isTimeOnNextDay = startDate.getDate() > entryDate.getDate() || 
-                                (startDate.getDate() === entryDate.getDate() && startHour < 8)
+        // startDate ist die tatsächliche Zeit (z.B. 3.12. 06:01), entryDate ist das Buchungsdatum (z.B. 2.12.)
+        const isTimeOnNextDay = startDate.getTime() > entryDate.getTime() && startHour < 8
         // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
         return startHour < 8 && isTimeOnNextDay
       })
@@ -710,9 +711,11 @@ export default function TimeTrackingPage() {
         const startTimeStr = format(startTime, 'HH:mm')
         const startDate = new Date(startTime)
         const entryDate = new Date(e.date)
+        entryDate.setHours(0, 0, 0, 0)
         // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        const isTimeOnNextDay = startDate.getDate() > entryDate.getDate() || 
-                                (startDate.getDate() === entryDate.getDate() && startTimeStr === '00:00')
+        // startDate ist die tatsächliche Zeit (z.B. 3.12. 00:00), entryDate ist das Buchungsdatum (z.B. 2.12.)
+        const isTimeOnNextDay = startDate.getTime() > entryDate.getTime() || 
+                                (startTimeStr === '00:00' && startDate.getDate() !== entryDate.getDate())
         return startTimeStr === '00:00' && isTimeOnNextDay
       })
       
@@ -737,8 +740,9 @@ export default function TimeTrackingPage() {
         const startTime = parseISO(e.startTime)
         const startDate = new Date(startTime)
         const entryDate = new Date(e.date)
+        entryDate.setHours(0, 0, 0, 0)
         // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        return startDate.getDate() > entryDate.getDate()
+        return startDate.getTime() > entryDate.getTime()
       })
       const interruptionEntry = interruptionEntryNextDay || interruptionEntryCurrentDay
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
@@ -2530,7 +2534,6 @@ export default function TimeTrackingPage() {
                             )}
                           {/* Zeige Schlafenszeit und Unterbrechungen nur wenn Nachtdienst-Einträge vorhanden */}
                           {(() => {
-                            const hasSleepEntries = dayEntries.some(e => e.entryType === 'SLEEP')
                             // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
                             // Für die Anzeige: Am aktuellen Tag zeigen wir die Unterbrechungen vom Folgetag (wo sie gebucht sind)
                             // Am Folgetag zeigen wir die Unterbrechungen, die dort gebucht sind
@@ -2541,7 +2544,9 @@ export default function TimeTrackingPage() {
                             const interruptionEntry = interruptionEntryNext || interruptionEntryCurrent
                             const interruptionHours = (interruptionEntry?.sleepInterruptionMinutes || 0) / 60
                             const sleepHours = getSleepHoursForDate(day)
-                            if (hasSleepEntries || interruptionHours > 0) {
+                            // WICHTIG: Verwende sleepHours statt hasSleepEntries, da getSleepHoursForDate bereits prüft,
+                            // ob SLEEP-Einträge vorhanden sind (auch bei Ein-Tag-Buchung)
+                            if (sleepHours > 0 || interruptionHours > 0) {
                               // Konvertiere Stunden in Stunden:Minuten Format für bessere Lesbarkeit
                               const sleepMinutes = Math.round(sleepHours * 60)
                               const sleepHoursDisplay = Math.floor(sleepMinutes / 60)
@@ -3195,7 +3200,6 @@ export default function TimeTrackingPage() {
                 {(() => {
                   // Prüfe ob Nachtdienst-Einträge vorhanden sind (auch wenn Checkbox nicht aktiviert ist)
                   const dayEntries = getEntriesForDate(selectedDate)
-                  const hasSleepEntries = dayEntries.some(e => e.entryType === 'SLEEP')
                   const hasNightShiftWork = dayEntries.some(e => 
                     e.entryType !== 'SLEEP' && 
                     e.entryType !== 'SLEEP_INTERRUPTION' &&
@@ -3207,12 +3211,13 @@ export default function TimeTrackingPage() {
                     const endTime = format(parseISO(e.endTime), 'HH:mm')
                     return (startTime === '19:00' && endTime === '23:00') || startTime === '06:01'
                   })
-                  const showTimeOverview = isNightShift || hasSleepEntries || hasNightShiftPattern
-                  
-                  if (!showTimeOverview) return null
-                  
                   const sleepHours = getSleepHoursForDate(selectedDate)
                   const interruptionHours = getSleepInterruptionHoursForDate(selectedDate)
+                  // WICHTIG: Verwende sleepHours statt hasSleepEntries, da getSleepHoursForDate bereits prüft,
+                  // ob SLEEP-Einträge vorhanden sind (auch bei Ein-Tag-Buchung)
+                  const showTimeOverview = isNightShift || sleepHours > 0 || interruptionHours > 0 || hasNightShiftPattern
+                  
+                  if (!showTimeOverview) return null
                   
                   return (
                     <Card className="mt-4">
@@ -3226,7 +3231,7 @@ export default function TimeTrackingPage() {
                             {getTotalHoursForDate(selectedDate).toFixed(2)}h
                           </span>
                         </div>
-                        {hasSleepEntries && (
+                        {sleepHours > 0 && (
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">Schlafenszeit:</span>
                             <span className="font-medium text-purple-600">
