@@ -280,21 +280,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Prüfe ob das Datum noch bearbeitbar ist (nur für Mitarbeiter, nicht für Admins)
     const entryDate = new Date(entry.date)
-    if (!isDateEditableForEmployee(entryDate, false)) {
-      return NextResponse.json(
-        { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
-        { status: 403 }
-      )
-    }
-
     const startTimeDate = new Date(entry.startTime)
     const startHour = startTimeDate.getHours()
     const startMinute = startTimeDate.getMinutes()
     const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`
     
-    // Prüfe ob es ein Nachtdienst-Eintrag ist
+    // Prüfe ob es ein Nachtdienst-Eintrag ist (MUSS VOR der Editierbarkeitsprüfung gemacht werden!)
     // Zweiter Block: Startzeit muss 06:01 sein (Sekunden werden ignoriert)
     const isNightShiftSecondBlock = startHour === 6 && startMinute === 1 // 06:01
     
@@ -305,6 +297,32 @@ export async function DELETE(
       const endHour = endTimeDate.getHours()
       const endMinute = endTimeDate.getMinutes()
       isNightShiftFirstBlock = endHour === 23 && endMinute === 0 // 19:00-23:00
+    }
+
+    // WICHTIG: Editierbarkeitsprüfung muss NACH der Nachtdienst-Erkennung gemacht werden!
+    // Bei Nachtdienst: Die Prüfung gilt für den Tag, an dem der Nachtdienst BEGANN
+    // - Erster Block (19:00-23:00): entryDate ist der Tag, an dem der Nachtdienst begann
+    // - Zweiter Block (06:01): entryDate ist der Folgetag, aber der Nachtdienst begann am Vortag
+    let dateToCheck = entryDate
+    if (isNightShiftSecondBlock) {
+      // Zweiter Block: Prüfe den Vortag (wo der Nachtdienst begann)
+      dateToCheck = new Date(entryDate)
+      dateToCheck.setDate(dateToCheck.getDate() - 1)
+    }
+    
+    // Prüfe ob das Datum noch bearbeitbar ist (nur für Mitarbeiter, nicht für Admins)
+    if (!isDateEditableForEmployee(dateToCheck, false)) {
+      if (isNightShiftSecondBlock) {
+        return NextResponse.json(
+          { error: 'Der zugehörige Nachtdienst-Eintrag am Vortag kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
+          { status: 403 }
+        )
+      } else {
+        return NextResponse.json(
+          { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
+          { status: 403 }
+        )
+      }
     }
 
     // Bei Nachtdienst: Prüfe auch den zugehörigen Block
@@ -409,16 +427,10 @@ export async function DELETE(
         }
       }
     } else if (isNightShiftSecondBlock) {
-      // Zweiter Block (06:01): Der Vortag (wo der Nachtdienst begann) muss editierbar sein
+      // Zweiter Block (06:01): Der Vortag (wo der Nachtdienst begann) wurde bereits oben geprüft
       // Der zweite Block gehört zum Nachtdienst, der am Vortag begann
       const previousDay = new Date(entryDate)
       previousDay.setDate(previousDay.getDate() - 1)
-      if (!isDateEditableForEmployee(previousDay, false)) {
-        return NextResponse.json(
-          { error: 'Der zugehörige Nachtdienst-Eintrag am Vortag kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
-          { status: 403 }
-        )
-      }
       
       // Finde und lösche den zugehörigen ersten Block (19:00-23:00) am Vortag sowie alle SLEEP-Einträge
       const previousDayStart = new Date(previousDay)
