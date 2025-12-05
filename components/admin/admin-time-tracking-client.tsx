@@ -503,6 +503,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   const deleteTimeEntry = async (entryId: string) => {
     // Finde den Block, der gelöscht werden soll
     const blockToDelete = workBlocks.find(b => b.id === entryId)
+    const entryToDelete = entries.find(e => e.id === entryId)
     const isNightShiftBlock = blockToDelete && (
       (blockToDelete.startTime === '19:00' && blockToDelete.endTime === '23:00') ||
       (blockToDelete.startTime === '06:01')
@@ -517,32 +518,58 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     }
 
     try {
+      // OPTIMISTIC UPDATE: Entferne den Eintrag sofort aus dem State
+      // Finde alle zugehörigen Einträge (z.B. SLEEP, SLEEP_INTERRUPTION bei Nachtdienst)
+      const entryDate = entryToDelete ? new Date(entryToDelete.date) : selectedDate
+      const previousDay = new Date(entryDate)
+      previousDay.setDate(previousDay.getDate() - 1)
+      const nextDay = new Date(entryDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      
+      // Entferne den gelöschten Eintrag und alle zugehörigen Einträge sofort aus dem State
+      setEntries(prevEntries => {
+        return prevEntries.filter(e => {
+          const eDate = new Date(e.date)
+          // Entferne den gelöschten Eintrag
+          if (e.id === entryId) return false
+          // Bei Nachtdienst: Entferne auch zugehörige SLEEP und SLEEP_INTERRUPTION Einträge
+          if (isNightShiftBlock && entryToDelete) {
+            // Entferne SLEEP und SLEEP_INTERRUPTION Einträge am gleichen Tag, Vortag und Folgetag
+            if ((isSameDay(eDate, entryDate) || isSameDay(eDate, previousDay) || isSameDay(eDate, nextDay)) &&
+                (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION')) {
+              return false
+            }
+          }
+          return true
+        })
+      })
+
       const response = await fetch(`/api/admin/time-entries/${entryId}`, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
+        // Bei Fehler: Lade Daten neu, um State zu korrigieren
+        await loadEntriesForMonth()
         const errorData = await response.json()
         setError(errorData.error || 'Fehler beim Löschen des Eintrags')
         return
       }
 
-      // WICHTIG: Lade Einträge neu - zuerst loadEntriesForDate, dann loadEntriesForMonth
-      // Damit werden auch SLEEP-Einträge korrekt aus dem State entfernt
-      // Lade auch den Vortag und Folgetag, falls es ein Nachtdienst war
-      const previousDay = new Date(selectedDate)
-      previousDay.setDate(previousDay.getDate() - 1)
-      const nextDay = new Date(selectedDate)
-      nextDay.setDate(nextDay.getDate() + 1)
+      // WICHTIG: Lade ALLE betroffenen Tage neu, um sicherzustellen, dass die Kalenderansicht aktualisiert wird
+      // 1. Lade den gesamten Monat neu (für Kalenderansicht)
+      await loadEntriesForMonth()
       
-      // Lade Einträge für aktuellen Tag, Vortag und Folgetag neu
-      await loadEntriesForDate(selectedDate)
+      // 2. Lade betroffene Tage neu (für Detailansicht)
+      await loadEntriesForDate(entryDate)
       await loadEntriesForDate(previousDay)
       await loadEntriesForDate(nextDay)
-      await loadEntriesForMonth()
+      
       setError('')
     } catch (error) {
       console.error('Fehler beim Löschen:', error)
+      // Bei Fehler: Lade Daten neu, um State zu korrigieren
+      await loadEntriesForMonth()
       setError('Ein Fehler ist aufgetreten')
     }
   }
