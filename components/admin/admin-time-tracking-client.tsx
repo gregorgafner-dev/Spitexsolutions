@@ -227,6 +227,20 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     if (hasNightShiftOnThisDay) {
       // Nachtdienst beginnt am aktuellen Tag
+      // WICHTIG: Prüfe, ob der zweite Block (06:01) am Folgetag noch existiert
+      const nextDay = addDays(date, 1)
+      const nextDayEntries = getEntriesForDate(nextDay)
+      const hasSecondBlock = nextDayEntries.some(e => {
+        if (e.entryType !== 'WORK' || !e.endTime) return false
+        const startTime = format(parseISO(e.startTime), 'HH:mm')
+        return startTime === '06:01'
+      })
+      
+      // Wenn der zweite Block nicht mehr existiert, sollten auch keine Schlafzeiten angezeigt werden
+      if (!hasSecondBlock) {
+        return 0
+      }
+      
       // Zähle SLEEP 23:01-23:59 am aktuellen Tag
       const sleepEntriesCurrentDay = dayEntries.filter(e => {
         if (e.entryType !== 'SLEEP' || !e.endTime) return false
@@ -245,8 +259,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       }
       
       // Zähle SLEEP 00:00-06:00 am Folgetag (gehört zu diesem Nachtdienst)
-      const nextDay = addDays(date, 1)
-      const nextDayEntries = getEntriesForDate(nextDay)
       const sleepEntriesNextDay = nextDayEntries.filter(e => {
         if (e.entryType !== 'SLEEP' || !e.endTime) return false
         const startTime = format(parseISO(e.startTime), 'HH:mm')
@@ -283,6 +295,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       
       if (hasNightShiftOnPreviousDay) {
         // Nachtdienst begann am Vortag
+        // WICHTIG: Prüfe, ob der zweite Block (06:01) am aktuellen Tag noch existiert
+        const hasSecondBlock = dayEntries.some(e => {
+          if (e.entryType !== 'WORK' || !e.endTime) return false
+          const startTime = format(parseISO(e.startTime), 'HH:mm')
+          return startTime === '06:01'
+        })
+        
+        // Wenn der zweite Block nicht mehr existiert, sollten auch keine Schlafzeiten angezeigt werden
+        if (!hasSecondBlock) {
+          return 0
+        }
+        
         // Zähle nur SLEEP 00:00-06:00 am aktuellen Tag (gehört zum Nachtdienst vom Vortag)
         const sleepEntriesCurrentDay = dayEntries.filter(e => {
           if (e.entryType !== 'SLEEP' || !e.endTime) return false
@@ -306,9 +330,29 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const interruptionHours = interruptionMinutes / 60
         totalSleepHours = Math.max(0, totalSleepHours - interruptionHours)
       } else {
-        // Kein Nachtdienst - zähle alle SLEEP-Einträge am aktuellen Tag (falls vorhanden)
-        const sleepEntries = dayEntries.filter(e => e.entryType === 'SLEEP' && e.endTime !== null)
-        for (const entry of sleepEntries) {
+        // Kein Nachtdienst am aktuellen Tag und kein Nachtdienst am Vortag
+        // WICHTIG: Wenn keine Nachtdienst-Blöcke existieren, sollten auch keine Schlafzeiten angezeigt werden
+        // Prüfe, ob es noch einen 06:01-Block am aktuellen Tag gibt (vom Vortag-Nachtdienst)
+        const hasSecondBlockFromPreviousDay = dayEntries.some(e => {
+          if (e.entryType !== 'WORK' || !e.endTime) return false
+          const startTime = format(parseISO(e.startTime), 'HH:mm')
+          return startTime === '06:01'
+        })
+        
+        if (!hasSecondBlockFromPreviousDay) {
+          // Kein Nachtdienst-Block existiert mehr - keine Schlafzeiten anzeigen
+          return 0
+        }
+        
+        // Es gibt noch einen 06:01-Block (vom Vortag-Nachtdienst)
+        // Zähle nur SLEEP 00:00-06:00 am aktuellen Tag (gehört zum Nachtdienst vom Vortag)
+        const sleepEntriesCurrentDay = dayEntries.filter(e => {
+          if (e.entryType !== 'SLEEP' || !e.endTime) return false
+          const startTime = format(parseISO(e.startTime), 'HH:mm')
+          return startTime === '00:00'
+        })
+        
+        for (const entry of sleepEntriesCurrentDay) {
           if (entry.endTime) {
             const start = parseISO(entry.startTime)
             const end = parseISO(entry.endTime)
@@ -317,6 +361,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             totalSleepHours += diffMinutes / 60
           }
         }
+        
+        // Subtrahiere Unterbrechungen vom aktuellen Tag (wo sie gebucht sind)
+        const interruptionEntry = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+        const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
+        const interruptionHours = interruptionMinutes / 60
+        totalSleepHours = Math.max(0, totalSleepHours - interruptionHours)
       }
     }
     
