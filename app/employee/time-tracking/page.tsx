@@ -625,24 +625,31 @@ export default function TimeTrackingPage() {
     
     let totalSleepHours = 0
     
-    // 1. Prüfe, ob es einen Nachtdienst-Block (19:00-23:00) am aktuellen Tag gibt
+    // 1. Prüfe, ob es einen Nachtdienst-Block am aktuellen Tag gibt
+    // Nachtdienst: Block beginnt nach 18:00 und endet nach 22:00 (flexibel für abweichende Zeiten)
     const dayEntries = getEntriesForDate(date)
     const hasNightShiftOnThisDay = dayEntries.some(e => {
       if (e.entryType !== 'WORK' || !e.endTime) return false
-      const startTime = format(parseISO(e.startTime), 'HH:mm')
-      const endTime = format(parseISO(e.endTime), 'HH:mm')
-      return startTime === '19:00' && endTime === '23:00'
+      const startTime = parseISO(e.startTime)
+      const endTime = parseISO(e.endTime)
+      const startHour = startTime.getHours()
+      const endHour = endTime.getHours()
+      // Nachtdienst: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
+      return startHour >= 18 && (endHour >= 22 || endHour <= 1)
     })
     
     if (hasNightShiftOnThisDay) {
       // Nachtdienst beginnt am aktuellen Tag
-      // WICHTIG: Prüfe, ob der zweite Block (06:01) am Folgetag noch existiert
+      // WICHTIG: Prüfe, ob der zweite Block am Folgetag noch existiert
+      // Nachtdienst zweiter Block: Beginnt vor 08:00 (flexibel für abweichende Zeiten)
       const nextDay = addDays(date, 1)
       const nextDayEntries = getEntriesForDate(nextDay)
       const hasSecondBlock = nextDayEntries.some(e => {
         if (e.entryType !== 'WORK' || !e.endTime) return false
-        const startTime = format(parseISO(e.startTime), 'HH:mm')
-        return startTime === '06:01'
+        const startTime = parseISO(e.startTime)
+        const startHour = startTime.getHours()
+        // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
+        return startHour < 8
       })
       
       // Wenn der zweite Block nicht mehr existiert, sollten auch keine Schlafzeiten angezeigt werden
@@ -697,18 +704,24 @@ export default function TimeTrackingPage() {
       const previousDayEntries = getEntriesForDate(previousDay)
       const hasNightShiftOnPreviousDay = previousDayEntries.some(e => {
         if (e.entryType !== 'WORK' || !e.endTime) return false
-        const startTime = format(parseISO(e.startTime), 'HH:mm')
-        const endTime = format(parseISO(e.endTime), 'HH:mm')
-        return startTime === '19:00' && endTime === '23:00'
+        const startTime = parseISO(e.startTime)
+        const endTime = parseISO(e.endTime)
+        const startHour = startTime.getHours()
+        const endHour = endTime.getHours()
+        // Nachtdienst: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
+        return startHour >= 18 && (endHour >= 22 || endHour <= 1)
       })
       
       if (hasNightShiftOnPreviousDay) {
         // Nachtdienst begann am Vortag
-        // WICHTIG: Prüfe, ob der zweite Block (06:01) am aktuellen Tag noch existiert
+        // WICHTIG: Prüfe, ob der zweite Block am aktuellen Tag noch existiert
+        // Nachtdienst zweiter Block: Beginnt vor 08:00 (flexibel für abweichende Zeiten)
         const hasSecondBlock = dayEntries.some(e => {
           if (e.entryType !== 'WORK' || !e.endTime) return false
-          const startTime = format(parseISO(e.startTime), 'HH:mm')
-          return startTime === '06:01'
+          const startTime = parseISO(e.startTime)
+          const startHour = startTime.getHours()
+          // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
+          return startHour < 8
         })
         
         // Wenn der zweite Block nicht mehr existiert, sollten auch keine Schlafzeiten angezeigt werden
@@ -741,11 +754,14 @@ export default function TimeTrackingPage() {
       } else {
         // Kein Nachtdienst am aktuellen Tag und kein Nachtdienst am Vortag
         // WICHTIG: Wenn keine Nachtdienst-Blöcke existieren, sollten auch keine Schlafzeiten angezeigt werden
-        // Prüfe, ob es noch einen 06:01-Block am aktuellen Tag gibt (vom Vortag-Nachtdienst)
+        // Prüfe, ob es noch einen zweiten Block am aktuellen Tag gibt (vom Vortag-Nachtdienst)
+        // Nachtdienst zweiter Block: Beginnt vor 08:00 (flexibel für abweichende Zeiten)
         const hasSecondBlockFromPreviousDay = dayEntries.some(e => {
           if (e.entryType !== 'WORK' || !e.endTime) return false
-          const startTime = format(parseISO(e.startTime), 'HH:mm')
-          return startTime === '06:01'
+          const startTime = parseISO(e.startTime)
+          const startHour = startTime.getHours()
+          // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
+          return startHour < 8
         })
         
         if (!hasSecondBlockFromPreviousDay) {
@@ -753,7 +769,13 @@ export default function TimeTrackingPage() {
           return 0
         }
         
-        // Es gibt noch einen 06:01-Block (vom Vortag-Nachtdienst)
+        // WICHTIG: Prüfe auch, ob der erste Block am Vortag noch existiert
+        // Wenn nur der zweite Block existiert, aber kein erster Block, dann keine Schlafzeiten anzeigen
+        if (!hasNightShiftOnPreviousDay) {
+          return 0
+        }
+        
+        // Es gibt noch einen zweiten Block (vom Vortag-Nachtdienst)
         // Zähle nur SLEEP 00:00-06:00 am aktuellen Tag (gehört zum Nachtdienst vom Vortag)
         const sleepEntriesCurrentDay = dayEntries.filter(e => {
           if (e.entryType !== 'SLEEP' || !e.endTime) return false
