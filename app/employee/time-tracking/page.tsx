@@ -1295,47 +1295,47 @@ export default function TimeTrackingPage() {
     
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd')
-    const nextDateStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd')
-    
-    // Verwende die gefilterten Blöcke für die Anzeige, aber alle Blöcke für das Speichern
-    // Wenn Nachtdienst nicht aktiviert ist, müssen wir trotzdem alle Blöcke speichern können
-    const blocksToSave = isNightShift 
-      ? workBlocks 
-      : workBlocks.filter(block => {
-          // Beim Speichern: Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke
-          const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                   (block.startTime === '06:01')
-          return !isNightShiftBlock
-        })
-    
-    console.log('handleSave called', { isNightShift, workBlocks, blocksToSave, sleepInterruptions })
-
-    // Bei Nachtdienst: Speichere Standard-Zeiten wenn keine Abweichungen
-    if (isNightShift) {
-      // Prüfe ob Abweichungen vorhanden sind
-      const hasDeviations = blocksToSave.some(block => {
-        // Erster Block: Startzeit kann abweichen (aber Endzeit ist immer 23:00)
-        if (block.startTime && block.startTime !== '19:00') return true
-        // Zweiter Block: Endzeit kann abweichen (aber Startzeit ist immer 06:01)
-        if (block.startTime === '06:01' && block.endTime && block.endTime !== '07:00') return true
-        return false
-      })
-
-      // Prüfe auch auf Unterbrechungen
-      const hasInterruptions = sleepInterruptions.hours > 0 || sleepInterruptions.minutes > 0
-
-      // Wenn keine Abweichungen und keine Unterbrechungen, speichere Standard-Zeiten
-      // WICHTIG: Prüfe auch, ob beide Blöcke vorhanden sind (kann sein, dass nur einer vorhanden ist)
-      // ABER: Auch wenn nur ein Block vorhanden ist, können wir den Standard-Nachtdienst speichern,
-      // da fehlende Blöcke später automatisch hinzugefügt werden
-      const hasBothBlocks = blocksToSave.length >= 2 || 
-        (blocksToSave.some(b => b.startTime === '19:00' || (b.startTime && b.startTime.startsWith('19:'))) &&
-         blocksToSave.some(b => b.startTime === '06:01' || (b.startTime && b.startTime.startsWith('06:01'))))
+      const nextDateStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd')
       
-      // WICHTIG: Speichere Standard-Nachtdienst auch wenn nur ein Block vorhanden ist,
-      // da fehlende Blöcke automatisch hinzugefügt werden (siehe Zeile 1524-1558)
-      // Dies verhindert, dass Nachtdienste nicht gespeichert werden, wenn nur ein Block erfasst wurde
-      if (!hasDeviations && !hasInterruptions) {
+      // Verwende die gefilterten Blöcke für die Anzeige, aber alle Blöcke für das Speichern
+      // Wenn Nachtdienst nicht aktiviert ist, müssen wir trotzdem alle Blöcke speichern können
+      const blocksToSave = isNightShift 
+        ? workBlocks 
+        : workBlocks.filter(block => {
+            // Beim Speichern: Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke
+            const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
+                                     (block.startTime === '06:01')
+            return !isNightShiftBlock
+          })
+      
+      console.log('handleSave called', { isNightShift, workBlocks, blocksToSave, sleepInterruptions })
+
+      // Bei Nachtdienst: Speichere Standard-Zeiten wenn keine Abweichungen
+      if (isNightShift) {
+        // Prüfe ob Abweichungen vorhanden sind
+        const hasDeviations = blocksToSave.some(block => {
+          // Erster Block: Startzeit kann abweichen (aber Endzeit ist immer 23:00)
+          if (block.startTime && block.startTime !== '19:00') return true
+          // Zweiter Block: Endzeit kann abweichen (aber Startzeit ist immer 06:01)
+          if (block.startTime === '06:01' && block.endTime && block.endTime !== '07:00') return true
+          return false
+        })
+
+        // Prüfe auch auf Unterbrechungen
+        const hasInterruptions = sleepInterruptions.hours > 0 || sleepInterruptions.minutes > 0
+
+        // Wenn keine Abweichungen und keine Unterbrechungen, speichere Standard-Zeiten
+        // WICHTIG: Prüfe auch, ob beide Blöcke vorhanden sind (kann sein, dass nur einer vorhanden ist)
+        // ABER: Auch wenn nur ein Block vorhanden ist, können wir den Standard-Nachtdienst speichern,
+        // da fehlende Blöcke später automatisch hinzugefügt werden
+        const hasBothBlocks = blocksToSave.length >= 2 || 
+          (blocksToSave.some(b => b.startTime === '19:00' || (b.startTime && b.startTime.startsWith('19:'))) &&
+           blocksToSave.some(b => b.startTime === '06:01' || (b.startTime && b.startTime.startsWith('06:01'))))
+        
+        // WICHTIG: Speichere Standard-Nachtdienst auch wenn nur ein Block vorhanden ist,
+        // da fehlende Blöcke automatisch hinzugefügt werden (siehe Zeile 1524-1558)
+        // Dies verhindert, dass Nachtdienste nicht gespeichert werden, wenn nur ein Block erfasst wurde
+        if (!hasDeviations && !hasInterruptions) {
         try {
           // Lösche alle bestehenden Einträge für diesen Tag und Folgetag
           const existingEntries = entries.filter(e => {
@@ -1534,8 +1534,7 @@ export default function TimeTrackingPage() {
       return
     }
 
-    try {
-      // WICHTIG: Bei Nachtdienst: Prüfe ZUERST, ob am aktuellen Tag oder Folgetag bereits ein Nachtdienst existiert
+    // WICHTIG: Bei Nachtdienst: Prüfe ZUERST, ob am aktuellen Tag oder Folgetag bereits ein Nachtdienst existiert
       // (vom Vortag), bevor wir Einträge löschen. Dies verhindert, dass Einträge
       // von aufeinanderfolgenden Nachtdiensten gelöscht werden.
       // Diese Variable wird später auch für die SLEEP-Einträge-Erstellung verwendet
