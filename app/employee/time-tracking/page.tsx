@@ -1066,11 +1066,16 @@ export default function TimeTrackingPage() {
 
       // Wenn keine Abweichungen und keine Unterbrechungen, speichere Standard-Zeiten
       // WICHTIG: Prüfe auch, ob beide Blöcke vorhanden sind (kann sein, dass nur einer vorhanden ist)
+      // ABER: Auch wenn nur ein Block vorhanden ist, können wir den Standard-Nachtdienst speichern,
+      // da fehlende Blöcke später automatisch hinzugefügt werden
       const hasBothBlocks = blocksToSave.length >= 2 || 
         (blocksToSave.some(b => b.startTime === '19:00' || (b.startTime && b.startTime.startsWith('19:'))) &&
          blocksToSave.some(b => b.startTime === '06:01' || (b.startTime && b.startTime.startsWith('06:01'))))
       
-      if (!hasDeviations && !hasInterruptions && hasBothBlocks) {
+      // WICHTIG: Speichere Standard-Nachtdienst auch wenn nur ein Block vorhanden ist,
+      // da fehlende Blöcke automatisch hinzugefügt werden (siehe Zeile 1524-1558)
+      // Dies verhindert, dass Nachtdienste nicht gespeichert werden, wenn nur ein Block erfasst wurde
+      if (!hasDeviations && !hasInterruptions) {
         try {
           // Lösche alle bestehenden Einträge für diesen Tag und Folgetag
           const existingEntries = entries.filter(e => {
