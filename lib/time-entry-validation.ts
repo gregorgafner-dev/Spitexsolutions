@@ -30,18 +30,36 @@ export async function checkOverlappingBlocks(
   endTime: Date | null,
   excludeEntryId?: string // ID des Eintrags, der aktualisiert wird (wird bei Prüfung ausgeschlossen)
 ): Promise<{ overlaps: boolean; overlappingEntry?: TimeEntry }> {
-  // Hole alle Einträge für diesen Tag
+  // WICHTIG: Bei Ein-Tag-Buchung für Nachtdienste müssen wir auch Einträge vom Vortag/Folgetag prüfen
+  // Hole alle Einträge für diesen Tag, Vortag und Folgetag
   const dayStart = new Date(date)
   dayStart.setHours(0, 0, 0, 0)
   const dayEnd = new Date(date)
   dayEnd.setHours(23, 59, 59, 999)
+  
+  const previousDay = new Date(date)
+  previousDay.setDate(previousDay.getDate() - 1)
+  const previousDayStart = new Date(previousDay)
+  previousDayStart.setHours(0, 0, 0, 0)
+  const previousDayEnd = new Date(previousDay)
+  previousDayEnd.setHours(23, 59, 59, 999)
+  
+  const nextDay = new Date(date)
+  nextDay.setDate(nextDay.getDate() + 1)
+  const nextDayStart = new Date(nextDay)
+  nextDayStart.setHours(0, 0, 0, 0)
+  const nextDayEnd = new Date(nextDay)
+  nextDayEnd.setHours(23, 59, 59, 999)
 
   const existingEntries = await prisma.timeEntry.findMany({
     where: {
       employeeId,
       date: {
-        gte: dayStart,
-        lte: dayEnd,
+        OR: [
+          { gte: dayStart, lte: dayEnd },
+          { gte: previousDayStart, lte: previousDayEnd },
+          { gte: nextDayStart, lte: nextDayEnd },
+        ],
       },
       // Nur WORK-Einträge prüfen (SLEEP und SLEEP_INTERRUPTION können überlappen)
       entryType: 'WORK',
@@ -51,107 +69,38 @@ export async function checkOverlappingBlocks(
   })
 
   // Prüfe Überlappung mit jedem bestehenden Eintrag
-  // WICHTIG: Bei Nachtdiensten: Blöcke 19:00-23:00 und 06:01-XX:XX am gleichen Tag
-  // gehören zu verschiedenen Nachtdiensten und sollten nicht als Überschneidung gewertet werden
-  const isNightShiftFirstBlock = startTime.getHours() === 19 && startTime.getMinutes() === 0 && 
-                                  endTime && endTime.getHours() === 23 && endTime.getMinutes() === 0
-  const isNightShiftSecondBlock = startTime.getHours() === 6 && startTime.getMinutes() === 1
+  // WICHTIG: Bei Ein-Tag-Buchung für Nachtdienste werden beide Blöcke auf das Startdatum gebucht
+  // Wir müssen die tatsächlichen Zeiten vergleichen, nicht nur das Datum
+  // Nachtdienst-Blöcke: Erster Block (18:00-24:00) und zweiter Block (00:00-08:00) überlappen nicht
+  const isNightShiftFirstBlock = startTime.getHours() >= 18 && endTime && 
+                                  (endTime.getHours() >= 22 || endTime.getHours() <= 1)
+  const isNightShiftSecondBlock = startTime.getHours() < 8
 
   for (const entry of existingEntries) {
     // Prüfe ob der bestehende Eintrag ein Nachtdienst-Block ist
-    const existingIsNightShiftFirstBlock = entry.startTime.getHours() === 19 && entry.startTime.getMinutes() === 0 &&
-                                           entry.endTime && entry.endTime.getHours() === 23 && entry.endTime.getMinutes() === 0
-    const existingIsNightShiftSecondBlock = entry.startTime.getHours() === 6 && entry.startTime.getMinutes() === 1
+    const existingIsNightShiftFirstBlock = entry.startTime.getHours() >= 18 && entry.endTime &&
+                                          (entry.endTime.getHours() >= 22 || entry.endTime.getHours() <= 1)
+    const existingIsNightShiftSecondBlock = entry.startTime.getHours() < 8
 
-    // Wenn der neue Block ein Nachtdienst-Block ist und der bestehende Eintrag auch ein Nachtdienst-Block ist,
-    // aber unterschiedliche Typen (erster vs. zweiter Block), dann keine Überschneidung prüfen
-    // Diese gehören zu verschiedenen Nachtdiensten
+    // Wenn beide Blöcke Nachtdienst-Blöcke sind, aber unterschiedliche Typen (erster vs. zweiter Block),
+    // dann gehören sie zum gleichen Nachtdienst - das ist erlaubt
     if ((isNightShiftFirstBlock && existingIsNightShiftSecondBlock) ||
         (isNightShiftSecondBlock && existingIsNightShiftFirstBlock)) {
-      continue // Überspringe diese Prüfung, da es verschiedene Nachtdienste sind
-    }
-
-    if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
-      return { overlaps: true, overlappingEntry: entry }
-    }
-  }
-
-  // Bei Nachtdienst: Prüfe auch Einträge vom Vortag/Folgetag
-  // Wenn Startzeit 06:01 ist, prüfe auch den Vortag
-  if (isNightShiftSecondBlock) {
-    const previousDay = new Date(date)
-    previousDay.setDate(previousDay.getDate() - 1)
-    const prevDayStart = new Date(previousDay)
-    prevDayStart.setHours(0, 0, 0, 0)
-    const prevDayEnd = new Date(previousDay)
-    prevDayEnd.setHours(23, 59, 59, 999)
-
-    const prevDayEntries = await prisma.timeEntry.findMany({
-      where: {
-        employeeId,
-        date: {
-          gte: prevDayStart,
-          lte: prevDayEnd,
-        },
-        entryType: 'WORK',
-        ...(excludeEntryId ? { id: { not: excludeEntryId } } : {}),
-      },
-    })
-
-    for (const entry of prevDayEntries) {
-      // Prüfe ob der bestehende Eintrag ein Nachtdienst-Block ist
-      const existingIsNightShiftFirstBlock = entry.startTime.getHours() === 19 && entry.startTime.getMinutes() === 0 &&
-                                             entry.endTime && entry.endTime.getHours() === 23 && entry.endTime.getMinutes() === 0
+      // Prüfe ob sie zum gleichen Nachtdienst gehören (gleicher Tag oder Vortag/Folgetag)
+      const entryDate = new Date(entry.date)
+      const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate())
+      const newDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      const dayDiff = Math.abs((entryDateOnly.getTime() - newDateOnly.getTime()) / (1000 * 60 * 60 * 24))
       
-      // Wenn der bestehende Eintrag der erste Block eines Nachtdienstes ist (19:00-23:00),
-      // dann gehört er zum gleichen Nachtdienst wie der aktuelle Block (06:01) - das ist erlaubt
-      if (existingIsNightShiftFirstBlock) {
+      // Wenn die Blöcke am gleichen Tag oder am Vortag/Folgetag sind, gehören sie zum gleichen Nachtdienst
+      if (dayDiff <= 1) {
         continue // Überspringe diese Prüfung, da es zum gleichen Nachtdienst gehört
       }
-
-      if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
-        return { overlaps: true, overlappingEntry: entry }
-      }
     }
-  }
 
-  // Wenn Startzeit 19:00 ist, prüfe auch den Folgetag
-  if (isNightShiftFirstBlock) {
-    const nextDay = new Date(date)
-    nextDay.setDate(nextDay.getDate() + 1)
-    const nextDayStart = new Date(nextDay)
-    nextDayStart.setHours(0, 0, 0, 0)
-    const nextDayEnd = new Date(nextDay)
-    nextDayEnd.setHours(23, 59, 59, 999)
-
-    const nextDayEntries = await prisma.timeEntry.findMany({
-      where: {
-        employeeId,
-        date: {
-          gte: nextDayStart,
-          lte: nextDayEnd,
-        },
-        entryType: 'WORK',
-        ...(excludeEntryId ? { id: { not: excludeEntryId } } : {}),
-      },
-    })
-
-    for (const entry of nextDayEntries) {
-      // Prüfe ob der bestehende Eintrag ein Nachtdienst-Block ist
-      const existingIsNightShiftSecondBlock = entry.startTime.getHours() === 6 && entry.startTime.getMinutes() === 1
-      
-      // Wenn der bestehende Eintrag der zweite Block eines Nachtdienstes ist (06:01),
-      // dann kann er entweder:
-      // 1. Zum gleichen Nachtdienst gehören wie der aktuelle Block (19:00-23:00) - das ist erlaubt
-      // 2. Zu einem Nachtdienst vom Vortag gehören - das ist auch erlaubt, da verschiedene Nachtdienste
-      // In beiden Fällen sollte keine Überschneidung gewertet werden
-      if (existingIsNightShiftSecondBlock) {
-        continue // Überspringe diese Prüfung, da es entweder zum gleichen Nachtdienst gehört oder zu einem anderen
-      }
-
-      if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
-        return { overlaps: true, overlappingEntry: entry }
-      }
+    // Prüfe Überlappung basierend auf tatsächlichen Zeiten (unabhängig vom Buchungsdatum)
+    if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
+      return { overlaps: true, overlappingEntry: entry }
     }
   }
 

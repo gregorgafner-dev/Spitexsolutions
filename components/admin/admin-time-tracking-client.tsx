@@ -634,14 +634,15 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           }),
         })
 
-        // Speichere Standard-Zeiten für Folgetag
+        // WICHTIG: Bei Ein-Tag-Buchung werden alle Blöcke auf das Startdatum gebucht
+        // Aber die Zeiten müssen korrekt sein (zweiter Block und SLEEP sind am nächsten Tag)
         await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             employeeId: selectedEmployeeId,
-            date: nextDateStr,
-            startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+            date: dateStr, // Auf Startdatum gebucht
+            startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Aber Zeit ist am nächsten Tag
             endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
             breakMinutes: 0,
             entryType: 'SLEEP',
@@ -653,8 +654,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             employeeId: selectedEmployeeId,
-            date: nextDateStr,
-            startTime: new Date(`${nextDateStr}T06:01:00`).toISOString(),
+            date: dateStr, // Auf Startdatum gebucht
+            startTime: new Date(`${nextDateStr}T06:01:00`).toISOString(), // Aber Zeit ist am nächsten Tag
             endTime: new Date(`${nextDateStr}T07:00:00`).toISOString(),
             breakMinutes: 0,
             entryType: 'WORK',
@@ -741,16 +742,24 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const effectiveStartTime = isNightShift && i === 1 ? '06:01' : block.startTime
         const effectiveEndTime = isNightShift && i === 0 ? '23:00' : (isNightShift && i === 1 && !block.endTime ? '07:00' : block.endTime)
         
-        // Für zweiten Block bei Nachtdienst: Datum ist der Folgetag
-        const blockDate = isNightShift && i === 1 ? nextDateStr : dateStr
+        // WICHTIG: Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
+        // Aber die Zeiten müssen korrekt sein (zweiter Block ist am nächsten Tag)
+        const blockDate = dateStr // Beide Blöcke auf Startdatum
         
         if (!effectiveEndTime) {
           setError('Bitte füllen Sie alle Endzeiten aus')
           return
         }
 
-        const startDateTime = new Date(`${blockDate}T${effectiveStartTime}:00`)
-        const endDateTime = new Date(`${blockDate}T${effectiveEndTime}:00`)
+        // Erstelle DateTime-Objekte
+        let startDateTime = new Date(`${dateStr}T${effectiveStartTime}:00`)
+        let endDateTime = new Date(`${dateStr}T${effectiveEndTime}:00`)
+        
+        // Bei Nachtdienst: Zweiter Block (06:01) ist am nächsten Tag
+        if (isNightShift && i === 1) {
+          startDateTime = new Date(`${nextDateStr}T${effectiveStartTime}:00`)
+          endDateTime = new Date(`${nextDateStr}T${effectiveEndTime}:00`)
+        }
 
         // Wenn Endzeit vor Startzeit, dann ist es am nächsten Tag
         if (endDateTime <= startDateTime) {
@@ -827,14 +836,15 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         })
 
         if (nextDaySleepEntries.length === 0) {
-          // Erstelle SLEEP-Eintrag für Folgetag (00:00-06:00)
+          // WICHTIG: Bei Ein-Tag-Buchung wird SLEEP-Eintrag auf Startdatum gebucht
+          // Aber die Zeit ist am nächsten Tag (00:00-06:00)
           await fetch('/api/admin/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               employeeId: selectedEmployeeId,
-              date: nextDateStr,
-              startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+              date: dateStr, // Auf Startdatum gebucht
+              startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Aber Zeit ist am nächsten Tag
               endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
               breakMinutes: 0,
               entryType: 'SLEEP',
@@ -843,13 +853,15 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
 
         // Speichere/aktualisiere Unterbrechungen während des Schlafens
-        // WICHTIG: Unterbrechungen werden immer auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
+        // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf Startdatum gebucht
+        // (Schlafenszeit ist 00:00-06:00 am nächsten Tag, aber Buchung auf Startdatum)
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
         if (totalInterruptionMinutes > 0) {
-          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag für den Folgetag existiert
+          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag existiert (auf Startdatum oder Folgetag)
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
-            return isSameDay(entryDate, addDays(selectedDate, 1)) && e.entryType === 'SLEEP_INTERRUPTION'
+            return (isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))) && 
+                   e.entryType === 'SLEEP_INTERRUPTION'
           })
 
           if (existingInterruption) {
@@ -862,14 +874,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               }),
             })
           } else {
-            // Erstelle neuen Eintrag für den Folgetag
+            // Erstelle neuen Eintrag auf Startdatum
             await fetch('/api/admin/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 employeeId: selectedEmployeeId,
-                date: nextDateStr,
-                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+                date: dateStr, // Auf Startdatum gebucht
+                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Zeit ist am nächsten Tag
                 endTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
                 breakMinutes: 0,
                 entryType: 'SLEEP_INTERRUPTION',
@@ -878,10 +890,11 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             })
           }
         } else {
-          // Lösche SLEEP_INTERRUPTION-Eintrag vom Folgetag falls vorhanden
+          // Lösche SLEEP_INTERRUPTION-Eintrag falls vorhanden (auf Startdatum oder Folgetag)
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
-            return isSameDay(entryDate, addDays(selectedDate, 1)) && e.entryType === 'SLEEP_INTERRUPTION'
+            return (isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))) && 
+                   e.entryType === 'SLEEP_INTERRUPTION'
           })
           if (existingInterruption) {
             await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {

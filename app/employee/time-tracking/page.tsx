@@ -1376,14 +1376,15 @@ export default function TimeTrackingPage() {
           // Warte kurz
           await new Promise(resolve => setTimeout(resolve, 200))
 
-          // Speichere SLEEP-Eintrag für Folgetag (00:00-06:00)
-          console.log('Erstelle zweiten SLEEP-Block:', { date: nextDateStr, startTime: '00:00', endTime: '06:00' })
+          // WICHTIG: Bei Ein-Tag-Buchung wird SLEEP-Eintrag auf Startdatum gebucht
+          // Aber die Zeit ist am nächsten Tag (00:00-06:00)
+          console.log('Erstelle zweiten SLEEP-Block:', { date: dateStr, startTime: '00:00', endTime: '06:00' })
           const sleepBlock2Response = await fetch('/api/employee/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              date: nextDateStr,
-              startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+              date: dateStr, // Auf Startdatum gebucht
+              startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Aber Zeit ist am nächsten Tag
               endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
               breakMinutes: 0,
               entryType: 'SLEEP',
@@ -1413,14 +1414,15 @@ export default function TimeTrackingPage() {
           // Warte kurz
           await new Promise(resolve => setTimeout(resolve, 200))
 
-          // Speichere Standard-Zeiten für Folgetag - Block 2 (06:01-07:00)
-          console.log('Erstelle zweiten WORK-Block:', { date: nextDateStr, startTime: '06:01', endTime: '07:00' })
+          // WICHTIG: Bei Ein-Tag-Buchung wird zweiter Block auf Startdatum gebucht
+          // Aber die Zeit ist am nächsten Tag (06:01-07:00)
+          console.log('Erstelle zweiten WORK-Block:', { date: dateStr, startTime: '06:01', endTime: '07:00' })
           const workBlock2Response = await fetch('/api/employee/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              date: nextDateStr,
-              startTime: new Date(`${nextDateStr}T06:01:00`).toISOString(),
+              date: dateStr, // Auf Startdatum gebucht
+              startTime: new Date(`${nextDateStr}T06:01:00`).toISOString(), // Aber Zeit ist am nächsten Tag
               endTime: new Date(`${nextDateStr}T07:00:00`).toISOString(),
               breakMinutes: 0,
               entryType: 'WORK',
@@ -1802,16 +1804,24 @@ export default function TimeTrackingPage() {
         const effectiveStartTime = isSecondBlock ? '06:01' : block.startTime
         const effectiveEndTime = isFirstBlock ? '23:00' : (isSecondBlock && !block.endTime ? '07:00' : block.endTime)
         
-        // Für zweiten Block bei Nachtdienst: Datum ist der Folgetag
-        const blockDate = isSecondBlock ? nextDateStr : dateStr
+        // WICHTIG: Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
+        // Aber die Zeiten müssen korrekt sein (zweiter Block ist am nächsten Tag)
+        const blockDate = dateStr // Beide Blöcke auf Startdatum
         
         if (!effectiveEndTime) {
           setError('Bitte füllen Sie alle Endzeiten aus')
           return
         }
 
-        const startDateTime = new Date(`${blockDate}T${effectiveStartTime}:00`)
-        const endDateTime = new Date(`${blockDate}T${effectiveEndTime}:00`)
+        // Erstelle DateTime-Objekte
+        let startDateTime = new Date(`${dateStr}T${effectiveStartTime}:00`)
+        let endDateTime = new Date(`${dateStr}T${effectiveEndTime}:00`)
+        
+        // Bei Nachtdienst: Zweiter Block (06:01) ist am nächsten Tag
+        if (isSecondBlock) {
+          startDateTime = new Date(`${nextDateStr}T${effectiveStartTime}:00`)
+          endDateTime = new Date(`${nextDateStr}T${effectiveEndTime}:00`)
+        }
 
         // Wenn Endzeit vor Startzeit, dann ist es am nächsten Tag
         if (endDateTime <= startDateTime) {
@@ -2095,13 +2105,15 @@ export default function TimeTrackingPage() {
           })
           
           if (!existingSleepOnNextDay) {
-            console.log('Erstelle SLEEP-Eintrag für Folgetag:', nextDateStr, '00:00-06:00')
+            // WICHTIG: Bei Ein-Tag-Buchung wird SLEEP-Eintrag auf Startdatum gebucht
+            // Aber die Zeit ist am nächsten Tag (00:00-06:00)
+            console.log('Erstelle SLEEP-Eintrag für Folgetag:', dateStr, '00:00-06:00')
             const sleepResponse2 = await fetch('/api/employee/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                date: nextDateStr,
-                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+                date: dateStr, // Auf Startdatum gebucht
+                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Aber Zeit ist am nächsten Tag
                 endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
                 breakMinutes: 0,
                 entryType: 'SLEEP',

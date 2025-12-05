@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
-import { calculateWorkHours, violatesMaxWorkBlock, isHolidayOrSunday, calculateSurchargeHours } from '@/lib/calculations'
+import { calculateWorkHours, violatesMaxWorkBlock, isHolidayOrSunday, calculateSurchargeHours, calculateProRataSurchargeHours } from '@/lib/calculations'
 import { updateMonthlyBalance } from '@/lib/update-monthly-balance'
 import { checkOverlappingBlocks, checkNegativeWorkTime, checkMissingEndTime } from '@/lib/time-entry-validation'
 
@@ -173,7 +173,21 @@ export async function POST(request: NextRequest) {
       }
       
       // Berechne Zeitzuschlag für Sonn-/Feiertage
-      if (isHolidayOrSunday(dateObj, year)) {
+      // WICHTIG: Bei Nachtdiensten, die über mehrere Tage gehen, verwende pro-rata Berechnung
+      // Ein Nachtdienst-Block geht über mehrere Tage, wenn die Endzeit am nächsten Tag liegt
+      const isNightShiftBlock = startTimeDate.getHours() >= 18 || 
+                                (endTimeDate.getHours() < 8 && endTimeDate.getDate() > startTimeDate.getDate())
+      
+      if (isNightShiftBlock) {
+        // Pro-rata Zuschlag: Nur Stunden am Sonntag/Feiertag erhalten Zuschlag
+        surchargeHours = calculateProRataSurchargeHours(
+          startTimeDate,
+          endTimeDate,
+          breakMinutes || 0,
+          dateObj
+        )
+      } else if (isHolidayOrSunday(dateObj, year)) {
+        // Normale Blöcke: Zuschlag für den ganzen Block, wenn am Sonntag/Feiertag
         const workHours = calculateWorkHours(startTimeDate, endTimeDate, breakMinutes || 0)
         surchargeHours = calculateSurchargeHours(workHours)
       }
