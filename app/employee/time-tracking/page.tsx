@@ -833,35 +833,87 @@ export default function TimeTrackingPage() {
               })
               if (secondBlock) relatedEntryIds.add(secondBlock.id)
             } else if (isSecondBlock) {
-              // Zweiter Block gelöscht - finde ersten Block (19:00 am aktuellen Tag)
+              // Zweiter Block gelöscht - finde ersten Block (19:00 am VORTAG, nicht aktuellen Tag!)
+              // WICHTIG: Der zweite Block (06:01) gehört zum Nachtdienst, der am VORTAG begann
               const firstBlock = prevEntries.find(e => {
                 const entryDate = new Date(e.date)
-                if (!isSameDay(entryDate, selectedDate) || e.entryType !== 'WORK' || !e.endTime) return false
+                // Der erste Block ist am VORTAG, nicht am aktuellen Tag!
+                if (!isSameDay(entryDate, previousDay) || e.entryType !== 'WORK' || !e.endTime) return false
                 const startTime = format(parseISO(e.startTime), 'HH:mm')
                 const endTime = format(parseISO(e.endTime), 'HH:mm')
                 return (startTime === '19:00' || startTime.startsWith('19:')) && 
                        (endTime === '23:00' || endTime.startsWith('23:'))
               })
               if (firstBlock) relatedEntryIds.add(firstBlock.id)
+              
+              // Finde SLEEP-Einträge am VORTAG (23:01-23:59) und am aktuellen Tag (00:00-06:00)
+              prevEntries.forEach(e => {
+                const entryDate = new Date(e.date)
+                const isPreviousDay = isSameDay(entryDate, previousDay)
+                const isCurrentDay = isSameDay(entryDate, selectedDate)
+                
+                if (e.entryType === 'SLEEP') {
+                  const startTime = format(parseISO(e.startTime), 'HH:mm')
+                  // SLEEP-Einträge am VORTAG: Nur wenn um 23:01 beginnt (gehört zu diesem Nachtdienst)
+                  if (isPreviousDay && (startTime === '23:01' || startTime.startsWith('23:01'))) {
+                    relatedEntryIds.add(e.id)
+                  }
+                  // SLEEP-Einträge am aktuellen Tag: Nur wenn um 00:00 beginnt (gehört zu diesem Nachtdienst)
+                  if (isCurrentDay && (startTime === '00:00' || startTime.startsWith('00:00'))) {
+                    relatedEntryIds.add(e.id)
+                  }
+                }
+                
+                // SLEEP_INTERRUPTION-Einträge am aktuellen Tag (gehören zu diesem Nachtdienst)
+                if (e.entryType === 'SLEEP_INTERRUPTION' && isCurrentDay) {
+                  relatedEntryIds.add(e.id)
+                }
+              })
             }
             
-            // Finde SLEEP-Einträge (23:01-23:59 am aktuellen Tag und 00:00-06:00 am Folgetag)
+            // Finde SLEEP-Einträge, die zu DIESEM Nachtdienst gehören
+            // WICHTIG: Bei aufeinanderfolgenden Nachtdiensten müssen wir präzise sein
+            // Ein SLEEP-Eintrag gehört zu diesem Nachtdienst, wenn:
+            // - Am aktuellen Tag: 23:01-23:59 (gehört zu diesem Nachtdienst)
+            // - Am Folgetag: 00:00-06:00 (gehört zu diesem Nachtdienst, wenn zweiter Block existiert)
             prevEntries.forEach(e => {
               const entryDate = new Date(e.date)
               const isCurrentDay = isSameDay(entryDate, selectedDate)
               const isNextDay = isSameDay(entryDate, nextDay)
               
-              if (e.entryType === 'SLEEP' && (isCurrentDay || isNextDay)) {
+              if (e.entryType === 'SLEEP') {
                 const startTime = format(parseISO(e.startTime), 'HH:mm')
-                if ((isCurrentDay && (startTime === '23:01' || startTime.startsWith('23:01'))) ||
-                    (isNextDay && (startTime === '00:00' || startTime.startsWith('00:00')))) {
+                // SLEEP-Einträge am aktuellen Tag: Nur wenn um 23:01 beginnt (gehört zu diesem Nachtdienst)
+                if (isCurrentDay && (startTime === '23:01' || startTime.startsWith('23:01'))) {
                   relatedEntryIds.add(e.id)
+                }
+                // SLEEP-Einträge am Folgetag: Nur wenn um 00:00 beginnt UND zweiter Block existiert
+                // (gehört zu diesem Nachtdienst, nicht zu einem anderen)
+                if (isNextDay && (startTime === '00:00' || startTime.startsWith('00:00'))) {
+                  // Prüfe ob zweiter Block existiert (gehört zu diesem Nachtdienst)
+                  const hasSecondBlock = prevEntries.some(entry => {
+                    const entryDate2 = new Date(entry.date)
+                    if (!isSameDay(entryDate2, nextDay) || entry.entryType !== 'WORK' || !entry.endTime) return false
+                    const st = format(parseISO(entry.startTime), 'HH:mm')
+                    return st === '06:01' || st.startsWith('06:01')
+                  })
+                  if (hasSecondBlock) {
+                    relatedEntryIds.add(e.id)
+                  }
                 }
               }
               
-              // Finde auch SLEEP_INTERRUPTION-Einträge am Folgetag
+              // SLEEP_INTERRUPTION-Einträge: Nur wenn am Folgetag UND zweiter Block existiert
               if (e.entryType === 'SLEEP_INTERRUPTION' && isNextDay) {
-                relatedEntryIds.add(e.id)
+                const hasSecondBlock = prevEntries.some(entry => {
+                  const entryDate2 = new Date(entry.date)
+                  if (!isSameDay(entryDate2, nextDay) || entry.entryType !== 'WORK' || !entry.endTime) return false
+                  const st = format(parseISO(entry.startTime), 'HH:mm')
+                  return st === '06:01' || st.startsWith('06:01')
+                })
+                if (hasSecondBlock) {
+                  relatedEntryIds.add(e.id)
+                }
               }
             })
           } else if (entryToDelete) {
@@ -882,33 +934,86 @@ export default function TimeTrackingPage() {
               })
               if (secondBlock) relatedEntryIds.add(secondBlock.id)
             } else if (isSecondBlock) {
-              // Finde ersten Block
+              // Finde ersten Block am VORTAG (nicht aktuellen Tag!)
+              // WICHTIG: Der zweite Block (06:01) gehört zum Nachtdienst, der am VORTAG begann
               const firstBlock = prevEntries.find(e => {
                 const entryDate = new Date(e.date)
-                if (!isSameDay(entryDate, selectedDate) || e.entryType !== 'WORK' || !e.endTime) return false
+                // Der erste Block ist am VORTAG, nicht am aktuellen Tag!
+                if (!isSameDay(entryDate, previousDay) || e.entryType !== 'WORK' || !e.endTime) return false
                 const st = format(parseISO(e.startTime), 'HH:mm')
                 const et = format(parseISO(e.endTime), 'HH:mm')
                 return (st === '19:00' || st.startsWith('19:')) && (et === '23:00' || et.startsWith('23:'))
               })
               if (firstBlock) relatedEntryIds.add(firstBlock.id)
+              
+              // Finde SLEEP-Einträge am VORTAG (23:01-23:59) und am aktuellen Tag (00:00-06:00)
+              prevEntries.forEach(e => {
+                const entryDate = new Date(e.date)
+                const isPreviousDay = isSameDay(entryDate, previousDay)
+                const isCurrentDay = isSameDay(entryDate, selectedDate)
+                
+                if (e.entryType === 'SLEEP') {
+                  const startTime = format(parseISO(e.startTime), 'HH:mm')
+                  // SLEEP-Einträge am VORTAG: Nur wenn um 23:01 beginnt (gehört zu diesem Nachtdienst)
+                  if (isPreviousDay && (startTime === '23:01' || startTime.startsWith('23:01'))) {
+                    relatedEntryIds.add(e.id)
+                  }
+                  // SLEEP-Einträge am aktuellen Tag: Nur wenn um 00:00 beginnt (gehört zu diesem Nachtdienst)
+                  if (isCurrentDay && (startTime === '00:00' || startTime.startsWith('00:00'))) {
+                    relatedEntryIds.add(e.id)
+                  }
+                }
+                
+                // SLEEP_INTERRUPTION-Einträge am aktuellen Tag (gehören zu diesem Nachtdienst)
+                if (e.entryType === 'SLEEP_INTERRUPTION' && isCurrentDay) {
+                  relatedEntryIds.add(e.id)
+                }
+              })
             }
             
-            // Finde SLEEP-Einträge
+            // Finde SLEEP-Einträge, die zu DIESEM Nachtdienst gehören
+            // WICHTIG: Bei aufeinanderfolgenden Nachtdiensten müssen wir präzise sein
+            // Ein SLEEP-Eintrag gehört zu diesem Nachtdienst, wenn:
+            // - Am aktuellen Tag: 23:01-23:59 (gehört zu diesem Nachtdienst)
+            // - Am Folgetag: 00:00-06:00 (gehört zu diesem Nachtdienst, wenn zweiter Block existiert)
             prevEntries.forEach(e => {
               const entryDate = new Date(e.date)
               const isCurrentDay = isSameDay(entryDate, selectedDate)
               const isNextDay = isSameDay(entryDate, nextDay)
               
-              if (e.entryType === 'SLEEP' && (isCurrentDay || isNextDay)) {
+              if (e.entryType === 'SLEEP') {
                 const startTime = format(parseISO(e.startTime), 'HH:mm')
-                if ((isCurrentDay && (startTime === '23:01' || startTime.startsWith('23:01'))) ||
-                    (isNextDay && (startTime === '00:00' || startTime.startsWith('00:00')))) {
+                // SLEEP-Einträge am aktuellen Tag: Nur wenn um 23:01 beginnt (gehört zu diesem Nachtdienst)
+                if (isCurrentDay && (startTime === '23:01' || startTime.startsWith('23:01'))) {
                   relatedEntryIds.add(e.id)
+                }
+                // SLEEP-Einträge am Folgetag: Nur wenn um 00:00 beginnt UND zweiter Block existiert
+                // (gehört zu diesem Nachtdienst, nicht zu einem anderen)
+                if (isNextDay && (startTime === '00:00' || startTime.startsWith('00:00'))) {
+                  // Prüfe ob zweiter Block existiert (gehört zu diesem Nachtdienst)
+                  const hasSecondBlock = prevEntries.some(entry => {
+                    const entryDate2 = new Date(entry.date)
+                    if (!isSameDay(entryDate2, nextDay) || entry.entryType !== 'WORK' || !entry.endTime) return false
+                    const st = format(parseISO(entry.startTime), 'HH:mm')
+                    return st === '06:01' || st.startsWith('06:01')
+                  })
+                  if (hasSecondBlock) {
+                    relatedEntryIds.add(e.id)
+                  }
                 }
               }
               
+              // SLEEP_INTERRUPTION-Einträge: Nur wenn am Folgetag UND zweiter Block existiert
               if (e.entryType === 'SLEEP_INTERRUPTION' && isNextDay) {
-                relatedEntryIds.add(e.id)
+                const hasSecondBlock = prevEntries.some(entry => {
+                  const entryDate2 = new Date(entry.date)
+                  if (!isSameDay(entryDate2, nextDay) || entry.entryType !== 'WORK' || !entry.endTime) return false
+                  const st = format(parseISO(entry.startTime), 'HH:mm')
+                  return st === '06:01' || st.startsWith('06:01')
+                })
+                if (hasSecondBlock) {
+                  relatedEntryIds.add(e.id)
+                }
               }
             })
           }
