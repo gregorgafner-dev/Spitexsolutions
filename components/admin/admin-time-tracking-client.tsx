@@ -119,6 +119,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const currentData = currentResponse.ok ? await currentResponse.json() : []
       const nextData = nextResponse.ok ? await nextResponse.json() : []
       
+      // WICHTIG: Aktualisiere auch den entries State, damit getSleepHoursForDate die aktuellen Daten verwendet
+      // Entferne alte Einträge für diesen Tag und Folgetag aus dem State
+      setEntries(prevEntries => {
+        const filtered = prevEntries.filter(e => {
+          const entryDate = new Date(e.date)
+          return !isSameDay(entryDate, date) && !isSameDay(entryDate, addDays(date, 1))
+        })
+        // Füge neue Einträge hinzu
+        return [...filtered, ...currentData, ...nextData]
+      })
+      
       // Konvertiere nur vollständige Einträge (mit endTime) in WorkBlocks
       const currentBlocks: WorkBlock[] = currentData
         .filter((entry: TimeEntry) => entry.endTime !== null && entry.entryType !== 'SLEEP')
