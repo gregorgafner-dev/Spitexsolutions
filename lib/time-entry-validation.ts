@@ -54,17 +54,21 @@ export async function checkOverlappingBlocks(
   const existingEntries = await prisma.timeEntry.findMany({
     where: {
       employeeId,
-      date: {
-        OR: [
-          { gte: dayStart, lte: dayEnd },
-          { gte: previousDayStart, lte: previousDayEnd },
-          { gte: nextDayStart, lte: nextDayEnd },
-        ],
-      },
-      // Nur WORK-Einträge prüfen (SLEEP und SLEEP_INTERRUPTION können überlappen)
-      entryType: 'WORK',
-      // Schließe den aktuellen Eintrag aus (bei Updates)
-      ...(excludeEntryId ? { id: { not: excludeEntryId } } : {}),
+      AND: [
+        {
+          OR: [
+            { date: { gte: dayStart, lte: dayEnd } },
+            { date: { gte: previousDayStart, lte: previousDayEnd } },
+            { date: { gte: nextDayStart, lte: nextDayEnd } },
+          ],
+        },
+        {
+          // Nur WORK-Einträge prüfen (SLEEP und SLEEP_INTERRUPTION können überlappen)
+          entryType: 'WORK',
+        },
+        // Schließe den aktuellen Eintrag aus (bei Updates)
+        ...(excludeEntryId ? [{ id: { not: excludeEntryId } }] : []),
+      ],
     },
   })
 
