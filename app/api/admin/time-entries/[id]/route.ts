@@ -279,6 +279,9 @@ export async function DELETE(
       const previousDay = new Date(entryDate)
       previousDay.setDate(previousDay.getDate() - 1)
       
+      // Definiere workEntry außerhalb des if-Blocks, damit es später verwendet werden kann
+      let workEntry: typeof entry | undefined = undefined
+      
       // Prüfe ob Vortag auch im laufenden Jahr liegt
       if (previousDay >= yearStart) {
         const previousDayStart = new Date(previousDay)
@@ -298,7 +301,7 @@ export async function DELETE(
         })
         
         // Finde und lösche Eintrag mit Startzeit 19:00 und Endzeit 23:00 (erster Arbeitszeit-Block)
-        const workEntry = relatedEntries.find(e => {
+        workEntry = relatedEntries.find(e => {
           if (!e.endTime || e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
           const startTime = new Date(e.startTime)
           const endTime = new Date(e.endTime)
