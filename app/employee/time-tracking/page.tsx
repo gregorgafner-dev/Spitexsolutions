@@ -679,13 +679,16 @@ export default function TimeTrackingPage() {
       }
       
       // Zähle SLEEP 23:01-23:59 am aktuellen Tag
+      // WICHTIG: Nur EIN SLEEP-Eintrag sollte gezählt werden (der erste/nächste)
       const sleepEntriesCurrentDay = dayEntries.filter(e => {
         if (e.entryType !== 'SLEEP' || !e.endTime) return false
         const startTime = format(parseISO(e.startTime), 'HH:mm')
         return startTime === '23:01'
       })
       
-      for (const entry of sleepEntriesCurrentDay) {
+      // WICHTIG: Nur den ersten SLEEP-Eintrag zählen (falls mehrere vorhanden sind)
+      if (sleepEntriesCurrentDay.length > 0) {
+        const entry = sleepEntriesCurrentDay[0]
         if (entry.endTime) {
           const start = parseISO(entry.startTime)
           const end = parseISO(entry.endTime)
@@ -722,7 +725,15 @@ export default function TimeTrackingPage() {
       // Kombiniere beide Listen
       const allSleepEntriesNextDay = [...sleepEntriesNextDay, ...sleepEntriesCurrentDayWithNextDayTime]
       
-      for (const entry of allSleepEntriesNextDay) {
+      // WICHTIG: Nur den ersten SLEEP-Eintrag zählen (falls mehrere vorhanden sind)
+      // Sortiere nach Startzeit, um den ersten zu nehmen
+      if (allSleepEntriesNextDay.length > 0) {
+        const sortedEntries = allSleepEntriesNextDay.sort((a, b) => {
+          const aStart = parseISO(a.startTime).getTime()
+          const bStart = parseISO(b.startTime).getTime()
+          return aStart - bStart
+        })
+        const entry = sortedEntries[0]
         if (entry.endTime) {
           const start = parseISO(entry.startTime)
           const end = parseISO(entry.endTime)
