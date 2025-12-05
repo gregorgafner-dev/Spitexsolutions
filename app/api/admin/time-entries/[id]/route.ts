@@ -229,18 +229,9 @@ export async function DELETE(
         }
         
         // WICHTIG: Lösche ALLE SLEEP-Einträge am Folgetag (00:00-06:00), die zu DIESEM Nachtdienst gehören
-        // Wenn wir den ersten Block löschen, gehören die SLEEP-Einträge am Folgetag zu diesem Nachtdienst
-        // WICHTIG: Auch wenn der zweite Block (06:01) bereits gelöscht wurde, müssen wir die SLEEP-Einträge löschen
-        // Prüfe, ob es einen 06:01-Block gibt ODER ob wir den ersten Block löschen (dann gehören die SLEEP-Einträge definitiv zu diesem Nachtdienst)
-        const hasSecondBlock = relatedEntries.some(e => {
-          if (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
-          const startTime = new Date(e.startTime)
-          return startTime.getHours() === 6 && startTime.getMinutes() === 1
-        })
-        
-        // Wenn der zweite Block existiert ODER wenn wir den ersten Block löschen, gehören die SLEEP-Einträge zu diesem Nachtdienst
-        // WICHTIG: Auch wenn der zweite Block bereits gelöscht wurde, müssen wir die SLEEP-Einträge löschen
-        // Daher löschen wir IMMER die SLEEP-Einträge, wenn wir den ersten Block löschen
+        // Wenn wir den ersten Block (19:00-23:00) löschen, gehören die SLEEP-Einträge am Folgetag (00:00-06:00) zu diesem Nachtdienst
+        // WICHTIG: Wir löschen IMMER alle SLEEP-Einträge am Folgetag, die um 00:00 beginnen
+        // (auch wenn der zweite Block bereits gelöscht wurde oder nicht existiert)
         const sleepEntries = relatedEntries.filter(e => {
           if (e.entryType !== 'SLEEP') return false
           const startTime = new Date(e.startTime)
@@ -249,8 +240,8 @@ export async function DELETE(
         })
         
         console.log('[Admin DELETE] SLEEP-Einträge am Folgetag gefunden:', {
+          nextDay: nextDay.toISOString(),
           count: sleepEntries.length,
-          hasSecondBlock,
           entries: sleepEntries.map(e => ({
             id: e.id,
             startTime: e.startTime.toISOString(),
@@ -259,18 +250,18 @@ export async function DELETE(
         })
         
         // Lösche SLEEP-Einträge IMMER, wenn wir den ersten Block löschen
-        // (auch wenn der zweite Block bereits gelöscht wurde)
         for (const sleepEntry of sleepEntries) {
-          console.log('[Admin DELETE] Lösche SLEEP-Eintrag am Folgetag:', sleepEntry.id)
+          console.log('[Admin DELETE] Lösche SLEEP-Eintrag am Folgetag (00:00):', sleepEntry.id)
           await prisma.timeEntry.delete({
             where: { id: sleepEntry.id },
           })
         }
         
-        // Finde und lösche SLEEP_INTERRUPTION-Einträge am Folgetag
-        // WICHTIG: Auch diese werden IMMER gelöscht, wenn wir den ersten Block löschen
+        // Finde und lösche ALLE SLEEP_INTERRUPTION-Einträge am Folgetag
+        // WICHTIG: Diese werden IMMER gelöscht, wenn wir den ersten Block löschen
         const interruptionEntries = relatedEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
         console.log('[Admin DELETE] SLEEP_INTERRUPTION-Einträge am Folgetag gefunden:', {
+          nextDay: nextDay.toISOString(),
           count: interruptionEntries.length,
           entries: interruptionEntries.map(e => ({
             id: e.id,
@@ -391,20 +382,9 @@ export async function DELETE(
         }
         
         // WICHTIG: Lösche ALLE SLEEP-Einträge am Vortag (23:01-23:59), die zu DIESEM Nachtdienst gehören
-        // Wenn wir den zweiten Block löschen, gehören die SLEEP-Einträge am Vortag zu diesem Nachtdienst
-        // WICHTIG: Auch wenn der erste Block (19:00-23:00) bereits gelöscht wurde, müssen wir die SLEEP-Einträge löschen
-        // Prüfe, ob es einen 19:00-23:00-Block gibt ODER ob wir den zweiten Block löschen (dann gehören die SLEEP-Einträge definitiv zu diesem Nachtdienst)
-        const hasFirstBlock = relatedEntries.some(e => {
-          if (!e.endTime || e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
-          const startTime = new Date(e.startTime)
-          const endTime = new Date(e.endTime)
-          return startTime.getHours() === 19 && startTime.getMinutes() === 0 &&
-                 endTime.getHours() === 23 && endTime.getMinutes() === 0
-        })
-        
-        // Wenn der erste Block existiert ODER wenn wir den zweiten Block löschen, gehören die SLEEP-Einträge zu diesem Nachtdienst
-        // WICHTIG: Auch wenn der erste Block bereits gelöscht wurde, müssen wir die SLEEP-Einträge löschen
-        // Daher löschen wir IMMER die SLEEP-Einträge, wenn wir den zweiten Block löschen
+        // Wenn wir den zweiten Block (06:01) löschen, gehören die SLEEP-Einträge am Vortag (23:01-23:59) zu diesem Nachtdienst
+        // WICHTIG: Wir löschen IMMER alle SLEEP-Einträge am Vortag, die um 23:01 beginnen
+        // (auch wenn der erste Block bereits gelöscht wurde oder nicht existiert)
         const sleepEntries = relatedEntries.filter(e => {
           if (e.entryType !== 'SLEEP') return false
           const startTime = new Date(e.startTime)
@@ -413,8 +393,8 @@ export async function DELETE(
         })
         
         console.log('[Admin DELETE] SLEEP-Einträge am Vortag gefunden:', {
+          previousDay: previousDay.toISOString(),
           count: sleepEntries.length,
-          hasFirstBlock,
           entries: sleepEntries.map(e => ({
             id: e.id,
             startTime: e.startTime.toISOString(),
@@ -423,7 +403,6 @@ export async function DELETE(
         })
         
         // Lösche SLEEP-Einträge IMMER, wenn wir den zweiten Block löschen
-        // (auch wenn der erste Block bereits gelöscht wurde)
         for (const sleepEntry of sleepEntries) {
           console.log('[Admin DELETE] Lösche SLEEP-Eintrag am Vortag (23:01):', sleepEntry.id)
           await prisma.timeEntry.delete({
@@ -431,10 +410,11 @@ export async function DELETE(
           })
         }
         
-        // Finde und lösche SLEEP_INTERRUPTION-Einträge am Vortag
-        // WICHTIG: Auch diese werden IMMER gelöscht, wenn wir den zweiten Block löschen
+        // Finde und lösche ALLE SLEEP_INTERRUPTION-Einträge am Vortag
+        // WICHTIG: Diese werden IMMER gelöscht, wenn wir den zweiten Block löschen
         const interruptionEntries = relatedEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
         console.log('[Admin DELETE] SLEEP_INTERRUPTION-Einträge am Vortag gefunden:', {
+          previousDay: previousDay.toISOString(),
           count: interruptionEntries.length,
           entries: interruptionEntries.map(e => ({
             id: e.id,

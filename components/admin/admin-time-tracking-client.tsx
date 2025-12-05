@@ -404,9 +404,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         return
       }
 
-      // Lade Einträge neu - wichtig: zuerst loadEntriesForDate, dann loadEntriesForMonth
-      // damit isNightShift korrekt aktualisiert wird
+      // WICHTIG: Lade Einträge neu - zuerst loadEntriesForDate, dann loadEntriesForMonth
+      // Damit werden auch SLEEP-Einträge korrekt aus dem State entfernt
+      // Lade auch den Vortag und Folgetag, falls es ein Nachtdienst war
+      const previousDay = new Date(selectedDate)
+      previousDay.setDate(previousDay.getDate() - 1)
+      const nextDay = new Date(selectedDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      
+      // Lade Einträge für aktuellen Tag, Vortag und Folgetag neu
       await loadEntriesForDate(selectedDate)
+      await loadEntriesForDate(previousDay)
+      await loadEntriesForDate(nextDay)
       await loadEntriesForMonth()
       setError('')
     } catch (error) {
