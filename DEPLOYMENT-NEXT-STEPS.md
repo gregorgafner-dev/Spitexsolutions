@@ -47,3 +47,7 @@ Nach dem ersten erfolgreichen Deployment müssen Sie die Datenbank initialisiere
 2. Gehen Sie zu **Deployments** → neuestes Deployment
 3. Nutzen Sie die Vercel CLI oder fügen Sie ein Build-Script hinzu
 
+
+
+
+

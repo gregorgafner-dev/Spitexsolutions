@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { AlertCircle, Clock, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { AlertCircle, Clock, Plus, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react'
 import { LogoSmall } from '@/components/logo-small'
 
 interface TimeEntry {
@@ -56,6 +56,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   })
   const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([])
   const [error, setError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
   const [isNightShift, setIsNightShift] = useState(false)
   const [sleepInterruptions, setSleepInterruptions] = useState({ hours: 0, minutes: 0 })
 
@@ -231,17 +232,36 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     if (hasNightShiftOnThisDay) {
       // Nachtdienst beginnt am aktuellen Tag
-      // WICHTIG: Prüfe, ob der zweite Block am Folgetag noch existiert
-      // Nachtdienst zweiter Block: Beginnt vor 08:00 (flexibel für abweichende Zeiten)
+      // WICHTIG: Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
+      // Der zweite Block kann entweder:
+      // 1. Am Folgetag gebucht sein (alte Methode) - prüfe nextDayEntries
+      // 2. Am aktuellen Tag gebucht sein, aber die Zeit ist am nächsten Tag (neue Ein-Tag-Buchung) - prüfe dayEntries mit tatsächlicher Zeit
       const nextDay = addDays(date, 1)
       const nextDayEntries = getEntriesForDate(nextDay)
-      const hasSecondBlock = nextDayEntries.some(e => {
+      
+      // Prüfe zweiter Block am Folgetag (alte Methode)
+      const hasSecondBlockOnNextDay = nextDayEntries.some(e => {
         if (e.entryType !== 'WORK' || !e.endTime) return false
         const startTime = parseISO(e.startTime)
         const startHour = startTime.getHours()
-        // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
         return startHour < 8
       })
+      
+      // Prüfe zweiter Block am aktuellen Tag mit Zeit am nächsten Tag (Ein-Tag-Buchung)
+      const hasSecondBlockOnCurrentDay = dayEntries.some(e => {
+        if (e.entryType !== 'WORK' || !e.endTime) return false
+        const startTime = parseISO(e.startTime)
+        const startHour = startTime.getHours()
+        const startDate = new Date(startTime)
+        const entryDate = new Date(e.date)
+        // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
+        const isTimeOnNextDay = startDate.getDate() > entryDate.getDate() || 
+                                (startDate.getDate() === entryDate.getDate() && startHour < 8)
+        // Zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00, etc.)
+        return startHour < 8 && isTimeOnNextDay
+      })
+      
+      const hasSecondBlock = hasSecondBlockOnNextDay || hasSecondBlockOnCurrentDay
       
       // Wenn der zweite Block nicht mehr existiert, sollten auch keine Schlafzeiten angezeigt werden
       if (!hasSecondBlock) {
@@ -266,13 +286,31 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       }
       
       // Zähle SLEEP 00:00-06:00 am Folgetag (gehört zu diesem Nachtdienst)
+      // WICHTIG: Bei Ein-Tag-Buchung können SLEEP-Einträge auch auf dem Startdatum gebucht sein,
+      // aber die Zeit ist am nächsten Tag
       const sleepEntriesNextDay = nextDayEntries.filter(e => {
         if (e.entryType !== 'SLEEP' || !e.endTime) return false
         const startTime = format(parseISO(e.startTime), 'HH:mm')
         return startTime === '00:00'
       })
       
-      for (const entry of sleepEntriesNextDay) {
+      // Prüfe auch SLEEP-Einträge am aktuellen Tag mit Zeit am nächsten Tag (Ein-Tag-Buchung)
+      const sleepEntriesCurrentDayWithNextDayTime = dayEntries.filter(e => {
+        if (e.entryType !== 'SLEEP' || !e.endTime) return false
+        const startTime = parseISO(e.startTime)
+        const startTimeStr = format(startTime, 'HH:mm')
+        const startDate = new Date(startTime)
+        const entryDate = new Date(e.date)
+        // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
+        const isTimeOnNextDay = startDate.getDate() > entryDate.getDate() || 
+                                (startDate.getDate() === entryDate.getDate() && startTimeStr === '00:00')
+        return startTimeStr === '00:00' && isTimeOnNextDay
+      })
+      
+      // Kombiniere beide Listen
+      const allSleepEntriesNextDay = [...sleepEntriesNextDay, ...sleepEntriesCurrentDayWithNextDayTime]
+      
+      for (const entry of allSleepEntriesNextDay) {
         if (entry.endTime) {
           const start = parseISO(entry.startTime)
           const end = parseISO(entry.endTime)
@@ -283,7 +321,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       }
       
       // Subtrahiere Unterbrechungen vom Folgetag (wo sie gebucht sind)
-      const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      // WICHTIG: Bei Ein-Tag-Buchung können Unterbrechungen auch auf dem Startdatum gebucht sein
+      const interruptionEntryNextDay = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      const interruptionEntryCurrentDay = dayEntries.find(e => {
+        if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+        const startTime = parseISO(e.startTime)
+        const startDate = new Date(startTime)
+        const entryDate = new Date(e.date)
+        // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
+        return startDate.getDate() > entryDate.getDate()
+      })
+      const interruptionEntry = interruptionEntryNextDay || interruptionEntryCurrentDay
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
       totalSleepHours = Math.max(0, totalSleepHours - interruptionHours)
@@ -562,8 +610,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       e.preventDefault()
     }
     setError('')
+    setIsSaving(true)
     
-    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd')
     const nextDateStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd')
     
     // Verwende die gefilterten Blöcke für die Anzeige, aber alle Blöcke für das Speichern
@@ -666,6 +716,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         await loadEntriesForDate(selectedDate)
         setError('')
         console.log('Standard-Nachtdienst-Zeiten gespeichert')
+        setIsSaving(false)
         return
       }
       // Wenn Abweichungen vorhanden sind, verarbeite sie normal weiter
@@ -673,10 +724,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     if (blocksToSave.length === 0) {
       setError('Bitte fügen Sie mindestens einen Arbeitsblock hinzu')
+      setIsSaving(false)
       return
     }
-
-    try {
       // Lösche alle bestehenden Einträge für diesen Tag (und Folgetag bei Nachtdienst)
       const existingEntries = entries.filter(e => {
         const entryDate = new Date(e.date)
@@ -718,11 +768,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             const nextBlock = sortedBlocks[i + 1]
             
             if (currentBlock.endTime && nextBlock.startTime) {
-              const breakMins = calculateBreakMinutes(currentBlock.endTime, nextBlock.startTime)
+                const breakMins = calculateBreakMinutes(currentBlock.endTime, nextBlock.startTime)
               if (breakMins < 45) {
                 const blockIndex1 = sortedBlocks.findIndex(b => b.id === currentBlock.id) + 1
                 const blockIndex2 = sortedBlocks.findIndex(b => b.id === nextBlock.id) + 1
                 setError(`Die Pause zwischen Block ${blockIndex1} und Block ${blockIndex2} beträgt nur ${breakMins} Minuten. Bei mehr als 6 Stunden Gesamtarbeitszeit ist eine verordnete Essenspause von mindestens 45 Minuten erforderlich.`)
+                setIsSaving(false)
                 return
               }
             }
@@ -735,6 +786,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const block = workBlocks[i]
         if (!block.startTime) {
           setError('Bitte füllen Sie alle Startzeiten aus')
+          setIsSaving(false)
           return
         }
 
@@ -748,6 +800,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         
         if (!effectiveEndTime) {
           setError('Bitte füllen Sie alle Endzeiten aus')
+          setIsSaving(false)
           return
         }
 
@@ -772,6 +825,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
         if (diffHours > 6) {
           setError(`Block ${blocksToSave.indexOf(block) + 1}: Zwischen Start und Ende dürfen maximal 6 Stunden liegen. Bitte teilen Sie die Arbeitszeit auf mehrere Blöcke auf.`)
+          setIsSaving(false)
           return
         }
 
@@ -910,6 +964,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     } catch (error) {
       setError('Ein Fehler ist aufgetreten')
       console.error(error)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -1647,7 +1703,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                     <Button
                       className="w-full"
                       onClick={handleSave}
-                      disabled={isDisabled}
+                      disabled={isDisabled || isSaving}
                       title={isDisabled ? 
                         (!selectedEmployeeId ? 'Bitte wählen Sie einen Mitarbeiter aus' :
                          hasIncompleteBlocks ? 'Bitte füllen Sie alle Start- und Endzeiten aus' :
@@ -1655,7 +1711,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                          hasBreakTooShort ? 'Pause zwischen Blöcken zu kurz (min. 45 Min.)' : '') 
                         : ''}
                     >
-                      Speichern
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Speichern...
+                        </>
+                      ) : (
+                        'Speichern'
+                      )}
                     </Button>
                   )
                 })()}

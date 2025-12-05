@@ -32,3 +32,7 @@ Fügen Sie diese hinzu (falls noch nicht vorhanden):
 
 Nachdem alle Umgebungsvariablen gesetzt sind, committen und pushen Sie den Code.
 
+
+
+
+

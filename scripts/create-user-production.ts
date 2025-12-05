@@ -11,7 +11,7 @@ async function main() {
   const employmentType = 'MONTHLY_SALARY'
   const pensum = 100 // 100%
 
-  console.log(`🌱 Erstelle Test-Benutzer: ${email}`)
+  console.log(`🌱 Erstelle Benutzer in Production-Datenbank: ${email}`)
 
   // Prüfe ob User bereits existiert
   const existingUser = await prisma.user.findUnique({
@@ -20,7 +20,14 @@ async function main() {
 
   if (existingUser) {
     console.log(`⚠️  Benutzer ${email} existiert bereits!`)
-    console.log('   Überspringe Erstellung...')
+    console.log('   Setze Passwort zurück...')
+    
+    const hashedPassword = await bcrypt.hash(password, 10)
+    await prisma.user.update({
+      where: { email },
+      data: { password: hashedPassword },
+    })
+    console.log(`✅ Passwort zurückgesetzt!`)
     return
   }
 
@@ -47,7 +54,7 @@ async function main() {
     },
   })
 
-  console.log(`✅ Test-Benutzer erstellt!`)
+  console.log(`✅ Benutzer erstellt!`)
   console.log(`   Email: ${email}`)
   console.log(`   Passwort: ${password}`)
   console.log(`   Name: ${firstName} ${lastName}`)
@@ -57,7 +64,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('❌ Fehler beim Erstellen des Test-Benutzers:', e)
+    console.error('❌ Fehler beim Erstellen des Benutzers:', e)
     process.exit(1)
   })
   .finally(async () => {

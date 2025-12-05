@@ -45,3 +45,7 @@ Prisma braucht eine Variable namens `DATABASE_URL`. Sie müssen diese manuell hi
 5. ✅ NEXTAUTH_URL (neu)
 6. ✅ NEXTAUTH_SECRET (neu - als Sensitive markiert)
 
+
+
+
+

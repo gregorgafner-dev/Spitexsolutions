@@ -111,3 +111,7 @@ Falls weiterhin Probleme:
 3. Screenshot der `/test-db` Seite
 4. Screenshot der Vercel Environment Variables (ohne Werte!)
 
+
+
+
+

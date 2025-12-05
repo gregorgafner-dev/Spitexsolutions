@@ -97,3 +97,7 @@ Fügen Sie ein Post-Deployment Script hinzu, das automatisch läuft.
 - Nutzen Sie `prisma db push` für Development
 - Für Production sollten Sie Prisma Migrate verwenden (für zukünftige Updates)
 
+
+
+
+

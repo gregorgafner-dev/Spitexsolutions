@@ -38,3 +38,7 @@ Am Ende sollten Sie 3 Umgebungsvariablen haben:
 
 Nachdem alle Variablen gesetzt sind, können wir den Code committen und pushen!
 
+
+
+
+
