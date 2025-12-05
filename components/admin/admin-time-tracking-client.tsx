@@ -120,7 +120,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const currentData = currentResponse.ok ? await currentResponse.json() : []
       const nextData = nextResponse.ok ? await nextResponse.json() : []
       
-      // WICHTIG: Aktualisiere auch den entries State, damit getSleepHoursForDate die aktuellen Daten verwendet
+      // WICHTIG: Aktualisiere auch den entries State, damit getSleepHoursForDate und getSurchargeHoursForDate die aktuellen Daten verwenden
       // Entferne alte Einträge für diesen Tag und Folgetag aus dem State
       setEntries(prevEntries => {
         const filtered = prevEntries.filter(e => {
@@ -480,7 +480,13 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   }
 
   const getSurchargeHoursForDate = (date: Date) => {
-    const dayEntries = getEntriesForDate(date).filter(e => e.endTime !== null)
+    // WICHTIG: Nur WORK, SICK und TRAINING Einträge haben Surcharge
+    // SLEEP und SLEEP_INTERRUPTION haben keine Surcharge
+    const dayEntries = getEntriesForDate(date).filter(e => 
+      e.endTime !== null && 
+      e.entryType !== 'SLEEP' && 
+      e.entryType !== 'SLEEP_INTERRUPTION'
+    )
     return dayEntries.reduce((total, entry) => {
       return total + (entry.surchargeHours || 0)
     }, 0)
@@ -557,10 +563,11 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       }
 
       // WICHTIG: Lade ALLE betroffenen Tage neu, um sicherzustellen, dass die Kalenderansicht aktualisiert wird
-      // 1. Lade den gesamten Monat neu (für Kalenderansicht)
+      // 1. Lade den gesamten Monat neu (für Kalenderansicht) - DAS IST WICHTIG FÜR DIE SURCHARGE-ANZEIGE
       await loadEntriesForMonth()
       
-      // 2. Lade betroffene Tage neu (für Detailansicht)
+      // 2. Lade betroffene Tage neu (für Detailansicht) - NACH loadEntriesForMonth, damit die Daten konsistent sind
+      // WICHTIG: loadEntriesForDate aktualisiert nur die WorkBlocks, nicht den entries State für die Kalenderansicht
       await loadEntriesForDate(entryDate)
       await loadEntriesForDate(previousDay)
       await loadEntriesForDate(nextDay)
