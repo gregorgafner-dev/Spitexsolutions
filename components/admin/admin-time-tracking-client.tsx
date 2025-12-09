@@ -364,6 +364,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const interruptionEntry = interruptionEntryCurrentDay || interruptionEntryNextDay
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
+      
+      console.log('[getSleepHoursForDate] Schlafzeit-Berechnung:', {
+        date: format(date, 'yyyy-MM-dd'),
+        sleepEntriesCurrentDay: sleepEntriesCurrentDay.length,
+        allSleepEntriesNextDay: allSleepEntriesNextDay.length,
+        totalSleepHoursBeforeInterruption: totalSleepHours,
+        interruptionMinutes,
+        interruptionHours,
+        totalSleepHoursAfterInterruption: Math.max(0, totalSleepHours - interruptionHours)
+      })
+      
       totalSleepHours = Math.max(0, totalSleepHours - interruptionHours)
     } else {
       // Kein Nachtdienst am aktuellen Tag
