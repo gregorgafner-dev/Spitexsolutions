@@ -634,7 +634,8 @@ export default function TimeTrackingPage() {
     
     // 1. Prüfe, ob es einen Nachtdienst-Block am aktuellen Tag gibt
     // Nachtdienst: Block beginnt nach 18:00 und endet nach 22:00 (flexibel für abweichende Zeiten)
-    const dayEntries = getEntriesForDate(date)
+    const allDayEntries = getEntriesForDate(date)
+    const dayEntries = allDayEntries.filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
     const hasNightShiftOnThisDay = dayEntries.some(e => {
       if (e.entryType !== 'WORK' || !e.endTime) return false
       const startTime = parseISO(e.startTime)
@@ -652,7 +653,8 @@ export default function TimeTrackingPage() {
       // 1. Am Folgetag gebucht sein (alte Methode) - prüfe nextDayEntries
       // 2. Am aktuellen Tag gebucht sein, aber die Zeit ist am nächsten Tag (neue Ein-Tag-Buchung) - prüfe dayEntries mit tatsächlicher Zeit
       const nextDay = addDays(date, 1)
-      const nextDayEntries = getEntriesForDate(nextDay)
+      const allNextDayEntries = getEntriesForDate(nextDay)
+      const nextDayEntries = allNextDayEntries.filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
       
       // Prüfe zweiter Block am Folgetag (alte Methode)
       const hasSecondBlockOnNextDay = nextDayEntries.some(e => {
@@ -684,76 +686,58 @@ export default function TimeTrackingPage() {
         return 0
       }
       
-      // Zähle SLEEP 23:01-23:59 am aktuellen Tag
-      // WICHTIG: Nur EIN SLEEP-Eintrag sollte gezählt werden (der erste/nächste)
-      const sleepEntriesCurrentDay = dayEntries.filter(e => {
-        if (e.entryType !== 'SLEEP' || !e.endTime) return false
-        const startTime = format(parseISO(e.startTime), 'HH:mm')
-        return startTime === '23:01'
-      })
+      // WICHTIG: Bei Ein-Tag-Buchung sind alle SLEEP-Einträge auf dem Startdatum gebucht
+      // Finde alle SLEEP-Einträge, die zu diesem Nachtdienst gehören
+      // 1. SLEEP 23:01-23:59 (am aktuellen Tag, Zeit ist am aktuellen Tag)
+      // 2. SLEEP 00:00-06:00 (am aktuellen Tag gebucht, aber Zeit ist am nächsten Tag)
       
-      // WICHTIG: Nur den ersten SLEEP-Eintrag zählen (falls mehrere vorhanden sind)
-      if (sleepEntriesCurrentDay.length > 0) {
-        const entry = sleepEntriesCurrentDay[0]
-        if (entry.endTime) {
-          const start = parseISO(entry.startTime)
-          const end = parseISO(entry.endTime)
-          const diffMs = end.getTime() - start.getTime()
-          const diffMinutes = diffMs / (1000 * 60)
-          totalSleepHours += diffMinutes / 60
-        }
-      }
+      // Finde alle SLEEP-Einträge am aktuellen Tag (Ein-Tag-Buchung)
+      const allSleepEntries = allDayEntries.filter(e => e.entryType === 'SLEEP' && e.endTime !== null)
       
-      // Zähle SLEEP 00:00-06:00 am Folgetag (gehört zu diesem Nachtdienst)
-      // WICHTIG: Bei Ein-Tag-Buchung können SLEEP-Einträge auch auf dem Startdatum gebucht sein,
-      // aber die Zeit ist am nächsten Tag
-      const sleepEntriesNextDay = nextDayEntries.filter(e => {
-        if (e.entryType !== 'SLEEP' || !e.endTime) return false
-        const startTime = format(parseISO(e.startTime), 'HH:mm')
-        return startTime === '00:00'
-      })
-      
-      // Prüfe auch SLEEP-Einträge am aktuellen Tag mit Zeit am nächsten Tag (Ein-Tag-Buchung)
-      const sleepEntriesCurrentDayWithNextDayTime = dayEntries.filter(e => {
-        if (e.entryType !== 'SLEEP' || !e.endTime) return false
-        const startTime = parseISO(e.startTime)
-        const startTimeStr = format(startTime, 'HH:mm')
-        const startDate = new Date(startTime)
-        const entryDate = new Date(e.date)
-        entryDate.setHours(0, 0, 0, 0)
-        // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        // startDate ist die tatsächliche Zeit (z.B. 3.12. 00:00), entryDate ist das Buchungsdatum (z.B. 2.12.)
-        const isTimeOnNextDay = startDate.getTime() > entryDate.getTime() || 
-                                (startTimeStr === '00:00' && startDate.getDate() !== entryDate.getDate())
-        return startTimeStr === '00:00' && isTimeOnNextDay
-      })
+      // Finde auch SLEEP-Einträge am Folgetag (alte Methode)
+      const allSleepEntriesNextDay = allNextDayEntries.filter(e => e.entryType === 'SLEEP' && e.endTime !== null)
       
       // Kombiniere beide Listen
-      const allSleepEntriesNextDay = [...sleepEntriesNextDay, ...sleepEntriesCurrentDayWithNextDayTime]
+      const allSleepEntriesCombined = [...allSleepEntries, ...allSleepEntriesNextDay]
       
-      // WICHTIG: Nur den ersten SLEEP-Eintrag zählen (falls mehrere vorhanden sind)
-      // Sortiere nach Startzeit, um den ersten zu nehmen
-      if (allSleepEntriesNextDay.length > 0) {
-        const sortedEntries = allSleepEntriesNextDay.sort((a, b) => {
-          const aStart = parseISO(a.startTime).getTime()
-          const bStart = parseISO(b.startTime).getTime()
-          return aStart - bStart
-        })
-        const entry = sortedEntries[0]
-        if (entry.endTime) {
-          const start = parseISO(entry.startTime)
-          const end = parseISO(entry.endTime)
-          const diffMs = end.getTime() - start.getTime()
+      // Sortiere nach Startzeit, um die korrekten Einträge zu finden
+      const sortedSleepEntries = allSleepEntriesCombined.sort((a, b) => {
+        const aStart = parseISO(a.startTime).getTime()
+        const bStart = parseISO(b.startTime).getTime()
+        return aStart - bStart
+      })
+      
+      // Zähle nur die ersten beiden SLEEP-Einträge (23:01-23:59 und 00:00-06:00)
+      // Diese gehören zu diesem Nachtdienst
+      let sleepEntriesCounted = 0
+      for (const entry of sortedSleepEntries) {
+        if (sleepEntriesCounted >= 2) break // Nur die ersten beiden zählen
+        
+        const startTime = parseISO(entry.startTime)
+        const startTimeStr = format(startTime, 'HH:mm')
+        const endTime = parseISO(entry.endTime!)
+        const endTimeStr = format(endTime, 'HH:mm')
+        
+        // Prüfe ob es ein SLEEP-Eintrag für diesen Nachtdienst ist
+        // Entweder 23:01-23:59 oder 00:00-06:00
+        const isSleepForThisNightShift = 
+          (startTimeStr === '23:01' && endTimeStr === '23:59') ||
+          (startTimeStr === '00:00' && endTimeStr === '06:00')
+        
+        if (isSleepForThisNightShift) {
+          const diffMs = endTime.getTime() - startTime.getTime()
           const diffMinutes = diffMs / (1000 * 60)
-          totalSleepHours += diffMinutes / 60
+          const hours = diffMinutes / 60
+          totalSleepHours += hours
+          sleepEntriesCounted++
         }
       }
       
       // Subtrahiere Unterbrechungen
       // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf dem Startdatum gebucht
       // Prüfe zuerst am aktuellen Tag (Ein-Tag-Buchung), dann am Folgetag (alte Methode)
-      const interruptionEntryCurrentDay = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
-      const interruptionEntryNextDay = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      const interruptionEntryCurrentDay = allDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      const interruptionEntryNextDay = allNextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionEntry = interruptionEntryCurrentDay || interruptionEntryNextDay
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
