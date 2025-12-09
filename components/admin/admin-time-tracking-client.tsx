@@ -315,22 +315,22 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       
       // Zähle nur die ersten beiden SLEEP-Einträge (23:01-23:59 und 00:00-06:00)
       // Diese gehören zu diesem Nachtdienst
+      // WICHTIG: Prüfe flexibel auf Startzeiten, nicht auf exakte Endzeiten
       let sleepEntriesCounted = 0
       for (const entry of sortedSleepEntries) {
         if (sleepEntriesCounted >= 2) break // Nur die ersten beiden zählen
         
         const startTime = parseISO(entry.startTime)
-        const startTimeStr = format(startTime, 'HH:mm')
         const endTime = parseISO(entry.endTime!)
-        const endTimeStr = format(endTime, 'HH:mm')
+        const startTimeStr = format(startTime, 'HH:mm')
         
         // Prüfe ob es ein SLEEP-Eintrag für diesen Nachtdienst ist
-        // Entweder 23:01-23:59 oder 00:00-06:00
+        // Entweder beginnt um 23:01 (23:01-23:59) oder um 00:00 (00:00-06:00)
         const isSleepForThisNightShift = 
-          (startTimeStr === '23:01' && endTimeStr === '23:59') ||
-          (startTimeStr === '00:00' && endTimeStr === '06:00')
+          startTimeStr === '23:01' || startTimeStr === '00:00'
         
         if (isSleepForThisNightShift) {
+          // Berechne die Differenz zwischen startTime und endTime
           const diffMs = endTime.getTime() - startTime.getTime()
           const diffMinutes = diffMs / (1000 * 60)
           const hours = diffMinutes / 60
