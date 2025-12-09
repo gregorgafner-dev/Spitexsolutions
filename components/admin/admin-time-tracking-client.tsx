@@ -620,20 +620,29 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       interruptionHours,
       hasNightShiftOnThisDay,
       total: workHours + (hasNightShiftOnThisDay ? interruptionHours : 0),
+      allDayEntriesCount: allDayEntries.length,
+      dayEntriesCount: dayEntries.length,
+      allWorkEntriesCount: allWorkEntries.length,
       allDayEntries: allDayEntries.map(e => ({
         id: e.id,
         entryType: e.entryType,
         date: format(new Date(e.date), 'yyyy-MM-dd'),
-        startTime: e.startTime ? format(parseISO(e.startTime), 'HH:mm') : null,
-        endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
+        startTime: e.startTime ? format(parseISO(e.startTime), 'yyyy-MM-dd HH:mm') : null,
+        endTime: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null,
         sleepInterruptionMinutes: e.sleepInterruptionMinutes
       })),
       allWorkEntries: allWorkEntries.map(e => ({
         id: e.id,
-        startTime: e.startTime ? format(parseISO(e.startTime), 'HH:mm') : null,
-        endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
+        date: format(new Date(e.date), 'yyyy-MM-dd'),
+        startTime: e.startTime ? format(parseISO(e.startTime), 'yyyy-MM-dd HH:mm') : null,
+        endTime: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null,
         startHour: e.startTime ? parseISO(e.startTime).getHours() : null,
-        endHour: e.endTime ? parseISO(e.endTime).getHours() : null
+        endHour: e.endTime ? parseISO(e.endTime).getHours() : null,
+        isNightShiftBlock: e.startTime && e.endTime ? (() => {
+          const startHour = parseISO(e.startTime).getHours()
+          const endHour = parseISO(e.endTime).getHours()
+          return startHour >= 18 && (endHour >= 22 || endHour <= 1)
+        })() : false
       }))
     })
     
