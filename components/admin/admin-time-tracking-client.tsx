@@ -292,11 +292,31 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       }
       
       // Zähle SLEEP 23:01-23:59 am aktuellen Tag
-      // WICHTIG: Nur EIN SLEEP-Eintrag sollte gezählt werden (der erste/nächste)
+      // WICHTIG: Bei Ein-Tag-Buchung ist der SLEEP-Eintrag auf dem Startdatum gebucht, aber die Zeit ist am aktuellen Tag
+      // Prüfe sowohl SLEEP-Einträge, die auf dem aktuellen Tag gebucht sind, als auch solche, die auf dem Startdatum gebucht sind
       const sleepEntriesCurrentDay = dayEntries.filter(e => {
         if (e.entryType !== 'SLEEP' || !e.endTime) return false
-        const startTime = format(parseISO(e.startTime), 'HH:mm')
-        return startTime === '23:01'
+        const startTime = parseISO(e.startTime)
+        const startTimeStr = format(startTime, 'HH:mm')
+        // Prüfe ob Startzeit 23:01 ist (entweder am aktuellen Tag oder am Startdatum mit Zeit am aktuellen Tag)
+        const entryDate = new Date(e.date)
+        entryDate.setHours(0, 0, 0, 0)
+        const startDate = new Date(startTime)
+        startDate.setHours(0, 0, 0, 0)
+        // Entweder: Startzeit ist 23:01 und auf dem aktuellen Tag gebucht
+        // Oder: Startzeit ist 23:01 und auf dem Startdatum gebucht (Ein-Tag-Buchung)
+        return startTimeStr === '23:01'
+      })
+      
+      console.log('[getSleepHoursForDate] SLEEP 23:01-23:59 Einträge gefunden:', {
+        date: format(date, 'yyyy-MM-dd'),
+        count: sleepEntriesCurrentDay.length,
+        entries: sleepEntriesCurrentDay.map(e => ({
+          id: e.id,
+          date: format(new Date(e.date), 'yyyy-MM-dd'),
+          startTime: format(parseISO(e.startTime), 'HH:mm'),
+          endTime: format(parseISO(e.endTime), 'HH:mm')
+        }))
       })
       
       // WICHTIG: Nur den ersten SLEEP-Eintrag zählen (falls mehrere vorhanden sind)
@@ -307,8 +327,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           const end = parseISO(entry.endTime)
           const diffMs = end.getTime() - start.getTime()
           const diffMinutes = diffMs / (1000 * 60)
-          totalSleepHours += diffMinutes / 60
+          const hours = diffMinutes / 60
+          console.log('[getSleepHoursForDate] SLEEP 23:01-23:59 berechnet:', {
+            start: format(start, 'HH:mm'),
+            end: format(end, 'HH:mm'),
+            diffMinutes,
+            hours
+          })
+          totalSleepHours += hours
         }
+      } else {
+        console.log('[getSleepHoursForDate] KEIN SLEEP 23:01-23:59 Eintrag gefunden!')
       }
       
       // Zähle SLEEP 00:00-06:00 am Folgetag (gehört zu diesem Nachtdienst)
@@ -338,6 +367,20 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       // Kombiniere beide Listen
       const allSleepEntriesNextDay = [...sleepEntriesNextDay, ...sleepEntriesCurrentDayWithNextDayTime]
       
+      console.log('[getSleepHoursForDate] SLEEP 00:00-06:00 Einträge gefunden:', {
+        date: format(date, 'yyyy-MM-dd'),
+        nextDay: format(nextDay, 'yyyy-MM-dd'),
+        sleepEntriesNextDay: sleepEntriesNextDay.length,
+        sleepEntriesCurrentDayWithNextDayTime: sleepEntriesCurrentDayWithNextDayTime.length,
+        allSleepEntriesNextDay: allSleepEntriesNextDay.length,
+        entries: allSleepEntriesNextDay.map(e => ({
+          id: e.id,
+          date: format(new Date(e.date), 'yyyy-MM-dd'),
+          startTime: format(parseISO(e.startTime), 'HH:mm'),
+          endTime: format(parseISO(e.endTime), 'HH:mm')
+        }))
+      })
+      
       // WICHTIG: Nur den ersten SLEEP-Eintrag zählen (falls mehrere vorhanden sind)
       // Sortiere nach Startzeit, um den ersten zu nehmen
       if (allSleepEntriesNextDay.length > 0) {
@@ -352,8 +395,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           const end = parseISO(entry.endTime)
           const diffMs = end.getTime() - start.getTime()
           const diffMinutes = diffMs / (1000 * 60)
-          totalSleepHours += diffMinutes / 60
+          const hours = diffMinutes / 60
+          console.log('[getSleepHoursForDate] SLEEP 00:00-06:00 berechnet:', {
+            start: format(start, 'HH:mm'),
+            end: format(end, 'HH:mm'),
+            diffMinutes,
+            hours
+          })
+          totalSleepHours += hours
         }
+      } else {
+        console.log('[getSleepHoursForDate] KEIN SLEEP 00:00-06:00 Eintrag gefunden!')
       }
       
       // Subtrahiere Unterbrechungen
