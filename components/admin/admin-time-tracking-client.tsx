@@ -490,6 +490,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     if (interruptionEntryCurrentDay) {
       const interruptionMinutes = interruptionEntryCurrentDay.sleepInterruptionMinutes || 0
       interruptionHours = interruptionMinutes / 60
+      console.log('[getTotalHoursForDate] Unterbrechung am aktuellen Tag gefunden:', {
+        date: format(date, 'yyyy-MM-dd'),
+        minutes: interruptionMinutes,
+        hours: interruptionHours,
+        entry: interruptionEntryCurrentDay
+      })
     } else {
       // Alte Methode: Prüfe am Folgetag
       const nextDay = addDays(date, 1)
@@ -497,6 +503,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       interruptionHours = interruptionMinutes / 60
+      if (interruptionHours > 0) {
+        console.log('[getTotalHoursForDate] Unterbrechung am Folgetag gefunden:', {
+          date: format(date, 'yyyy-MM-dd'),
+          nextDay: format(nextDay, 'yyyy-MM-dd'),
+          minutes: interruptionMinutes,
+          hours: interruptionHours
+        })
+      }
     }
     
     // WICHTIG: Addiere Unterbrechungen nur, wenn ein Nachtdienst-Block vorhanden ist
@@ -511,6 +525,20 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       // Nachtdienst: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
       // Flexibel: Auch 18:45-23:00 sollte erkannt werden
       return startHour >= 18 && (endHour >= 22 || endHour <= 1)
+    })
+    
+    console.log('[getTotalHoursForDate] Berechnung:', {
+      date: format(date, 'yyyy-MM-dd'),
+      workHours,
+      interruptionHours,
+      hasNightShiftOnThisDay,
+      total: workHours + (hasNightShiftOnThisDay ? interruptionHours : 0),
+      allDayEntries: allDayEntries.map(e => ({
+        id: e.id,
+        entryType: e.entryType,
+        date: format(new Date(e.date), 'yyyy-MM-dd'),
+        sleepInterruptionMinutes: e.sleepInterruptionMinutes
+      }))
     })
     
     // Addiere Unterbrechungen zur Arbeitszeit am Starttag des Nachtdienstes
@@ -1003,6 +1031,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf Startdatum gebucht
         // (Schlafenszeit ist 00:00-06:00 am nächsten Tag, aber Buchung auf Startdatum)
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
+        console.log('[handleSave] Speichere Unterbrechungen:', {
+          isActuallyNightShift,
+          sleepInterruptions,
+          totalInterruptionMinutes,
+          dateStr
+        })
         if (totalInterruptionMinutes > 0) {
           // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag existiert (auf Startdatum oder Folgetag)
           const existingInterruption = entries.find(e => {
@@ -1012,6 +1046,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           })
 
           if (existingInterruption) {
+            console.log('[handleSave] Aktualisiere bestehende Unterbrechung:', existingInterruption.id)
             // Aktualisiere bestehenden Eintrag
             await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'PATCH',
@@ -1021,8 +1056,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               }),
             })
           } else {
+            console.log('[handleSave] Erstelle neue Unterbrechung auf Startdatum:', dateStr)
             // Erstelle neuen Eintrag auf Startdatum
-            await fetch('/api/admin/time-entries', {
+            const response = await fetch('/api/admin/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1035,8 +1071,11 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 sleepInterruptionMinutes: totalInterruptionMinutes,
               }),
             })
+            const result = await response.json()
+            console.log('[handleSave] Unterbrechung erstellt:', result)
           }
         } else {
+          console.log('[handleSave] Keine Unterbrechung zu speichern, lösche falls vorhanden')
           // Lösche SLEEP_INTERRUPTION-Eintrag falls vorhanden (auf Startdatum oder Folgetag)
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
