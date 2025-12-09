@@ -547,7 +547,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   const getTotalHoursForDate = (date: Date) => {
     const allDayEntries = getEntriesForDate(date)
     const dayEntries = allDayEntries.filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
-    const workHours = dayEntries.reduce((total, entry) => {
+    
+    // WICHTIG: Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht
+    // Der erste Block (18:45-23:00) ist auf dem Startdatum gebucht, Zeit ist am Startdatum
+    // Der zweite Block (06:01-07:00) ist auf dem Startdatum gebucht, aber Zeit ist am nächsten Tag
+    // Daher müssen wir beide Blöcke vom aktuellen Tag nehmen
+    const allWorkEntries = dayEntries.filter(e => e.entryType === 'WORK')
+    
+    const workHours = allWorkEntries.reduce((total, entry) => {
       if (entry.endTime) {
         const start = parseISO(entry.startTime)
         const end = parseISO(entry.endTime)
@@ -577,8 +584,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       })
     } else {
       // Alte Methode: Prüfe am Folgetag
-      const nextDay = addDays(date, 1)
-      const nextDayEntries = getEntriesForDate(nextDay)
       const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       interruptionHours = interruptionMinutes / 60
@@ -595,7 +600,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     // WICHTIG: Addiere Unterbrechungen nur, wenn ein Nachtdienst-Block vorhanden ist
     // Prüfe, ob am aktuellen Tag ein Nachtdienst beginnt (18:00-23:00 Block vorhanden)
     // WICHTIG: Prüfe auch flexiblere Zeiten (z.B. 18:45-23:00)
-    const hasNightShiftOnThisDay = dayEntries.some(e => {
+    // WICHTIG: Prüfe auch Blöcke, die auf dem aktuellen Tag gebucht sind, aber die Zeit ist am nächsten Tag (Ein-Tag-Buchung)
+    const hasNightShiftOnThisDay = allWorkEntries.some(e => {
       if (e.entryType !== 'WORK' || !e.endTime) return false
       const startTime = parseISO(e.startTime)
       const endTime = parseISO(e.endTime)
