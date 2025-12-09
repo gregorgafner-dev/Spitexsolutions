@@ -957,17 +957,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
       }
 
-      // Prüfe, ob es sich um einen Nachtdienst handelt (auch wenn Checkbox nicht aktiviert ist)
-      // Nachtdienst: Block beginnt nach 18:00 und endet nach 22:00, oder Block beginnt vor 08:00
-      const hasNightShiftBlocks = blocksToSave.some(block => {
-        if (!block.startTime || !block.endTime) return false
-        const startHour = parseInt(block.startTime.split(':')[0])
-        const endHour = parseInt(block.endTime.split(':')[0])
-        return (startHour >= 18 && endHour >= 22) || startHour < 8
-      })
-      const isActuallyNightShift = isNightShift || hasNightShiftBlocks
-      
       // Bei Nachtdienst: Erstelle SLEEP-Einträge für aktuellen Tag (23:01-23:59) und Folgetag (00:00-06:00)
+      // WICHTIG: isActuallyNightShift wurde bereits am Anfang der Funktion definiert
       if (isActuallyNightShift) {
         // Prüfe ob SLEEP-Einträge für aktuellen Tag bereits existieren
         const currentDaySleepEntries = entries.filter(e => {
