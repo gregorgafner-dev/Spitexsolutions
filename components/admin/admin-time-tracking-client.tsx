@@ -1031,7 +1031,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf Startdatum gebucht
         // (Schlafenszeit ist 00:00-06:00 am nächsten Tag, aber Buchung auf Startdatum)
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
-        console.log('[handleSave] Speichere Unterbrechungen:', {
+        console.log('[handleSave] Speichere Unterbrechungen (isActuallyNightShift):', {
           isActuallyNightShift,
           sleepInterruptions,
           totalInterruptionMinutes,
@@ -1046,7 +1046,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           })
 
           if (existingInterruption) {
-            console.log('[handleSave] Aktualisiere bestehende Unterbrechung:', existingInterruption.id)
+            console.log('[handleSave] Aktualisiere bestehende Unterbrechung (isActuallyNightShift):', existingInterruption.id)
             // Aktualisiere bestehenden Eintrag
             await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'PATCH',
@@ -1056,7 +1056,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               }),
             })
           } else {
-            console.log('[handleSave] Erstelle neue Unterbrechung auf Startdatum:', dateStr)
+            console.log('[handleSave] Erstelle neue Unterbrechung auf Startdatum (isActuallyNightShift):', dateStr)
             // Erstelle neuen Eintrag auf Startdatum
             const response = await fetch('/api/admin/time-entries', {
               method: 'POST',
@@ -1072,10 +1072,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               }),
             })
             const result = await response.json()
-            console.log('[handleSave] Unterbrechung erstellt:', result)
+            console.log('[handleSave] Unterbrechung erstellt (isActuallyNightShift):', result)
           }
         } else {
-          console.log('[handleSave] Keine Unterbrechung zu speichern, lösche falls vorhanden')
+          console.log('[handleSave] Keine Unterbrechung zu speichern, lösche falls vorhanden (isActuallyNightShift)')
           // Lösche SLEEP_INTERRUPTION-Eintrag falls vorhanden (auf Startdatum oder Folgetag)
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
@@ -1090,44 +1090,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
       }
       
-      // WICHTIG: Speichere Unterbrechungen auch, wenn Checkbox nicht aktiviert ist, aber Nachtdienst-Blöcke vorhanden sind
-      if (!isNightShift && hasNightShiftBlocks) {
-        const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
-        if (totalInterruptionMinutes > 0) {
-          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag existiert (auf Startdatum oder Folgetag)
-          const existingInterruption = entries.find(e => {
-            const entryDate = new Date(e.date)
-            return (isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))) && 
-                   e.entryType === 'SLEEP_INTERRUPTION'
-          })
-
-          if (existingInterruption) {
-            // Aktualisiere bestehenden Eintrag
-            await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sleepInterruptionMinutes: totalInterruptionMinutes,
-              }),
-            })
-          } else {
-            // Erstelle neuen Eintrag auf Startdatum
-            await fetch('/api/admin/time-entries', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                employeeId: selectedEmployeeId,
-                date: dateStr, // Auf Startdatum gebucht
-                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Zeit ist am nächsten Tag
-                endTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
-                breakMinutes: 0,
-                entryType: 'SLEEP_INTERRUPTION',
-                sleepInterruptionMinutes: totalInterruptionMinutes,
-              }),
-            })
-          }
-        }
-      }
 
       await loadEntriesForMonth()
       await loadEntriesForDate(selectedDate)
