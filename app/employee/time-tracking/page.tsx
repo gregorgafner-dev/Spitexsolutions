@@ -916,12 +916,22 @@ export default function TimeTrackingPage() {
     
     let interruptionHours = 0
     if (hasNightShiftOnThisDay) {
-      // Nachtdienst beginnt am aktuellen Tag - prüfe Unterbrechungen am Folgetag
-      const nextDay = addDays(date, 1)
-      const nextDayEntries = getEntriesForDate(nextDay)
-      const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
-      const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
-      interruptionHours = interruptionMinutes / 60
+      // Nachtdienst beginnt am aktuellen Tag
+      // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auch am Startdatum gebucht
+      // Prüfe zuerst am aktuellen Tag (Ein-Tag-Buchung), dann am Folgetag (alte Methode)
+      const interruptionEntryCurrentDay = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      if (interruptionEntryCurrentDay) {
+        // Ein-Tag-Buchung: Unterbrechung ist am Startdatum gebucht
+        const interruptionMinutes = interruptionEntryCurrentDay.sleepInterruptionMinutes || 0
+        interruptionHours = interruptionMinutes / 60
+      } else {
+        // Alte Methode: Unterbrechung ist am Folgetag gebucht
+        const nextDay = addDays(date, 1)
+        const nextDayEntries = getEntriesForDate(nextDay)
+        const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+        const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
+        interruptionHours = interruptionMinutes / 60
+      }
     } else {
       // Kein Nachtdienst am aktuellen Tag - prüfe, ob Unterbrechungen auf diesem Tag gebucht sind
       // (kann bei Ein-Tag-Buchung vorkommen)
