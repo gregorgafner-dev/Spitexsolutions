@@ -945,8 +945,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
       }
 
+      // Prüfe, ob es sich um einen Nachtdienst handelt (auch wenn Checkbox nicht aktiviert ist)
+      // Nachtdienst: Block beginnt nach 18:00 und endet nach 22:00, oder Block beginnt vor 08:00
+      const hasNightShiftBlocks = blocksToSave.some(block => {
+        if (!block.startTime || !block.endTime) return false
+        const startHour = parseInt(block.startTime.split(':')[0])
+        const endHour = parseInt(block.endTime.split(':')[0])
+        return (startHour >= 18 && endHour >= 22) || startHour < 8
+      })
+      const isActuallyNightShift = isNightShift || hasNightShiftBlocks
+      
       // Bei Nachtdienst: Erstelle SLEEP-Einträge für aktuellen Tag (23:01-23:59) und Folgetag (00:00-06:00)
-      if (isNightShift) {
+      if (isActuallyNightShift) {
         // Prüfe ob SLEEP-Einträge für aktuellen Tag bereits existieren
         const currentDaySleepEntries = entries.filter(e => {
           const entryDate = new Date(e.date)
@@ -1039,6 +1049,45 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           if (existingInterruption) {
             await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'DELETE',
+            })
+          }
+        }
+      }
+      
+      // WICHTIG: Speichere Unterbrechungen auch, wenn Checkbox nicht aktiviert ist, aber Nachtdienst-Blöcke vorhanden sind
+      if (!isNightShift && hasNightShiftBlocks) {
+        const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
+        if (totalInterruptionMinutes > 0) {
+          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag existiert (auf Startdatum oder Folgetag)
+          const existingInterruption = entries.find(e => {
+            const entryDate = new Date(e.date)
+            return (isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))) && 
+                   e.entryType === 'SLEEP_INTERRUPTION'
+          })
+
+          if (existingInterruption) {
+            // Aktualisiere bestehenden Eintrag
+            await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sleepInterruptionMinutes: totalInterruptionMinutes,
+              }),
+            })
+          } else {
+            // Erstelle neuen Eintrag auf Startdatum
+            await fetch('/api/admin/time-entries', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                employeeId: selectedEmployeeId,
+                date: dateStr, // Auf Startdatum gebucht
+                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(), // Zeit ist am nächsten Tag
+                endTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+                breakMinutes: 0,
+                entryType: 'SLEEP_INTERRUPTION',
+                sleepInterruptionMinutes: totalInterruptionMinutes,
+              }),
             })
           }
         }
