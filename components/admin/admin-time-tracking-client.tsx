@@ -1667,41 +1667,51 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                         </div>
                       </div>
 
-                      {isNightShift && index === 1 && (
-                        <div className="border-t pt-3">
-                          <Label>Unterbrechungen während des Schlafens</Label>
-                          <div className="grid grid-cols-2 gap-3 mt-2">
-                            <div>
-                              <Label htmlFor={`sleep-hours-${block.id}`} className="text-xs">Stunden</Label>
-                              <Input
-                                id={`sleep-hours-${block.id}`}
-                                type="number"
-                                min="0"
-                                max="23"
-                                value={sleepInterruptions.hours}
-                                onChange={(e) => setSleepInterruptions({
-                                  ...sleepInterruptions,
-                                  hours: parseInt(e.target.value) || 0
-                                })}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor={`sleep-minutes-${block.id}`} className="text-xs">Minuten</Label>
-                              <Input
-                                id={`sleep-minutes-${block.id}`}
-                                type="number"
-                                min="0"
-                                max="59"
-                                value={sleepInterruptions.minutes}
-                                onChange={(e) => setSleepInterruptions({
-                                  ...sleepInterruptions,
-                                  minutes: parseInt(e.target.value) || 0
-                                })}
-                              />
+                      {(() => {
+                        // Prüfe, ob es sich um einen Nachtdienst handelt (auch wenn Checkbox nicht aktiviert ist)
+                        // Nachtdienst: Block beginnt nach 18:00 und endet nach 22:00, oder Block beginnt vor 08:00
+                        const isNightShiftBlock = (block.startTime && block.endTime) && (
+                          (parseInt(block.startTime.split(':')[0]) >= 18 && parseInt(block.endTime.split(':')[0]) >= 22) ||
+                          parseInt(block.startTime.split(':')[0]) < 8
+                        )
+                        const showInterruption = (isNightShift || isNightShiftBlock) && index === 1
+                        
+                        return showInterruption && (
+                          <div className="border-t pt-3">
+                            <Label>Unterbrechungen während des Schlafens</Label>
+                            <div className="grid grid-cols-2 gap-3 mt-2">
+                              <div>
+                                <Label htmlFor={`sleep-hours-${block.id}`} className="text-xs">Stunden</Label>
+                                <Input
+                                  id={`sleep-hours-${block.id}`}
+                                  type="number"
+                                  min="0"
+                                  max="23"
+                                  value={sleepInterruptions.hours}
+                                  onChange={(e) => setSleepInterruptions({
+                                    ...sleepInterruptions,
+                                    hours: parseInt(e.target.value) || 0
+                                  })}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`sleep-minutes-${block.id}`} className="text-xs">Minuten</Label>
+                                <Input
+                                  id={`sleep-minutes-${block.id}`}
+                                  type="number"
+                                  min="0"
+                                  max="59"
+                                  value={sleepInterruptions.minutes}
+                                  onChange={(e) => setSleepInterruptions({
+                                    ...sleepInterruptions,
+                                    minutes: parseInt(e.target.value) || 0
+                                  })}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )
+                      })()}
 
                       {block.startTime && block.endTime && exceedsMaxHours && (
                         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
