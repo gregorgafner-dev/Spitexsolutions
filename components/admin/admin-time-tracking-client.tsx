@@ -603,21 +603,44 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     // Prüfe, ob am aktuellen Tag ein Nachtdienst beginnt (18:00-23:00 Block vorhanden)
     // WICHTIG: Prüfe auch flexiblere Zeiten (z.B. 18:45-23:00)
     // WICHTIG: Prüfe auch Blöcke, die auf dem aktuellen Tag gebucht sind, aber die Zeit ist am nächsten Tag (Ein-Tag-Buchung)
-    const hasNightShiftOnThisDay = allWorkEntries.some(e => {
+    // Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht:
+    // - Erster Block: 18:45-23:00 (Zeit ist am Startdatum)
+    // - Zweiter Block: 06:01-07:00 (Zeit ist am nächsten Tag, aber gebucht auf Startdatum)
+    // Daher prüfen wir beide Blöcke:
+    const hasFirstBlock = allWorkEntries.some(e => {
       if (e.entryType !== 'WORK' || !e.endTime) return false
       const startTime = parseISO(e.startTime)
       const endTime = parseISO(e.endTime)
       const startHour = startTime.getHours()
       const endHour = endTime.getHours()
-      // Nachtdienst: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
+      // Nachtdienst erster Block: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
       // Flexibel: Auch 18:45-23:00 sollte erkannt werden
       return startHour >= 18 && (endHour >= 22 || endHour <= 1)
     })
+    
+    const hasSecondBlock = allWorkEntries.some(e => {
+      if (e.entryType !== 'WORK' || !e.endTime) return false
+      const startTime = parseISO(e.startTime)
+      const startHour = startTime.getHours()
+      // Nachtdienst zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00)
+      // WICHTIG: Bei Ein-Tag-Buchung ist dieser Block auf dem Startdatum gebucht,
+      // aber die Zeit ist am nächsten Tag (z.B. 2024-12-09 06:01:00)
+      // Daher prüfen wir die Stunde der startTime
+      return startHour < 8
+    })
+    
+    // Ein Nachtdienst beginnt am aktuellen Tag, wenn:
+    // 1. Der erste Block (18:00-23:00) vorhanden ist, ODER
+    // 2. Der zweite Block (06:01-07:00) vorhanden ist UND auf dem aktuellen Tag gebucht ist (Ein-Tag-Buchung)
+    // Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht
+    const hasNightShiftOnThisDay = hasFirstBlock || hasSecondBlock
     
     console.log('[getTotalHoursForDate] Berechnung:', {
       date: format(date, 'yyyy-MM-dd'),
       workHours,
       interruptionHours,
+      hasFirstBlock,
+      hasSecondBlock,
       hasNightShiftOnThisDay,
       total: workHours + (hasNightShiftOnThisDay ? interruptionHours : 0),
       allDayEntriesCount: allDayEntries.length,
@@ -638,10 +661,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         endTime: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null,
         startHour: e.startTime ? parseISO(e.startTime).getHours() : null,
         endHour: e.endTime ? parseISO(e.endTime).getHours() : null,
-        isNightShiftBlock: e.startTime && e.endTime ? (() => {
+        isFirstBlock: e.startTime && e.endTime ? (() => {
           const startHour = parseISO(e.startTime).getHours()
           const endHour = parseISO(e.endTime).getHours()
           return startHour >= 18 && (endHour >= 22 || endHour <= 1)
+        })() : false,
+        isSecondBlock: e.startTime ? (() => {
+          const startHour = parseISO(e.startTime).getHours()
+          return startHour < 8
         })() : false
       }))
     })
