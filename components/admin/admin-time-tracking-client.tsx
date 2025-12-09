@@ -584,6 +584,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       })
     } else {
       // Alte Methode: Prüfe am Folgetag
+      const nextDay = addDays(date, 1)
+      const nextDayEntries = getEntriesForDate(nextDay)
       const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       interruptionHours = interruptionMinutes / 60
