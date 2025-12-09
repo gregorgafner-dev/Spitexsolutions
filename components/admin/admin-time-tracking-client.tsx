@@ -478,15 +478,37 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       return total
     }, 0)
     
-    // Addiere Unterbrechungen während des Schlafens zur Arbeitszeit
-    // WICHTIG: Unterbrechungen werden IMMER und NUR auf den Folgetag gebucht
-    // Sie müssen NUR zur Arbeitszeit am Folgetag addiert werden (wo sie gebucht sind)
-    // Am aktuellen Tag werden sie NICHT addiert, weil sie dort nicht gebucht sind
-    const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
-    const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
-    const interruptionHours = interruptionMinutes / 60
+    // WICHTIG: Unterbrechungen während des Schlafens gehören zum Nachtdienst, der am aktuellen Tag beginnt
+    // Unterbrechungen werden auf den Folgetag gebucht (wo die Schlafenszeit 00:00-06:00 ist),
+    // aber sie müssen zur Arbeitszeit am Starttag des Nachtdienstes addiert werden (aktueller Tag)
+    // Prüfe, ob am aktuellen Tag ein Nachtdienst beginnt (19:00-23:00 Block vorhanden)
+    const hasNightShiftOnThisDay = dayEntries.some(e => {
+      if (e.entryType !== 'WORK' || !e.endTime) return false
+      const startTime = parseISO(e.startTime)
+      const endTime = parseISO(e.endTime)
+      const startHour = startTime.getHours()
+      const endHour = endTime.getHours()
+      // Nachtdienst: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
+      return startHour >= 18 && (endHour >= 22 || endHour <= 1)
+    })
     
-    // Nur addieren, wenn Unterbrechungen auf diesem Tag gebucht sind (Folgetag)
+    let interruptionHours = 0
+    if (hasNightShiftOnThisDay) {
+      // Nachtdienst beginnt am aktuellen Tag - prüfe Unterbrechungen am Folgetag
+      const nextDay = addDays(date, 1)
+      const nextDayEntries = getEntriesForDate(nextDay)
+      const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
+      interruptionHours = interruptionMinutes / 60
+    } else {
+      // Kein Nachtdienst am aktuellen Tag - prüfe, ob Unterbrechungen auf diesem Tag gebucht sind
+      // (kann bei Ein-Tag-Buchung vorkommen)
+      const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
+      interruptionHours = interruptionMinutes / 60
+    }
+    
+    // Addiere Unterbrechungen zur Arbeitszeit am Starttag des Nachtdienstes
     return workHours + interruptionHours
   }
 
