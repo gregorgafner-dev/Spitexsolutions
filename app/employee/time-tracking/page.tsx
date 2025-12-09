@@ -749,19 +749,12 @@ export default function TimeTrackingPage() {
         }
       }
       
-      // Subtrahiere Unterbrechungen vom Folgetag (wo sie gebucht sind)
-      // WICHTIG: Bei Ein-Tag-Buchung können Unterbrechungen auch auf dem Startdatum gebucht sein
+      // Subtrahiere Unterbrechungen
+      // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf dem Startdatum gebucht
+      // Prüfe zuerst am aktuellen Tag (Ein-Tag-Buchung), dann am Folgetag (alte Methode)
+      const interruptionEntryCurrentDay = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionEntryNextDay = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
-      const interruptionEntryCurrentDay = dayEntries.find(e => {
-        if (e.entryType !== 'SLEEP_INTERRUPTION') return false
-        const startTime = parseISO(e.startTime)
-        const startDate = new Date(startTime)
-        const entryDate = new Date(e.date)
-        entryDate.setHours(0, 0, 0, 0)
-        // Prüfe ob die tatsächliche Zeit am nächsten Tag liegt (Ein-Tag-Buchung)
-        return startDate.getTime() > entryDate.getTime()
-      })
-      const interruptionEntry = interruptionEntryNextDay || interruptionEntryCurrentDay
+      const interruptionEntry = interruptionEntryCurrentDay || interruptionEntryNextDay
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
       totalSleepHours = Math.max(0, totalSleepHours - interruptionHours)
