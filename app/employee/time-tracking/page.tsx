@@ -565,11 +565,17 @@ export default function TimeTrackingPage() {
       }
       
       // Lade Unterbrechungen während des Schlafens
-      // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht, daher aus nextData laden
+      // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf dem Startdatum gebucht
+      // Prüfe zuerst in currentData (Ein-Tag-Buchung), dann in nextData (alte Methode)
       if (hasNightShift) {
-        const sleepInterruptionEntry = nextData.find((e: TimeEntry) => 
+        const sleepInterruptionEntryCurrent = currentData.find((e: TimeEntry) => 
           e.entryType === 'SLEEP_INTERRUPTION'
         )
+        const sleepInterruptionEntryNext = nextData.find((e: TimeEntry) => 
+          e.entryType === 'SLEEP_INTERRUPTION'
+        )
+        const sleepInterruptionEntry = sleepInterruptionEntryCurrent || sleepInterruptionEntryNext
+        
         if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
           setSleepInterruptions({
