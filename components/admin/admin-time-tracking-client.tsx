@@ -580,13 +580,63 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     // Finde den Block, der gelöscht werden soll
     const blockToDelete = workBlocks.find(b => b.id === entryId)
     const entryToDelete = entries.find(e => e.id === entryId)
-    const isNightShiftBlock = blockToDelete && (
-      (blockToDelete.startTime === '19:00' && blockToDelete.endTime === '23:00') ||
-      (blockToDelete.startTime === '06:01')
-    )
     
-    const confirmMessage = isNightShiftBlock && isNightShift
-      ? 'Möchten Sie diesen Nachtdienst wirklich löschen? Beide Blöcke (19:00-23:00 und 06:01-07:xx) werden gelöscht.'
+    if (!entryToDelete) {
+      setError('Eintrag nicht gefunden')
+      return
+    }
+    
+    const entryDate = new Date(entryToDelete.date)
+    
+    // Prüfe, ob es sich um einen Nachtdienst-Block handelt
+    // Flexibel: Erster Block beginnt nach 18:00 und endet nach 22:00, zweiter Block beginnt vor 08:00
+    const startTime = parseISO(entryToDelete.startTime)
+    const endTime = entryToDelete.endTime ? parseISO(entryToDelete.endTime) : null
+    const startHour = startTime.getHours()
+    const endHour = endTime ? endTime.getHours() : null
+    
+    const isFirstBlock = startHour >= 18 && (endHour !== null && (endHour >= 22 || endHour <= 1))
+    const isSecondBlock = startHour < 8 && endHour !== null
+    
+    const isNightShiftBlock = isFirstBlock || isSecondBlock
+    
+    // Wenn es ein Nachtdienst-Block ist, finde alle zugehörigen Blöcke am gleichen Datum
+    let relatedEntryIds: string[] = [entryId]
+    
+    if (isNightShiftBlock) {
+      // Finde alle WORK-Einträge am gleichen Datum, die zu diesem Nachtdienst gehören
+      const sameDateEntries = entries.filter(e => {
+        const eDate = new Date(e.date)
+        if (!isSameDay(eDate, entryDate)) return false
+        
+        if (e.entryType === 'WORK' && e.id !== entryId) {
+          const eStartTime = parseISO(e.startTime)
+          const eEndTime = e.endTime ? parseISO(e.endTime) : null
+          const eStartHour = eStartTime.getHours()
+          const eEndHour = eEndTime ? eEndTime.getHours() : null
+          
+          // Erster Block: beginnt nach 18:00 und endet nach 22:00
+          const eIsFirstBlock = eStartHour >= 18 && (eEndHour !== null && (eEndHour >= 22 || eEndHour <= 1))
+          // Zweiter Block: beginnt vor 08:00
+          const eIsSecondBlock = eStartHour < 8 && eEndHour !== null
+          
+          // Wenn der gelöschte Block der erste ist, lösche auch den zweiten (und umgekehrt)
+          return (isFirstBlock && eIsSecondBlock) || (isSecondBlock && eIsFirstBlock)
+        }
+        
+        // Lösche auch alle SLEEP und SLEEP_INTERRUPTION Einträge am gleichen Datum
+        if (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') {
+          return true
+        }
+        
+        return false
+      })
+      
+      relatedEntryIds = [...relatedEntryIds, ...sameDateEntries.map(e => e.id)]
+    }
+    
+    const confirmMessage = isNightShiftBlock
+      ? `Möchten Sie diesen Nachtdienst wirklich löschen? Alle zugehörigen Blöcke (${relatedEntryIds.length} Einträge) werden gelöscht.`
       : 'Möchten Sie diesen Eintrag wirklich löschen?'
     
     if (!confirm(confirmMessage)) {
@@ -594,41 +644,31 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     }
 
     try {
-      // OPTIMISTIC UPDATE: Entferne den Eintrag sofort aus dem State
-      // Finde alle zugehörigen Einträge (z.B. SLEEP, SLEEP_INTERRUPTION bei Nachtdienst)
-      const entryDate = entryToDelete ? new Date(entryToDelete.date) : selectedDate
-      const previousDay = new Date(entryDate)
-      previousDay.setDate(previousDay.getDate() - 1)
-      const nextDay = new Date(entryDate)
-      nextDay.setDate(nextDay.getDate() + 1)
-      
-      // Entferne den gelöschten Eintrag und alle zugehörigen Einträge sofort aus dem State
+      // OPTIMISTIC UPDATE: Entferne alle zugehörigen Einträge sofort aus dem State
       setEntries(prevEntries => {
-        return prevEntries.filter(e => {
-          const eDate = new Date(e.date)
-          // Entferne den gelöschten Eintrag
-          if (e.id === entryId) return false
-          // Bei Nachtdienst: Entferne auch zugehörige SLEEP und SLEEP_INTERRUPTION Einträge
-          if (isNightShiftBlock && entryToDelete) {
-            // Entferne SLEEP und SLEEP_INTERRUPTION Einträge am gleichen Tag, Vortag und Folgetag
-            if ((isSameDay(eDate, entryDate) || isSameDay(eDate, previousDay) || isSameDay(eDate, nextDay)) &&
-                (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION')) {
-              return false
-            }
-          }
-          return true
+        return prevEntries.filter(e => !relatedEntryIds.includes(e.id))
+      })
+      
+      // Lösche auch aus workBlocks
+      setWorkBlocks(prevBlocks => {
+        return prevBlocks.filter(b => !relatedEntryIds.includes(b.id))
+      })
+
+      // Lösche alle zugehörigen Einträge
+      const deletePromises = relatedEntryIds.map(id => 
+        fetch(`/api/admin/time-entries/${id}`, {
+          method: 'DELETE',
         })
-      })
-
-      const response = await fetch(`/api/admin/time-entries/${entryId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
+      )
+      
+      const responses = await Promise.all(deletePromises)
+      
+      // Prüfe ob alle Löschungen erfolgreich waren
+      const failedDeletions = responses.filter(r => !r.ok)
+      if (failedDeletions.length > 0) {
         // Bei Fehler: Lade Daten neu, um State zu korrigieren
         await loadEntriesForMonth()
-        const errorData = await response.json()
-        setError(errorData.error || 'Fehler beim Löschen des Eintrags')
+        setError('Fehler beim Löschen einiger Einträge')
         return
       }
 
@@ -637,7 +677,11 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       await loadEntriesForMonth()
       
       // 2. Lade betroffene Tage neu (für Detailansicht) - NACH loadEntriesForMonth, damit die Daten konsistent sind
-      // WICHTIG: loadEntriesForDate aktualisiert nur die WorkBlocks, nicht den entries State für die Kalenderansicht
+      const previousDay = new Date(entryDate)
+      previousDay.setDate(previousDay.getDate() - 1)
+      const nextDay = new Date(entryDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      
       await loadEntriesForDate(entryDate)
       await loadEntriesForDate(previousDay)
       await loadEntriesForDate(nextDay)
