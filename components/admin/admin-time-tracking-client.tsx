@@ -622,7 +622,16 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         id: e.id,
         entryType: e.entryType,
         date: format(new Date(e.date), 'yyyy-MM-dd'),
+        startTime: e.startTime ? format(parseISO(e.startTime), 'HH:mm') : null,
+        endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
         sleepInterruptionMinutes: e.sleepInterruptionMinutes
+      })),
+      allWorkEntries: allWorkEntries.map(e => ({
+        id: e.id,
+        startTime: e.startTime ? format(parseISO(e.startTime), 'HH:mm') : null,
+        endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
+        startHour: e.startTime ? parseISO(e.startTime).getHours() : null,
+        endHour: e.endTime ? parseISO(e.endTime).getHours() : null
       }))
     })
     
