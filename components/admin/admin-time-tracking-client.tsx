@@ -164,10 +164,19 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         allBlocks 
       })
       
-      // Prüfe ob es ein Nachtdienst ist (19:00-23:00 und 06:01-07:xx vorhanden)
-      // Nur wenn beide typischen Nachtdienst-Blöcke vorhanden sind
-      const hasBlock1 = allBlocks.some(b => b.startTime === '19:00' && b.endTime === '23:00')
-      const hasBlock2 = allBlocks.some(b => b.startTime === '06:01')
+      // Prüfe ob es ein Nachtdienst ist (flexibel: 18:xx-23:00 und 06:01-07:xx vorhanden)
+      // Nachtdienst: Block beginnt nach 18:00 und endet nach 22:00, oder Block beginnt vor 08:00
+      const hasBlock1 = allBlocks.some(b => {
+        if (!b.startTime || !b.endTime) return false
+        const startHour = parseInt(b.startTime.split(':')[0])
+        const endHour = parseInt(b.endTime.split(':')[0])
+        return startHour >= 18 && endHour >= 22
+      })
+      const hasBlock2 = allBlocks.some(b => {
+        if (!b.startTime) return false
+        const startHour = parseInt(b.startTime.split(':')[0])
+        return startHour < 8
+      })
       const hasNightShift = hasBlock1 && hasBlock2
       
       // Setze isNightShift basierend auf geladenen Einträgen
@@ -180,7 +189,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       
       // Lade Unterbrechungen während des Schlafens
       // WICHTIG: Bei Ein-Tag-Buchung werden Unterbrechungen auf dem Startdatum gebucht
-      // Prüfe zuerst in currentData (Ein-Tag-Buchung), dann in nextData (alte Methode)
+      // Prüfe IMMER nach Unterbrechungen, wenn Nachtdienst-Blöcke vorhanden sind (auch ohne Checkbox)
       if (hasNightShift) {
         const sleepInterruptionEntryCurrent = currentData.find((e: TimeEntry) => 
           e.entryType === 'SLEEP_INTERRUPTION'
@@ -192,11 +201,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         
         if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
+          console.log('[loadEntriesForDate] Unterbrechung geladen:', {
+            totalMinutes,
+            hours: Math.floor(totalMinutes / 60),
+            minutes: totalMinutes % 60,
+            entry: sleepInterruptionEntry
+          })
           setSleepInterruptions({
             hours: Math.floor(totalMinutes / 60),
             minutes: totalMinutes % 60
           })
         } else {
+          console.log('[loadEntriesForDate] Keine Unterbrechung gefunden')
           setSleepInterruptions({ hours: 0, minutes: 0 })
         }
       } else {
