@@ -224,10 +224,23 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   }
 
   const getEntriesForDate = (date: Date) => {
-    return entries.filter(entry => {
+    const filtered = entries.filter(entry => {
       const entryDate = new Date(entry.date)
       return isSameDay(entryDate, date)
     })
+    console.log('[getEntriesForDate] Filterung:', {
+      date: format(date, 'yyyy-MM-dd'),
+      totalEntries: entries.length,
+      filteredCount: filtered.length,
+      filtered: filtered.map(e => ({
+        id: e.id,
+        entryType: e.entryType,
+        date: format(new Date(e.date), 'yyyy-MM-dd'),
+        startTime: e.startTime,
+        endTime: e.endTime
+      }))
+    })
+    return filtered
   }
 
   const getSleepHoursForDate = (date: Date) => {
@@ -546,6 +559,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
   const getTotalHoursForDate = (date: Date) => {
     const allDayEntries = getEntriesForDate(date)
+    console.log('[getTotalHoursForDate] getEntriesForDate Ergebnis:', {
+      date: format(date, 'yyyy-MM-dd'),
+      allDayEntriesCount: allDayEntries.length,
+      allDayEntries: allDayEntries.map(e => ({
+        id: e.id,
+        entryType: e.entryType,
+        date: format(new Date(e.date), 'yyyy-MM-dd'),
+        startTime: e.startTime,
+        endTime: e.endTime
+      }))
+    })
+    
     const dayEntries = allDayEntries.filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
     
     // WICHTIG: Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht
@@ -553,6 +578,21 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     // Der zweite Block (06:01-07:00) ist auf dem Startdatum gebucht, aber Zeit ist am nächsten Tag
     // Daher müssen wir beide Blöcke vom aktuellen Tag nehmen
     const allWorkEntries = dayEntries.filter(e => e.entryType === 'WORK')
+    
+    console.log('[getTotalHoursForDate] Gefilterte Einträge:', {
+      date: format(date, 'yyyy-MM-dd'),
+      dayEntriesCount: dayEntries.length,
+      allWorkEntriesCount: allWorkEntries.length,
+      allWorkEntries: allWorkEntries.map(e => ({
+        id: e.id,
+        entryType: e.entryType,
+        date: format(new Date(e.date), 'yyyy-MM-dd'),
+        startTime: e.startTime,
+        endTime: e.endTime,
+        startTimeParsed: e.startTime ? format(parseISO(e.startTime), 'yyyy-MM-dd HH:mm') : null,
+        endTimeParsed: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null
+      }))
+    })
     
     const workHours = allWorkEntries.reduce((total, entry) => {
       if (entry.endTime) {
