@@ -224,23 +224,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   }
 
   const getEntriesForDate = (date: Date) => {
-    const filtered = entries.filter(entry => {
+    return entries.filter(entry => {
       const entryDate = new Date(entry.date)
       return isSameDay(entryDate, date)
     })
-    console.log('[getEntriesForDate] Filterung:', {
-      date: format(date, 'yyyy-MM-dd'),
-      totalEntries: entries.length,
-      filteredCount: filtered.length,
-      filtered: filtered.map(e => ({
-        id: e.id,
-        entryType: e.entryType,
-        date: format(new Date(e.date), 'yyyy-MM-dd'),
-        startTime: e.startTime,
-        endTime: e.endTime
-      }))
-    })
-    return filtered
   }
 
   const getSleepHoursForDate = (date: Date) => {
@@ -559,18 +546,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
   const getTotalHoursForDate = (date: Date) => {
     const allDayEntries = getEntriesForDate(date)
-    console.log('[getTotalHoursForDate] getEntriesForDate Ergebnis:', {
-      date: format(date, 'yyyy-MM-dd'),
-      allDayEntriesCount: allDayEntries.length,
-      allDayEntries: allDayEntries.map(e => ({
-        id: e.id,
-        entryType: e.entryType,
-        date: format(new Date(e.date), 'yyyy-MM-dd'),
-        startTime: e.startTime,
-        endTime: e.endTime
-      }))
-    })
-    
     const dayEntries = allDayEntries.filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
     
     // WICHTIG: Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht
@@ -578,21 +553,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     // Der zweite Block (06:01-07:00) ist auf dem Startdatum gebucht, aber Zeit ist am nächsten Tag
     // Daher müssen wir beide Blöcke vom aktuellen Tag nehmen
     const allWorkEntries = dayEntries.filter(e => e.entryType === 'WORK')
-    
-    console.log('[getTotalHoursForDate] Gefilterte Einträge:', {
-      date: format(date, 'yyyy-MM-dd'),
-      dayEntriesCount: dayEntries.length,
-      allWorkEntriesCount: allWorkEntries.length,
-      allWorkEntries: allWorkEntries.map(e => ({
-        id: e.id,
-        entryType: e.entryType,
-        date: format(new Date(e.date), 'yyyy-MM-dd'),
-        startTime: e.startTime,
-        endTime: e.endTime,
-        startTimeParsed: e.startTime ? format(parseISO(e.startTime), 'yyyy-MM-dd HH:mm') : null,
-        endTimeParsed: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null
-      }))
-    })
     
     const workHours = allWorkEntries.reduce((total, entry) => {
       if (entry.endTime) {
@@ -616,12 +576,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     if (interruptionEntryCurrentDay) {
       const interruptionMinutes = interruptionEntryCurrentDay.sleepInterruptionMinutes || 0
       interruptionHours = interruptionMinutes / 60
-      console.log('[getTotalHoursForDate] Unterbrechung am aktuellen Tag gefunden:', {
-        date: format(date, 'yyyy-MM-dd'),
-        minutes: interruptionMinutes,
-        hours: interruptionHours,
-        entry: interruptionEntryCurrentDay
-      })
     } else {
       // Alte Methode: Prüfe am Folgetag
       const nextDay = addDays(date, 1)
@@ -629,14 +583,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const interruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       interruptionHours = interruptionMinutes / 60
-      if (interruptionHours > 0) {
-        console.log('[getTotalHoursForDate] Unterbrechung am Folgetag gefunden:', {
-          date: format(date, 'yyyy-MM-dd'),
-          nextDay: format(nextDay, 'yyyy-MM-dd'),
-          minutes: interruptionMinutes,
-          hours: interruptionHours
-        })
-      }
     }
     
     // WICHTIG: Addiere Unterbrechungen nur, wenn ein Nachtdienst-Block vorhanden ist
@@ -669,49 +615,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       return startHour < 8
     })
     
+    // WICHTIG: Wenn eine Unterbrechung vorhanden ist, ist definitiv ein Nachtdienst vorhanden
+    // (Unterbrechungen kommen nur bei Nachtdiensten vor)
     // Ein Nachtdienst beginnt am aktuellen Tag, wenn:
     // 1. Der erste Block (18:00-23:00) vorhanden ist, ODER
-    // 2. Der zweite Block (06:01-07:00) vorhanden ist UND auf dem aktuellen Tag gebucht ist (Ein-Tag-Buchung)
+    // 2. Der zweite Block (06:01-07:00) vorhanden ist, ODER
+    // 3. Eine Unterbrechung vorhanden ist (definitiv Nachtdienst)
     // Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht
-    const hasNightShiftOnThisDay = hasFirstBlock || hasSecondBlock
-    
-    console.log('[getTotalHoursForDate] Berechnung:', {
-      date: format(date, 'yyyy-MM-dd'),
-      workHours,
-      interruptionHours,
-      hasFirstBlock,
-      hasSecondBlock,
-      hasNightShiftOnThisDay,
-      total: workHours + (hasNightShiftOnThisDay ? interruptionHours : 0),
-      allDayEntriesCount: allDayEntries.length,
-      dayEntriesCount: dayEntries.length,
-      allWorkEntriesCount: allWorkEntries.length,
-      allDayEntries: allDayEntries.map(e => ({
-        id: e.id,
-        entryType: e.entryType,
-        date: format(new Date(e.date), 'yyyy-MM-dd'),
-        startTime: e.startTime ? format(parseISO(e.startTime), 'yyyy-MM-dd HH:mm') : null,
-        endTime: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null,
-        sleepInterruptionMinutes: e.sleepInterruptionMinutes
-      })),
-      allWorkEntries: allWorkEntries.map(e => ({
-        id: e.id,
-        date: format(new Date(e.date), 'yyyy-MM-dd'),
-        startTime: e.startTime ? format(parseISO(e.startTime), 'yyyy-MM-dd HH:mm') : null,
-        endTime: e.endTime ? format(parseISO(e.endTime), 'yyyy-MM-dd HH:mm') : null,
-        startHour: e.startTime ? parseISO(e.startTime).getHours() : null,
-        endHour: e.endTime ? parseISO(e.endTime).getHours() : null,
-        isFirstBlock: e.startTime && e.endTime ? (() => {
-          const startHour = parseISO(e.startTime).getHours()
-          const endHour = parseISO(e.endTime).getHours()
-          return startHour >= 18 && (endHour >= 22 || endHour <= 1)
-        })() : false,
-        isSecondBlock: e.startTime ? (() => {
-          const startHour = parseISO(e.startTime).getHours()
-          return startHour < 8
-        })() : false
-      }))
-    })
+    const hasNightShiftOnThisDay = hasFirstBlock || hasSecondBlock || interruptionHours > 0
     
     // Addiere Unterbrechungen zur Arbeitszeit am Starttag des Nachtdienstes
     return workHours + (hasNightShiftOnThisDay ? interruptionHours : 0)

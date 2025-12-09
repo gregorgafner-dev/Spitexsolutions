@@ -922,15 +922,44 @@ export default function TimeTrackingPage() {
     
     // WICHTIG: Addiere Unterbrechungen nur, wenn ein Nachtdienst-Block vorhanden ist
     // Prüfe, ob am aktuellen Tag ein Nachtdienst beginnt (18:00-23:00 Block vorhanden)
-    const hasNightShiftOnThisDay = dayEntries.some(e => {
+    // WICHTIG: Prüfe auch flexiblere Zeiten (z.B. 18:45-23:00)
+    // WICHTIG: Prüfe auch Blöcke, die auf dem aktuellen Tag gebucht sind, aber die Zeit ist am nächsten Tag (Ein-Tag-Buchung)
+    // Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht:
+    // - Erster Block: 18:45-23:00 (Zeit ist am Startdatum)
+    // - Zweiter Block: 06:01-07:00 (Zeit ist am nächsten Tag, aber gebucht auf Startdatum)
+    // Daher prüfen wir beide Blöcke:
+    const allWorkEntries = dayEntries.filter(e => e.entryType === 'WORK')
+    
+    const hasFirstBlock = allWorkEntries.some(e => {
       if (e.entryType !== 'WORK' || !e.endTime) return false
       const startTime = parseISO(e.startTime)
       const endTime = parseISO(e.endTime)
       const startHour = startTime.getHours()
       const endHour = endTime.getHours()
-      // Nachtdienst: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
+      // Nachtdienst erster Block: Beginnt nach 18:00 und endet nach 22:00 (oder um Mitternacht)
+      // Flexibel: Auch 18:45-23:00 sollte erkannt werden
       return startHour >= 18 && (endHour >= 22 || endHour <= 1)
     })
+    
+    const hasSecondBlock = allWorkEntries.some(e => {
+      if (e.entryType !== 'WORK' || !e.endTime) return false
+      const startTime = parseISO(e.startTime)
+      const startHour = startTime.getHours()
+      // Nachtdienst zweiter Block: Beginnt vor 08:00 (z.B. 06:01, 06:30, 07:00)
+      // WICHTIG: Bei Ein-Tag-Buchung ist dieser Block auf dem Startdatum gebucht,
+      // aber die Zeit ist am nächsten Tag (z.B. 2024-12-09 06:01:00)
+      // Daher prüfen wir die Stunde der startTime
+      return startHour < 8
+    })
+    
+    // WICHTIG: Wenn eine Unterbrechung vorhanden ist, ist definitiv ein Nachtdienst vorhanden
+    // (Unterbrechungen kommen nur bei Nachtdiensten vor)
+    // Ein Nachtdienst beginnt am aktuellen Tag, wenn:
+    // 1. Der erste Block (18:00-23:00) vorhanden ist, ODER
+    // 2. Der zweite Block (06:01-07:00) vorhanden ist, ODER
+    // 3. Eine Unterbrechung vorhanden ist (definitiv Nachtdienst)
+    // Bei Ein-Tag-Buchung sind beide Blöcke auf dem Startdatum gebucht
+    const hasNightShiftOnThisDay = hasFirstBlock || hasSecondBlock || interruptionHours > 0
     
     // Addiere Unterbrechungen zur Arbeitszeit am Starttag des Nachtdienstes
     return workHours + (hasNightShiftOnThisDay ? interruptionHours : 0)
