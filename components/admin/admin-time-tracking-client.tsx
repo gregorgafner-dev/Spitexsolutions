@@ -306,37 +306,36 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       // Kombiniere beide Listen
       const allSleepEntriesCombined = [...allSleepEntries, ...allSleepEntriesNextDay]
       
-      // Sortiere nach Startzeit, um die korrekten Einträge zu finden
-      const sortedSleepEntries = allSleepEntriesCombined.sort((a, b) => {
-        const aStart = parseISO(a.startTime).getTime()
-        const bStart = parseISO(b.startTime).getTime()
-        return aStart - bStart
+      // Finde explizit die beiden SLEEP-Einträge für diesen Nachtdienst
+      // 1. SLEEP 23:01-23:59 (beginnt um 23:01)
+      const sleepEntry23 = allSleepEntriesCombined.find(e => {
+        const startTime = parseISO(e.startTime)
+        const startTimeStr = format(startTime, 'HH:mm')
+        return startTimeStr === '23:01'
       })
       
-      // Zähle nur die ersten beiden SLEEP-Einträge (23:01-23:59 und 00:00-06:00)
-      // Diese gehören zu diesem Nachtdienst
-      // WICHTIG: Prüfe flexibel auf Startzeiten, nicht auf exakte Endzeiten
-      let sleepEntriesCounted = 0
-      for (const entry of sortedSleepEntries) {
-        if (sleepEntriesCounted >= 2) break // Nur die ersten beiden zählen
-        
-        const startTime = parseISO(entry.startTime)
-        const endTime = parseISO(entry.endTime!)
+      // 2. SLEEP 00:00-06:00 (beginnt um 00:00)
+      const sleepEntry00 = allSleepEntriesCombined.find(e => {
+        const startTime = parseISO(e.startTime)
         const startTimeStr = format(startTime, 'HH:mm')
-        
-        // Prüfe ob es ein SLEEP-Eintrag für diesen Nachtdienst ist
-        // Entweder beginnt um 23:01 (23:01-23:59) oder um 00:00 (00:00-06:00)
-        const isSleepForThisNightShift = 
-          startTimeStr === '23:01' || startTimeStr === '00:00'
-        
-        if (isSleepForThisNightShift) {
-          // Berechne die Differenz zwischen startTime und endTime
-          const diffMs = endTime.getTime() - startTime.getTime()
-          const diffMinutes = diffMs / (1000 * 60)
-          const hours = diffMinutes / 60
-          totalSleepHours += hours
-          sleepEntriesCounted++
-        }
+        return startTimeStr === '00:00'
+      })
+      
+      // Berechne die Schlafzeit aus beiden Einträgen
+      if (sleepEntry23 && sleepEntry23.endTime) {
+        const start = parseISO(sleepEntry23.startTime)
+        const end = parseISO(sleepEntry23.endTime)
+        const diffMs = end.getTime() - start.getTime()
+        const diffMinutes = diffMs / (1000 * 60)
+        totalSleepHours += diffMinutes / 60
+      }
+      
+      if (sleepEntry00 && sleepEntry00.endTime) {
+        const start = parseISO(sleepEntry00.startTime)
+        const end = parseISO(sleepEntry00.endTime)
+        const diffMs = end.getTime() - start.getTime()
+        const diffMinutes = diffMs / (1000 * 60)
+        totalSleepHours += diffMinutes / 60
       }
       
       // Subtrahiere Unterbrechungen
