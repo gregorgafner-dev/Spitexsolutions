@@ -961,10 +961,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const effectiveStartTime = isActuallyNightShift && i === 1 ? '06:01' : block.startTime
         const effectiveEndTime = isActuallyNightShift && i === 0 ? '23:00' : (isActuallyNightShift && i === 1 && !block.endTime ? '07:00' : block.endTime)
         
-        // WICHTIG: Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
-        // Aber die Zeiten müssen korrekt sein (zweiter Block ist am nächsten Tag)
-        const blockDate = dateStr // Beide Blöcke auf Startdatum
-        
         if (!effectiveEndTime) {
           setError('Bitte füllen Sie alle Endzeiten aus')
           setIsSaving(false)
@@ -984,6 +980,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         // Wenn Endzeit vor Startzeit, dann ist es am nächsten Tag
         if (endDateTime <= startDateTime) {
           endDateTime.setDate(endDateTime.getDate() + 1)
+        }
+        
+        // WICHTIG: Bestimme das Buchungsdatum basierend auf der tatsächlichen Zeit
+        // Bei Nachtdienst (Ein-Tag-Buchung): Beide Blöcke auf Startdatum
+        // Bei normalen Arbeitszeiten: Datum basierend auf startDateTime
+        let blockDate: string
+        if (isActuallyNightShift) {
+          // Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
+          blockDate = dateStr
+        } else {
+          // Bei normalen Arbeitszeiten: Verwende das Datum von startDateTime
+          blockDate = format(startDateTime, 'yyyy-MM-dd')
         }
 
         // Prüfe 6-Stunden-Regel pro Block

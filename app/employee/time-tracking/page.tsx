@@ -1730,10 +1730,6 @@ export default function TimeTrackingPage() {
         const effectiveStartTime = isSecondBlock ? '06:01' : block.startTime
         const effectiveEndTime = isFirstBlock ? '23:00' : (isSecondBlock && !block.endTime ? '07:00' : block.endTime)
         
-        // WICHTIG: Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
-        // Aber die Zeiten müssen korrekt sein (zweiter Block ist am nächsten Tag)
-        const blockDate = dateStr // Beide Blöcke auf Startdatum
-        
         if (!effectiveEndTime) {
           setError('Bitte füllen Sie alle Endzeiten aus')
           setIsSaving(false)
@@ -1753,6 +1749,18 @@ export default function TimeTrackingPage() {
         // Wenn Endzeit vor Startzeit, dann ist es am nächsten Tag
         if (endDateTime <= startDateTime) {
           endDateTime.setDate(endDateTime.getDate() + 1)
+        }
+        
+        // WICHTIG: Bestimme das Buchungsdatum basierend auf der tatsächlichen Zeit
+        // Bei Nachtdienst (Ein-Tag-Buchung): Beide Blöcke auf Startdatum
+        // Bei normalen Arbeitszeiten: Datum basierend auf startDateTime
+        let blockDate: string
+        if (isNightShift) {
+          // Bei Ein-Tag-Buchung werden beide Blöcke auf das Startdatum gebucht
+          blockDate = dateStr
+        } else {
+          // Bei normalen Arbeitszeiten: Verwende das Datum von startDateTime
+          blockDate = format(startDateTime, 'yyyy-MM-dd')
         }
 
         // Prüfe 6-Stunden-Regel pro Block (nur bei normalen Einträgen, nicht bei Nachtdienst)
