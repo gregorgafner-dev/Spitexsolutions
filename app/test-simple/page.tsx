@@ -27,7 +27,7 @@ export default function TestSimplePage() {
         <p>Öffnen Sie die Browser-Konsole (F12) und prüfen Sie:</p>
         <ul>
           <li>Gibt es rote Fehlermeldungen?</li>
-          <li>Wird "Button wurde geklickt!" geloggt, wenn Sie den Button klicken?</li>
+          <li>Wird &quot;Button wurde geklickt!&quot; geloggt, wenn Sie den Button klicken?</li>
         </ul>
       </div>
     </div>

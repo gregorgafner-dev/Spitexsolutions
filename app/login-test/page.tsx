@@ -121,7 +121,7 @@ export default function LoginTestPage() {
         <ol>
           <li>Öffnen Sie die Browser-Konsole (F12 → Console)</li>
           <li>Füllen Sie Email und Passwort aus</li>
-          <li>Klicken Sie auf "Anmelden"</li>
+          <li>Klicken Sie auf &quot;Anmelden&quot;</li>
           <li>Prüfen Sie die Console-Logs</li>
         </ol>
       </div>
