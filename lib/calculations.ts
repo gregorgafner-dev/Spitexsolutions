@@ -135,61 +135,6 @@ export function calculateSurchargeHours(workHours: number): number {
 }
 
 /**
- * Berechnet den pro-rata Zeitzuschlag für einen Zeitblock, der über mehrere Tage geht
- * Nur die Stunden, die tatsächlich am Sonntag/Feiertag liegen, erhalten Zuschlag
- * 
- * @param startTime Startzeit des Blocks
- * @param endTime Endzeit des Blocks
- * @param breakMinutes Pausenzeit in Minuten
- * @param bookingDate Datum, auf das der Block gebucht wird
- * @returns Zuschlagstunden (nur für Stunden am Sonntag/Feiertag)
- */
-export function calculateProRataSurchargeHours(
-  startTime: Date,
-  endTime: Date,
-  breakMinutes: number = 0,
-  bookingDate: Date
-): number {
-  const year = bookingDate.getFullYear()
-  let totalSurchargeHours = 0
-  
-  // Teile den Block in Stunden auf und prüfe für jede Stunde, ob sie am Sonntag/Feiertag liegt
-  const currentHour = new Date(startTime)
-  const endHour = new Date(endTime)
-  
-  // Iteriere durch jede Stunde
-  while (currentHour < endHour) {
-    const hourStart = new Date(currentHour)
-    const hourEnd = new Date(currentHour)
-    hourEnd.setHours(hourEnd.getHours() + 1)
-    
-    // Begrenze auf den tatsächlichen Block
-    const actualStart = hourStart > startTime ? hourStart : startTime
-    const actualEnd = hourEnd < endTime ? hourEnd : endTime
-    
-    // Prüfe ob diese Stunde am Sonntag/Feiertag liegt
-    const hourDate = new Date(actualStart)
-    hourDate.setHours(0, 0, 0, 0)
-    
-    if (isHolidayOrSunday(hourDate, year)) {
-      // Berechne die Stunden dieser Stunde
-      const hourDurationMs = actualEnd.getTime() - actualStart.getTime()
-      const hourDurationMinutes = hourDurationMs / (1000 * 60)
-      const hourDurationHours = hourDurationMinutes / 60
-      
-      // Zuschlag für diese Stunde (10%)
-      const hourSurcharge = hourDurationHours * 0.1
-      totalSurchargeHours += hourSurcharge
-    }
-    
-    // Nächste Stunde
-    currentHour.setHours(currentHour.getHours() + 1)
-  }
-  
-  return Math.round(totalSurchargeHours * 100) / 100
-}
-
-/**
  * Berechnet die effektive Arbeitszeit aus einem TimeEntry
  */
 export function calculateWorkHours(
@@ -208,8 +153,9 @@ export function calculateWorkHours(
  */
 export function violatesMaxWorkBlock(startTime: Date, endTime: Date): boolean {
   const diffMs = endTime.getTime() - startTime.getTime()
-  const diffHours = diffMs / (1000 * 60 * 60)
-  return diffHours > 6
+  const diffMinutes = diffMs / (1000 * 60)
+  // 6 Stunden = 360 Minuten, prüfe ob mehr als 360 Minuten
+  return diffMinutes > 360
 }
 
 /**

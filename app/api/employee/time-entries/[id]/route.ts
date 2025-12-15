@@ -280,13 +280,21 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
+    // Prüfe ob das Datum noch bearbeitbar ist (nur für Mitarbeiter, nicht für Admins)
     const entryDate = new Date(entry.date)
+    if (!isDateEditableForEmployee(entryDate, false)) {
+      return NextResponse.json(
+        { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
+        { status: 403 }
+      )
+    }
+
     const startTimeDate = new Date(entry.startTime)
     const startHour = startTimeDate.getHours()
     const startMinute = startTimeDate.getMinutes()
     const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`
     
-    // Prüfe ob es ein Nachtdienst-Eintrag ist (MUSS VOR der Editierbarkeitsprüfung gemacht werden!)
+    // Prüfe ob es ein Nachtdienst-Eintrag ist
     // Zweiter Block: Startzeit muss 06:01 sein (Sekunden werden ignoriert)
     const isNightShiftSecondBlock = startHour === 6 && startMinute === 1 // 06:01
     
@@ -297,32 +305,6 @@ export async function DELETE(
       const endHour = endTimeDate.getHours()
       const endMinute = endTimeDate.getMinutes()
       isNightShiftFirstBlock = endHour === 23 && endMinute === 0 // 19:00-23:00
-    }
-
-    // WICHTIG: Editierbarkeitsprüfung muss NACH der Nachtdienst-Erkennung gemacht werden!
-    // Bei Nachtdienst: Die Prüfung gilt für den Tag, an dem der Nachtdienst BEGANN
-    // - Erster Block (19:00-23:00): entryDate ist der Tag, an dem der Nachtdienst begann
-    // - Zweiter Block (06:01): entryDate ist der Folgetag, aber der Nachtdienst begann am Vortag
-    let dateToCheck = entryDate
-    if (isNightShiftSecondBlock) {
-      // Zweiter Block: Prüfe den Vortag (wo der Nachtdienst begann)
-      dateToCheck = new Date(entryDate)
-      dateToCheck.setDate(dateToCheck.getDate() - 1)
-    }
-    
-    // Prüfe ob das Datum noch bearbeitbar ist (nur für Mitarbeiter, nicht für Admins)
-    if (!isDateEditableForEmployee(dateToCheck, false)) {
-      if (isNightShiftSecondBlock) {
-        return NextResponse.json(
-          { error: 'Der zugehörige Nachtdienst-Eintrag am Vortag kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
-          { status: 403 }
-        )
-      } else {
-        return NextResponse.json(
-          { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
-          { status: 403 }
-        )
-      }
     }
 
     // Bei Nachtdienst: Prüfe auch den zugehörigen Block
@@ -363,20 +345,16 @@ export async function DELETE(
         })
       }
       
-      // WICHTIG: Lösche ALLE SLEEP-Einträge am Folgetag, die zu DIESEM Nachtdienst gehören
-      // Wenn wir den ersten Block (19:00-23:00) löschen, gehören ALLE SLEEP-Einträge am Folgetag zu diesem Nachtdienst
-      // WICHTIG: Wir löschen ALLE SLEEP-Einträge am Folgetag, unabhängig davon, ob der zweite Block existiert
+      // Finde und lösche SLEEP-Einträge am Folgetag (00:00-06:00)
       const sleepEntries = relatedEntries.filter(e => e.entryType === 'SLEEP')
-      const interruptionEntries = relatedEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
-      
-      // Lösche ALLE SLEEP-Einträge am Folgetag
       for (const sleepEntry of sleepEntries) {
         await prisma.timeEntry.delete({
           where: { id: sleepEntry.id },
         })
       }
       
-      // Lösche ALLE SLEEP_INTERRUPTION-Einträge am Folgetag
+      // Finde und lösche SLEEP_INTERRUPTION-Einträge am Folgetag
+      const interruptionEntries = relatedEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
       for (const interruptionEntry of interruptionEntries) {
         await prisma.timeEntry.delete({
           where: { id: interruptionEntry.id },
@@ -386,8 +364,7 @@ export async function DELETE(
       // Aktualisiere Monatssaldo für Folgetag
       await updateMonthlyBalance(entry.employeeId, nextDay)
       
-      // Lösche auch SLEEP-Einträge am aktuellen Tag (23:01-23:59), die zu DIESEM Nachtdienst gehören
-      // Ein SLEEP-Eintrag gehört zu diesem Nachtdienst, wenn er um 23:01 beginnt
+      // Lösche auch SLEEP-Einträge am aktuellen Tag (23:01-23:59)
       const currentDayStart = new Date(entryDate)
       currentDayStart.setHours(0, 0, 0, 0)
       const currentDayEnd = new Date(entryDate)
@@ -404,19 +381,22 @@ export async function DELETE(
         },
       })
       
-      // WICHTIG: Lösche ALLE SLEEP-Einträge am aktuellen Tag, die zu DIESEM Nachtdienst gehören
-      // Wenn wir den ersten Block (19:00-23:00) löschen, gehören ALLE SLEEP-Einträge am aktuellen Tag zu diesem Nachtdienst
-      // WICHTIG: Wir löschen ALLE SLEEP-Einträge am aktuellen Tag, unabhängig von der Startzeit
       for (const sleepEntry of currentDayEntries) {
         await prisma.timeEntry.delete({
           where: { id: sleepEntry.id },
         })
       }
     } else if (isNightShiftSecondBlock) {
-      // Zweiter Block (06:01): Der Vortag (wo der Nachtdienst begann) wurde bereits oben geprüft
+      // Zweiter Block (06:01): Der Vortag (wo der Nachtdienst begann) muss editierbar sein
       // Der zweite Block gehört zum Nachtdienst, der am Vortag begann
       const previousDay = new Date(entryDate)
       previousDay.setDate(previousDay.getDate() - 1)
+      if (!isDateEditableForEmployee(previousDay, false)) {
+        return NextResponse.json(
+          { error: 'Der zugehörige Nachtdienst-Eintrag am Vortag kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
+          { status: 403 }
+        )
+      }
       
       // Finde und lösche den zugehörigen ersten Block (19:00-23:00) am Vortag sowie alle SLEEP-Einträge
       const previousDayStart = new Date(previousDay)
@@ -450,20 +430,16 @@ export async function DELETE(
         })
       }
       
-      // WICHTIG: Lösche ALLE SLEEP-Einträge am Vortag, die zu DIESEM Nachtdienst gehören
-      // Wenn wir den zweiten Block (06:01) löschen, gehören ALLE SLEEP-Einträge am Vortag zu diesem Nachtdienst
-      // WICHTIG: Wir löschen ALLE SLEEP-Einträge am Vortag, unabhängig davon, ob der erste Block existiert
+      // Finde und lösche SLEEP-Einträge am Vortag (23:01-23:59)
       const sleepEntries = relatedEntries.filter(e => e.entryType === 'SLEEP')
-      const interruptionEntries = relatedEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
-      
-      // Lösche ALLE SLEEP-Einträge am Vortag
       for (const sleepEntry of sleepEntries) {
         await prisma.timeEntry.delete({
           where: { id: sleepEntry.id },
         })
       }
       
-      // Lösche ALLE SLEEP_INTERRUPTION-Einträge am Vortag
+      // Finde und lösche SLEEP_INTERRUPTION-Einträge am Vortag
+      const interruptionEntries = relatedEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
       for (const interruptionEntry of interruptionEntries) {
         await prisma.timeEntry.delete({
           where: { id: interruptionEntry.id },
@@ -473,9 +449,7 @@ export async function DELETE(
       // Aktualisiere Monatssaldo für Vortag
       await updateMonthlyBalance(entry.employeeId, previousDay)
       
-      // WICHTIG: Lösche ALLE SLEEP-Einträge am aktuellen Tag, die zu DIESEM Nachtdienst gehören
-      // Wenn wir den zweiten Block (06:01) löschen, gehören ALLE SLEEP-Einträge am aktuellen Tag zu diesem Nachtdienst
-      // WICHTIG: Wir löschen ALLE SLEEP-Einträge am aktuellen Tag, unabhängig von der Startzeit
+      // Lösche auch SLEEP-Einträge und SLEEP_INTERRUPTION-Einträge am aktuellen Tag (00:00-06:00)
       const currentDayStart = new Date(entryDate)
       currentDayStart.setHours(0, 0, 0, 0)
       const currentDayEnd = new Date(entryDate)
@@ -492,7 +466,6 @@ export async function DELETE(
         },
       })
       
-      // Lösche ALLE SLEEP-Einträge am aktuellen Tag
       for (const sleepEntry of currentDayEntries) {
         await prisma.timeEntry.delete({
           where: { id: sleepEntry.id },

@@ -43,3 +43,6 @@ Für jede Variable (`DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`):
 
 
 
+
+
+

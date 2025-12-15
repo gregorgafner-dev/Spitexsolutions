@@ -11,14 +11,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Lösche automatisch gelesene Nachrichten, die vor mehr als 4 Tagen gelesen wurden
-    const fourDaysAgo = subDays(new Date(), 4)
+    // Lösche automatisch gelesene Nachrichten, die älter als 2 Tage sind
+    const twoDaysAgo = subDays(new Date(), 2)
     await prisma.message.deleteMany({
       where: {
         read: true,
-        readAt: {
-          not: null,
-          lt: fourDaysAgo,
+        updatedAt: {
+          lt: twoDaysAgo,
         },
       },
     })
@@ -67,27 +66,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
     }
 
-    // Setze readAt, wenn die Nachricht als gelesen markiert wird
-    const updateData: { read: boolean; readAt?: Date | null } = { read }
-    if (read && !updateData.readAt) {
-      updateData.readAt = new Date()
-    } else if (!read) {
-      updateData.readAt = null
-    }
-
     const updatedMessage = await prisma.message.update({
       where: { id: messageId },
-      data: updateData,
+      data: { read },
     })
 
-    // Lösche automatisch gelesene Nachrichten, die vor mehr als 4 Tagen gelesen wurden
-    const fourDaysAgo = subDays(new Date(), 4)
+    // Lösche automatisch gelesene Nachrichten, die älter als 2 Tage sind
+    // (wird auch beim Markieren als gelesen ausgeführt)
+    const twoDaysAgo = subDays(new Date(), 2)
     await prisma.message.deleteMany({
       where: {
         read: true,
-        readAt: {
-          not: null,
-          lt: fourDaysAgo,
+        updatedAt: {
+          lt: twoDaysAgo,
         },
       },
     })

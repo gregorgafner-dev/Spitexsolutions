@@ -14,9 +14,6 @@
     "db:push:force": "tsx scripts/safe-db-push.ts --force-reset",
     "db:push:unsafe": "prisma db push",
     "db:restore": "tsx scripts/restore-database.ts",
-    "db:restore-from-backup": "tsx scripts/restore-from-backup.ts",
-    "db:restore-from-backup:prod": "DATABASE_URL=$DATABASE_URL tsx scripts/restore-from-backup.ts",
-    "db:create-admin": "tsx scripts/create-admin.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:init-worktime": "tsx scripts/init-worktime-config.ts"
