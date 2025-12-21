@@ -110,12 +110,11 @@ export async function POST(request: NextRequest) {
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF()
     
-    // Logo einfügen
+    // Logo einfügen - Spitex Solutions Logo
     let logoLoaded = false
     const logoPaths = [
-      join(process.cwd(), 'public', 'logo-spitex-domus.png'),
-      join(process.cwd(), 'public', 'logo-spitex-domus.svg'),
-      join(process.cwd(), 'public', 'logo.png'),
+      join(process.cwd(), 'public', 'logo.png'), // Spitex Solutions Logo
+      join(process.cwd(), 'public', 'logo-spitex-domus.png'), // Fallback
     ]
     
     for (const logoPath of logoPaths) {
@@ -143,7 +142,9 @@ export async function POST(request: NextRequest) {
     
     if (!logoLoaded) {
       doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
       doc.text('SPITEX SOLUTIONS', 20, currentY)
+      doc.setFont('helvetica', 'normal')
       doc.setFontSize(12)
       doc.text('für Spitex Domus GmbH', 20, currentY + 8)
       currentY += 20
