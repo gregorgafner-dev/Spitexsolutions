@@ -587,13 +587,25 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           }),
         })
 
-        await loadEntriesForMonth()
-        await loadEntriesForDate(selectedDate)
-        setError('')
-        console.log('Standard-Nachtdienst-Zeiten gespeichert')
-        return
+        // Speichere jetzt noch normale Blöcke (die nicht Nachtdienst-Blöcke sind)
+        const normalBlocksToSave = blocksToSave.filter(block => !isNightShiftBlock(block))
+        if (normalBlocksToSave.length > 0) {
+          // Normale Blöcke werden im normalen Speicher-Flow weiter unten verarbeitet
+          // Wir müssen hier nicht return machen, sondern weiter zum normalen Speicher-Flow
+          console.log('Standard-Nachtdienst-Zeiten gespeichert, speichere noch normale Blöcke:', normalBlocksToSave.length)
+          // Setze blocksToSave auf nur normale Blöcke für den weiteren Verarbeitungs-Flow
+          blocksToSave = normalBlocksToSave
+        } else {
+          // Keine normalen Blöcke - fertig
+          await loadEntriesForMonth()
+          await loadEntriesForDate(selectedDate)
+          setError('')
+          console.log('Standard-Nachtdienst-Zeiten gespeichert (keine normalen Blöcke)')
+          return
+        }
+      } else {
+        // Abweichungen vorhanden - verarbeite alle Blöcke normal weiter
       }
-      // Wenn Abweichungen vorhanden sind, verarbeite sie normal weiter
     }
     
     if (blocksToSave.length === 0) {
