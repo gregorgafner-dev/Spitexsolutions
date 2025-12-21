@@ -187,13 +187,24 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       // Lade Unterbrechungen während des Schlafens
       // WICHTIG: Unterbrechungen werden am Startdatum gebucht
       if (hasNightShift) {
-        const sleepInterruptionEntry = data.find((e: TimeEntry) => 
+        // Versuche zuerst aus den aktuell geladenen Daten (data) zu laden
+        let sleepInterruptionEntry = data.find((e: TimeEntry) => 
           e.entryType === 'SLEEP_INTERRUPTION'
         )
+        
+        // Falls nicht gefunden, prüfe auch im entries State (falls loadEntriesForMonth bereits geladen hat)
+        if (!sleepInterruptionEntry) {
+          const entriesForDate = entries.filter(entry => {
+            const entryDate = new Date(entry.date)
+            return isSameDay(entryDate, date) && entry.entryType === 'SLEEP_INTERRUPTION'
+          })
+          sleepInterruptionEntry = entriesForDate[0] || null
+        }
         
         console.log('Admin: Lade Schlafunterbrechung', {
           hasNightShift,
           dataLength: data.length,
+          entriesLength: entries.length,
           sleepInterruptionEntry: sleepInterruptionEntry ? {
             id: sleepInterruptionEntry.id,
             sleepInterruptionMinutes: sleepInterruptionEntry.sleepInterruptionMinutes
@@ -204,7 +215,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           }))
         })
         
-        if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
+        if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes && sleepInterruptionEntry.sleepInterruptionMinutes > 0) {
           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
           const interruptionHours = Math.floor(totalMinutes / 60)
           const interruptionMinutes = totalMinutes % 60
