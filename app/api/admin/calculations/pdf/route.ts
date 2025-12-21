@@ -170,10 +170,17 @@ export async function POST(request: NextRequest) {
     
     // Gesamtstunden
     const totalHours = results.reduce((sum, r) => sum + r.totalHours, 0)
+    const totalSleepHours = results.reduce((sum, r) => sum + r.sleepHours, 0)
     doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
     doc.text(`Gesamt: ${totalHours.toFixed(2)} Stunden`, 20, currentY)
     doc.setFont('helvetica', 'normal')
+    currentY += 8
+    // Gesamtschlafstunden
+    doc.setFontSize(12)
+    doc.setTextColor(0, 0, 255) // Blau, wie bei einzelnen Schlafstunden
+    doc.text(`Gesamtschlafstunden: ${totalSleepHours.toFixed(2)}h`, 20, currentY)
+    doc.setTextColor(0, 0, 0) // Zurück zu Schwarz
     currentY += 15
     
     // Trennlinie
