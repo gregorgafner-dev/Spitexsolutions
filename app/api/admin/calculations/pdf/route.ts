@@ -232,14 +232,6 @@ export async function POST(request: NextRequest) {
         currentY += 7.5
       }
       
-      // Schlafstunden
-      if (result.sleepHours > 0) {
-        doc.setTextColor(0, 0, 255) // Blau
-        doc.text(`Schlafstunden: ${result.sleepHours.toFixed(2)}h`, 25, currentY)
-        doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += 7.5
-      }
-      
       // Schlafunterbrechungen
       if (result.sleepInterruptionHours > 0) {
         doc.setTextColor(200, 100, 0) // Orange
@@ -258,7 +250,17 @@ export async function POST(request: NextRequest) {
       doc.setFont('helvetica', 'bold')
       doc.text(`Total Arbeitszeit: ${result.totalHours.toFixed(2)}h`, 25, currentY)
       doc.setFont('helvetica', 'normal')
-      currentY += 10 // Abstand vor nächstem Mitarbeiter
+      currentY += 7.5
+      
+      // Schlafstunden nach Total Arbeitszeit anzeigen
+      if (result.sleepHours > 0) {
+        doc.setTextColor(0, 0, 255) // Blau
+        doc.text(`Schlafstunden: ${result.sleepHours.toFixed(2)}h`, 25, currentY)
+        doc.setTextColor(0, 0, 0) // Schwarz
+        currentY += 10 // Abstand vor nächstem Mitarbeiter
+      } else {
+        currentY += 10 // Abstand vor nächstem Mitarbeiter auch wenn keine Schlafstunden
+      }
       
       // Abstand zwischen Mitarbeitern
       currentY += 5
