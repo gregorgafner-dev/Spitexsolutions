@@ -94,6 +94,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const response = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&startDate=${start}&endDate=${end}`)
       if (response.ok) {
         const data = await response.json()
+        // Debug: Prüfe ob Schlafunterbrechungen geladen wurden
+        const sleepInterruptions = data.filter((e: TimeEntry) => e.entryType === 'SLEEP_INTERRUPTION')
+        if (sleepInterruptions.length > 0) {
+          console.log('Admin: loadEntriesForMonth - Gefundene Schlafunterbrechungen', {
+            count: sleepInterruptions.length,
+            interruptions: sleepInterruptions.map((e: TimeEntry) => ({
+              id: e.id,
+              date: e.date,
+              sleepInterruptionMinutes: e.sleepInterruptionMinutes
+            }))
+          })
+        }
         setEntries(data)
       }
     } catch (error) {
@@ -220,10 +232,21 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   }
 
   const getEntriesForDate = (date: Date) => {
-    return entries.filter(entry => {
+    const filtered = entries.filter(entry => {
       const entryDate = new Date(entry.date)
       return isSameDay(entryDate, date)
     })
+    // Debug: Log für Schlafunterbrechung
+    const sleepInterruption = filtered.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+    if (sleepInterruption) {
+      console.log('Admin: getEntriesForDate - Gefundene Schlafunterbrechung', {
+        date: date.toISOString().split('T')[0],
+        sleepInterruptionMinutes: sleepInterruption.sleepInterruptionMinutes,
+        allEntriesCount: filtered.length,
+        entryTypes: filtered.map(e => e.entryType)
+      })
+    }
+    return filtered
   }
 
   const getSleepHoursForDate = (date: Date) => {
@@ -790,7 +813,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
       }
 
+      // WICHTIG: Erst loadEntriesForMonth, dann loadEntriesForDate, damit entries State aktuell ist
       await loadEntriesForMonth()
+      // Kurze Pause, damit React State aktualisiert wird
+      await new Promise(resolve => setTimeout(resolve, 100))
       await loadEntriesForDate(selectedDate)
       setError('')
     } catch (error) {
