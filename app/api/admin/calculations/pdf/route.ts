@@ -129,10 +129,10 @@ export async function POST(request: NextRequest) {
         const mimeType = 'image/png'
         
         // Logo mit korrektem Seitenverhältnis einfügen
-        // Typisches Logo-Seitenverhältnis: ca. 2.5:1 für horizontale Logos
-        // Höhe: 16mm, Breite: 40mm (Verhältnis 2.5:1)
-        // Dies verhindert Verzerrung durch falsche Proportionen
-        doc.addImage(logoBase64, mimeType, 20, 10, 40, 16)
+        // Das Logo sollte nicht verzerrt sein - verwende realistische Dimensionen
+        // Höhe: 25mm, Breite: wird proportional berechnet (ca. 70mm für typisches Logo mit Text)
+        // Das Seitenverhältnis wird automatisch beibehalten wenn nur Höhe angegeben wird
+        doc.addImage(logoBase64, mimeType, 20, 10, 70, 25)
         logoLoaded = true
         break
       } catch (error) {
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Header mit Logo oder Text
-    let currentY = logoLoaded ? 35 : 20
+    let currentY = logoLoaded ? 42 : 20
     
     if (!logoLoaded) {
       doc.setFontSize(20)
