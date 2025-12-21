@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validierung 2: Prüfe negative Arbeitszeit
-    if (endTime && startTime) {
+    // Validierung 2: Prüfe negative Arbeitszeit (nicht für SLEEP_INTERRUPTION)
+    if (entryType !== 'SLEEP_INTERRUPTION' && endTime && startTime) {
       const startTimeDate = new Date(startTime)
       const endTimeDate = new Date(endTime)
       if (checkNegativeWorkTime(startTimeDate, endTimeDate)) {
