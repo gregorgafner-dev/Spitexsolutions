@@ -239,8 +239,14 @@ export async function POST(request: NextRequest) {
       if (result.sleepInterruptionHours > 0) {
         doc.setTextColor(200, 100, 0) // Orange
         doc.text(`Schlafunterbrechungen: ${result.sleepInterruptionHours.toFixed(2)}h`, 25, currentY)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(128, 128, 128) // Grau
+        doc.text('In den Arbeitsstunden eingerechnet', 30, currentY + 4)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
         doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += 7.5
+        currentY += 9 // Etwas mehr Abstand wegen der zusätzlichen Zeile
       }
       
       // Total Arbeitszeit
