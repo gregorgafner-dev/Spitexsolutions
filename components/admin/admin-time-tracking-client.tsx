@@ -826,9 +826,24 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
       // WICHTIG: Erst loadEntriesForMonth, dann loadEntriesForDate, damit entries State aktuell ist
       await loadEntriesForMonth()
-      // Kurze Pause, damit React State aktualisiert wird
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Warte etwas länger, damit die Datenbank-Updates verarbeitet werden
+      await new Promise(resolve => setTimeout(resolve, 300))
       await loadEntriesForDate(selectedDate)
+      
+      // Stelle sicher, dass Schlafunterbrechung korrekt geladen wird - lade nochmal explizit
+      if (isNightShift) {
+        const refreshResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${dateStr}`)
+        const refreshData = refreshResponse.ok ? await refreshResponse.json() : []
+        const refreshSleepInterruption = refreshData.find((e: TimeEntry) => e.entryType === 'SLEEP_INTERRUPTION')
+        if (refreshSleepInterruption && refreshSleepInterruption.sleepInterruptionMinutes && refreshSleepInterruption.sleepInterruptionMinutes > 0) {
+          const totalMinutes = refreshSleepInterruption.sleepInterruptionMinutes
+          setSleepInterruptions({
+            hours: Math.floor(totalMinutes / 60),
+            minutes: totalMinutes % 60
+          })
+        }
+      }
+      
       setError('')
     } catch (error) {
       setError('Ein Fehler ist aufgetreten')
