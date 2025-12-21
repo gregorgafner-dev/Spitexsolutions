@@ -57,8 +57,8 @@ export async function PATCH(
       )
     }
 
-    // Validierung 2: Prüfe negative Arbeitszeit
-    if (endTimeDate && checkNegativeWorkTime(startTimeDate, endTimeDate)) {
+    // Validierung 2: Prüfe negative Arbeitszeit (nicht für SLEEP_INTERRUPTION)
+    if (entry.entryType !== 'SLEEP_INTERRUPTION' && endTimeDate && checkNegativeWorkTime(startTimeDate, endTimeDate)) {
       return NextResponse.json(
         { error: 'Endzeit muss nach Startzeit liegen' },
         { status: 400 }
