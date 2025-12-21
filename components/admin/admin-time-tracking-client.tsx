@@ -114,9 +114,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       
       const data = response.ok ? await response.json() : []
       
-      // Konvertiere nur vollständige Einträge (mit endTime) in WorkBlocks
+      // Konvertiere vollständige Einträge (mit endTime) in WorkBlocks - inkl. SLEEP-Einträge für Löschmöglichkeit
       const blocks: WorkBlock[] = data
-        .filter((entry: TimeEntry) => entry.endTime !== null && entry.entryType !== 'SLEEP')
+        .filter((entry: TimeEntry) => entry.endTime !== null)
         .map((entry: TimeEntry) => ({
           id: entry.id,
           startTime: format(parseISO(entry.startTime), 'HH:mm'),
@@ -130,9 +130,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       })
       
       // Prüfe ob es ein Nachtdienst ist (19:00-23:00 und 06:01-07:xx vorhanden)
-      // Nur wenn beide typischen Nachtdienst-Blöcke vorhanden sind
-      const hasBlock1 = blocks.some(b => b.startTime === '19:00' && b.endTime === '23:00')
-      const hasBlock2 = blocks.some(b => b.startTime === '06:01')
+      // Nur wenn beide typischen Nachtdienst-Blöcke vorhanden sind (SLEEP-Einträge ignorieren)
+      const workBlocksOnly = blocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
+      const hasBlock1 = workBlocksOnly.some(b => b.startTime === '19:00' && b.endTime === '23:00')
+      const hasBlock2 = workBlocksOnly.some(b => b.startTime === '06:01')
       const hasNightShift = hasBlock1 && hasBlock2
       
       // Setze isNightShift basierend auf geladenen Einträgen
@@ -363,10 +364,13 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     // Verwende die gefilterten Blöcke für die Anzeige, aber alle Blöcke für das Speichern
     // Wenn Nachtdienst nicht aktiviert ist, müssen wir trotzdem alle Blöcke speichern können
+    // SLEEP-Einträge werden nie gespeichert (werden automatisch erstellt)
     const blocksToSave = isNightShift 
-      ? workBlocks 
+      ? workBlocks.filter(block => block.entryType !== 'SLEEP' && block.entryType !== 'SLEEP_INTERRUPTION')
       : workBlocks.filter(block => {
           // Beim Speichern: Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke
+          // Keine SLEEP-Einträge speichern (werden automatisch erstellt)
+          if (block.entryType === 'SLEEP' || block.entryType === 'SLEEP_INTERRUPTION') return false
           const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
                                    (block.startTime === '06:01')
           return !isNightShiftBlock
@@ -1072,6 +1076,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 {/* WICHTIG: Admins müssen ALLE Blöcke sehen können, damit sie sie löschen können */}
                 {/* Zeige alle Blöcke für Admins */}
                 {workBlocks
+                  .filter(block => block.entryType !== 'SLEEP' && block.entryType !== 'SLEEP_INTERRUPTION')
                   .map((block, index) => {
                   // Bei Nachtdienst: Erster Block endet immer um 23:00, zweiter Block startet immer um 06:01
                   const effectiveStartTime = isNightShift && index === 1 ? '06:01' : block.startTime
@@ -1082,14 +1087,15 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                   const blockMinutes = blockHours * 60
                   const exceedsMaxHours = !isNightShift && blockMinutes > 360
                   
-                  // Prüfe Pause zum nächsten Block
-                  const nextBlock = workBlocks[index + 1]
+                  // Prüfe Pause zum nächsten Block (nur Work-Blöcke)
+                  const workBlocksOnly = workBlocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
+                  const nextBlock = workBlocksOnly[index + 1]
                   let breakMinutes = 0
                   let breakTooShort = false
                   // Bei Nachtdienst gelten die Pausen-Regeln nicht
                   if (!isNightShift && block.endTime && nextBlock?.startTime) {
                     breakMinutes = calculateBreakMinutes(block.endTime, nextBlock.startTime)
-                    const totalHours = calculateTotalWorkHours(workBlocks)
+                    const totalHours = calculateTotalWorkHours(workBlocksOnly)
                     if (totalHours > 6 && breakMinutes < 45) {
                       breakTooShort = true
                     }
@@ -1349,8 +1355,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 </Button>
 
                 {(() => {
-                  // Berechne die angezeigten Blöcke (gefiltert)
+                  // Berechne die angezeigten Blöcke (gefiltert) - ohne SLEEP-Einträge (werden separat angezeigt)
                   const displayedBlocks = workBlocks.filter(block => {
+                    // SLEEP-Einträge werden separat angezeigt
+                    if (block.entryType === 'SLEEP' || block.entryType === 'SLEEP_INTERRUPTION') return false
                     if (isNightShift) return true
                     const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
                                              (block.startTime === '06:01')
@@ -1437,6 +1445,36 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                     >
                       Speichern
                     </Button>
+                  )
+                })()}
+
+                {/* Zeige SLEEP-Einträge separat, damit sie gelöscht werden können */}
+                {(() => {
+                  const sleepBlocks = workBlocks.filter(block => block.entryType === 'SLEEP')
+                  if (sleepBlocks.length === 0) return null
+                  
+                  return (
+                    <div className="mt-4 space-y-2">
+                      <div className="text-sm font-medium text-gray-700">Schlafenszeit-Einträge (können gelöscht werden):</div>
+                      {sleepBlocks.map((block) => (
+                        <div key={block.id} className="border border-purple-200 rounded-lg p-3 bg-purple-50 flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm text-purple-700">
+                              Schlaf: {block.startTime} - {block.endTime}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteTimeEntry(block.id)}
+                            title="Schlafenszeit-Eintrag löschen"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   )
                 })()}
 
