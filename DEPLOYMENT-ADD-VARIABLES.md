@@ -52,3 +52,5 @@ Prisma braucht eine Variable namens `DATABASE_URL`. Sie müssen diese manuell hi
 
 
 
+
+
