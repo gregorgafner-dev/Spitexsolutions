@@ -194,19 +194,23 @@ export async function POST(request: NextRequest) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(12)
       doc.text(result.employeeName, 20, currentY)
+      currentY += 7 // Abstand nach Name
+      
+      // (Stundenlohn) in neuer Zeile, leicht eingerückt
       if (result.employmentType === 'HOURLY_WAGE') {
-        doc.setFontSize(10)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
         doc.setTextColor(0, 0, 255) // Blau
-        doc.text('(Stundenlohn)', 20 + doc.getTextWidth(result.employeeName) + 3, currentY)
+        doc.text('(Stundenlohn)', 25, currentY)
         doc.setTextColor(0, 0, 0) // Zurück zu Schwarz
+        currentY += 6
       }
-      doc.setFont('helvetica', 'normal')
-      currentY += 8
       
       // Arbeitsstunden
       doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
       doc.text(`Arbeitsstunden: ${result.hours.toFixed(2)}h`, 25, currentY)
-      currentY += 6
+      currentY += 7.5 // Mehr Abstand zwischen Zeilen
       
       // Zeitzuschlag
       if (result.surchargeHours > 0) {
@@ -215,7 +219,7 @@ export async function POST(request: NextRequest) {
         doc.text(`Zeitzuschlag (Sonn-/Feiertage): ${result.surchargeHours.toFixed(2)}h`, 25, currentY)
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += 6
+        currentY += 7.5
       }
       
       // Schlafstunden
@@ -223,7 +227,7 @@ export async function POST(request: NextRequest) {
         doc.setTextColor(0, 0, 255) // Blau
         doc.text(`Schlafstunden: ${result.sleepHours.toFixed(2)}h`, 25, currentY)
         doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += 6
+        currentY += 7.5
       }
       
       // Schlafunterbrechungen
@@ -231,30 +235,40 @@ export async function POST(request: NextRequest) {
         doc.setTextColor(200, 100, 0) // Orange
         doc.text(`Schlafunterbrechungen: ${result.sleepInterruptionHours.toFixed(2)}h`, 25, currentY)
         doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += 6
+        currentY += 7.5
       }
       
       // Total Arbeitszeit
       doc.setFont('helvetica', 'bold')
       doc.text(`Total Arbeitszeit: ${result.totalHours.toFixed(2)}h`, 25, currentY)
       doc.setFont('helvetica', 'normal')
-      currentY += 8
+      currentY += 10 // Mehr Abstand vor gelber Box
       
       // Für Stundenlohnangestellte: Aufschlüsselung
       if (result.employmentType === 'HOURLY_WAGE' && result.surchargeHours > 0) {
+        const boxHeight = 26 // Größere Box für besseren Abstand
+        
+        // Prüfe ob Box auf diese Seite passt
+        if (currentY + boxHeight > pageHeight - marginBottom) {
+          doc.addPage()
+          currentY = 20
+        }
+        
+        const boxY = currentY
         doc.setFillColor(255, 240, 200) // Hellorange Hintergrund
-        doc.rect(25, currentY - 2, 165, 20, 'F')
+        doc.rect(25, boxY, 165, boxHeight, 'F')
+        
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
         doc.setTextColor(200, 80, 0) // Dunkleres Orange
-        doc.text('Für Stundenlohnangestellte:', 27, currentY + 5)
+        doc.text('Für Stundenlohnangestellte:', 27, boxY + 6)
         doc.setFont('helvetica', 'normal')
-        doc.text(`Normale Stunden: ${result.hours.toFixed(2)}h`, 27, currentY + 12)
+        doc.text(`Normale Stunden: ${result.hours.toFixed(2)}h`, 27, boxY + 13)
         doc.setFont('helvetica', 'bold')
-        doc.text(`Zuschlag Stunden: ${result.surchargeHours.toFixed(2)}h`, 27, currentY + 19)
+        doc.text(`Zuschlag Stunden: ${result.surchargeHours.toFixed(2)}h`, 27, boxY + 20)
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += 22
+        currentY += boxHeight + 5 // Box-Höhe + zusätzlicher Abstand
       }
       
       // Abstand zwischen Mitarbeitern
