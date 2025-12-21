@@ -630,11 +630,22 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const entriesToDelete = existingEntries.filter(e => {
         if (blockIds.includes(e.id)) return false // Behalte, wenn in blocksToSave
         
-        // Wenn Nachtdienst aktiv, lösche auch SLEEP und SLEEP_INTERRUPTION, die nicht mehr benötigt werden
-        if (isNightShift && (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION')) {
-          // Prüfe ob es noch Nachtdienst-Blöcke gibt
+        // Für SLEEP_INTERRUPTION-Einträge: Lösche wenn keine Nachtdienst-Blöcke vorhanden sind
+        // (unabhängig davon, ob isNightShift aktiv ist oder nicht)
+        if (e.entryType === 'SLEEP_INTERRUPTION') {
           const hasNightBlocks = blocksToSave.some(b => isNightShiftBlock(b))
-          if (!hasNightBlocks) return true // Lösche SLEEP-Einträge wenn kein Nachtdienst mehr
+          // Lösche SLEEP_INTERRUPTION wenn kein Nachtdienst mehr vorhanden ist
+          return !hasNightBlocks
+        }
+        
+        // Für SLEEP-Einträge: Lösche wenn Nachtdienst aktiv, aber keine Nachtdienst-Blöcke vorhanden
+        if (e.entryType === 'SLEEP') {
+          if (isNightShift) {
+            const hasNightBlocks = blocksToSave.some(b => isNightShiftBlock(b))
+            return !hasNightBlocks // Lösche SLEEP-Einträge wenn kein Nachtdienst mehr
+          }
+          // Wenn isNightShift false ist, lösche SLEEP-Einträge auch (da sie nicht mehr benötigt werden)
+          return true
         }
         
         // Für normale Einträge: Lösche wenn nicht in blocksToSave
@@ -1282,10 +1293,65 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               )}
               <div className="space-y-4">
                 {/* WICHTIG: Admins müssen ALLE Blöcke sehen können, damit sie sie löschen können */}
-                {/* Zeige alle Blöcke für Admins */}
-                {workBlocks
-                  .filter(block => block.entryType !== 'SLEEP' && block.entryType !== 'SLEEP_INTERRUPTION')
-                  .map((block, index) => {
+                {/* Zeige alle Blöcke für Admins, inkl. SLEEP_INTERRUPTION wenn vorhanden */}
+                {(() => {
+                  const filteredBlocks = workBlocks.filter(block => {
+                    // Zeige SLEEP-Einträge nie
+                    if (block.entryType === 'SLEEP') return false
+                    // Zeige SLEEP_INTERRUPTION nur wenn keine Nachtdienst-Blöcke vorhanden sind (als Rest-Eintrag)
+                    if (block.entryType === 'SLEEP_INTERRUPTION') {
+                      const workBlocksOnly = workBlocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
+                      const hasNightShiftBlocks = workBlocksOnly.some(b => {
+                        const startTime = b.startTime
+                        return (startTime.startsWith('19:') || startTime.localeCompare('19:00') < 0) && b.endTime === '23:00'
+                      }) || workBlocksOnly.some(b => b.startTime.startsWith('06:01'))
+                      return !hasNightShiftBlocks // Nur anzeigen wenn keine Nachtdienst-Blöcke vorhanden
+                    }
+                    return true
+                  })
+                  
+                  // Berechne korrekte Indizes für normale Blöcke (ohne SLEEP_INTERRUPTION)
+                  const normalBlocksOnly = filteredBlocks.filter(b => b.entryType !== 'SLEEP_INTERRUPTION')
+                  
+                  return filteredBlocks.map((block, index) => {
+                    // Für normale Blöcke: Verwende korrekten Index basierend auf normalen Blöcken
+                    const normalBlockIndex = normalBlocksOnly.findIndex(b => b.id === block.id)
+                    const displayIndex = block.entryType === 'SLEEP_INTERRUPTION' ? -1 : normalBlockIndex
+                  // Für SLEEP_INTERRUPTION-Einträge: Zeige als separaten löschbaren Block
+                  if (block.entryType === 'SLEEP_INTERRUPTION') {
+                    const interruptionEntry = getEntriesForDate(selectedDate).find(e => e.id === block.id)
+                    const interruptionHours = interruptionEntry?.sleepInterruptionMinutes 
+                      ? Math.floor(interruptionEntry.sleepInterruptionMinutes / 60) 
+                      : 0
+                    const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes 
+                      ? interruptionEntry.sleepInterruptionMinutes % 60 
+                      : 0
+                    
+                    return (
+                      <div key={block.id} className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-orange-700">
+                            Schlafunterbrechung (Rest-Eintrag)
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteTimeEntry(block.id)}
+                            title="Schlafunterbrechung löschen"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Dauer: {interruptionHours}h {interruptionMinutes}min
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Dieser Eintrag ist ein Überbleibsel eines gelöschten Nachtdienstes. Sie können ihn löschen.
+                        </div>
+                      </div>
+                    )
+                  }
                   // Bei Nachtdienst: Identifiziere den Block-Typ basierend auf Startzeit
                   // Nur echte Nachtdienst-Blöcke (nicht normale Blöcke)
                   const isFirstBlock = isNightShift && !block.startTime.startsWith('06:01') && block.endTime === '23:00'
@@ -1294,7 +1360,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                   // Für die Berechnung: Verwende die tatsächlichen Zeiten
                   const effectiveStartTime = block.startTime
                   const effectiveEndTime = block.endTime
-                  const blockHours = calculateBlockHours(effectiveStartTime, effectiveEndTime, index)
+                  const blockHours = calculateBlockHours(effectiveStartTime, effectiveEndTime, displayIndex >= 0 ? displayIndex : 0)
                   // Bei Nachtdienst-Blöcken gelten die 6-Stunden-Regel und Pausen-Regel nicht
                   // Für normale Blöcke: 6 Stunden = 360 Minuten, berechne Minuten direkt für präzisere Validierung
                   const blockMinutes = blockHours * 60
@@ -1302,7 +1368,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                   
                   // Prüfe Pause zum nächsten Block (nur Work-Blöcke)
                   const workBlocksOnly = workBlocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
-                  const nextBlock = workBlocksOnly[index + 1]
+                  const nextBlock = displayIndex >= 0 ? workBlocksOnly[displayIndex + 1] : undefined
                   let breakMinutes = 0
                   let breakTooShort = false
                   // Bei Nachtdienst gelten die Pausen-Regeln nicht
@@ -1321,7 +1387,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                           {isNightShift ? (
                             isFirstBlock ? 'Abweichende Startzeit' : 'Abweichende Endzeit'
                           ) : (
-                            `Block ${index + 1}`
+                            `Block ${displayIndex + 1}`
                           )}
                         </span>
                         {(() => {
@@ -1536,7 +1602,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                                 Pause zu kurz
                               </p>
                               <p className="text-xs text-red-700 mt-1">
-                                Die Pause zwischen Block {index + 1} und Block {index + 2} beträgt nur {breakMinutes} Minuten. 
+                                Die Pause zwischen Block {displayIndex + 1} und Block {displayIndex + 2} beträgt nur {breakMinutes} Minuten. 
                                 Bei mehr als 6 Stunden Gesamtarbeitszeit ist eine verordnete Essenspause von mindestens 45 Minuten erforderlich.
                               </p>
                             </div>
@@ -1545,7 +1611,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                       )}
                     </div>
                   )
-                })}
+                })
+                })()}
 
                 {!isNightShift && (
                   <Button
