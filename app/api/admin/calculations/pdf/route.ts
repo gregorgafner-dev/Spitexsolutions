@@ -251,34 +251,7 @@ export async function POST(request: NextRequest) {
       doc.setFont('helvetica', 'bold')
       doc.text(`Total Arbeitszeit: ${result.totalHours.toFixed(2)}h`, 25, currentY)
       doc.setFont('helvetica', 'normal')
-      currentY += 10 // Mehr Abstand vor gelber Box
-      
-      // Für Stundenlohnangestellte: Aufschlüsselung
-      if (result.employmentType === 'HOURLY_WAGE' && result.surchargeHours > 0) {
-        const boxHeight = 26 // Größere Box für besseren Abstand
-        
-        // Prüfe ob Box auf diese Seite passt
-        if (currentY + boxHeight > pageHeight - marginBottom) {
-          doc.addPage()
-          currentY = 20
-        }
-        
-        const boxY = currentY
-        doc.setFillColor(255, 240, 200) // Hellorange Hintergrund
-        doc.rect(25, boxY, 165, boxHeight, 'F')
-        
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(9)
-        doc.setTextColor(200, 80, 0) // Dunkleres Orange
-        doc.text('Für Stundenlohnangestellte:', 27, boxY + 6)
-        doc.setFont('helvetica', 'normal')
-        doc.text(`Normale Stunden: ${result.hours.toFixed(2)}h`, 27, boxY + 13)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`Zuschlag Stunden: ${result.surchargeHours.toFixed(2)}h`, 27, boxY + 20)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(0, 0, 0) // Schwarz
-        currentY += boxHeight + 5 // Box-Höhe + zusätzlicher Abstand
-      }
+      currentY += 10 // Abstand vor nächstem Mitarbeiter
       
       // Abstand zwischen Mitarbeitern
       currentY += 5
