@@ -128,10 +128,11 @@ export async function POST(request: NextRequest) {
         const logoBase64 = logoData.toString('base64')
         const mimeType = 'image/png'
         
-        // Logo mit korrektem Seitenverhältnis einfügen (Breite basierend auf Höhe)
-        // Höhe: 18mm, Breite: wird automatisch proportional angepasst
-        // Für typische horizontale Logos verwenden wir eine Breite von ~55mm bei 18mm Höhe
-        doc.addImage(logoBase64, mimeType, 20, 10, 55, 18)
+        // Logo mit korrektem Seitenverhältnis einfügen
+        // Typisches Logo-Seitenverhältnis: ca. 2.5:1 für horizontale Logos
+        // Höhe: 16mm, Breite: 40mm (Verhältnis 2.5:1)
+        // Dies verhindert Verzerrung durch falsche Proportionen
+        doc.addImage(logoBase64, mimeType, 20, 10, 40, 16)
         logoLoaded = true
         break
       } catch (error) {
