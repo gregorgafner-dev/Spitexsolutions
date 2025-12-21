@@ -703,18 +703,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         // WICHTIG: Unterbrechungen werden am Startdatum gebucht (Schlafenszeit 00:00-06:00)
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
         
+        // Lade aktuelle Einträge vom Tag, um nach bestehender Schlafunterbrechung zu suchen
+        const currentDayEntriesResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${dateStr}`)
+        const currentDayEntries = currentDayEntriesResponse.ok ? await currentDayEntriesResponse.json() : []
+        const existingInterruption = currentDayEntries.find((e: TimeEntry) => 
+          e.entryType === 'SLEEP_INTERRUPTION'
+        )
         
         if (totalInterruptionMinutes > 0) {
-          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag für das Startdatum existiert
-          const existingInterruption = entries.find(e => {
-            const entryDate = new Date(e.date)
-            return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION'
-          })
-          
-
           if (existingInterruption) {
             // Aktualisiere bestehenden Eintrag
-            const response = await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
+            await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -723,7 +722,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             })
           } else {
             // Erstelle neuen Eintrag für das Startdatum
-            const response = await fetch('/api/admin/time-entries', {
+            await fetch('/api/admin/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -739,10 +738,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           }
         } else {
           // Lösche SLEEP_INTERRUPTION-Eintrag vom Startdatum falls vorhanden
-          const existingInterruption = entries.find(e => {
-            const entryDate = new Date(e.date)
-            return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION'
-          })
           if (existingInterruption) {
             await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'DELETE',
