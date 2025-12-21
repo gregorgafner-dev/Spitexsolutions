@@ -131,9 +131,14 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       
       // Prüfe ob es ein Nachtdienst ist (19:00-23:00 und 06:01-07:xx vorhanden)
       // Nur wenn beide typischen Nachtdienst-Blöcke vorhanden sind (SLEEP-Einträge ignorieren)
+      // Erkenne auch abweichende Zeiten: Block mit Startzeit 19:xx (oder früher, aber nicht 06:01) und Block mit Startzeit 06:01
       const workBlocksOnly = blocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
-      const hasBlock1 = workBlocksOnly.some(b => b.startTime === '19:00' && b.endTime === '23:00')
-      const hasBlock2 = workBlocksOnly.some(b => b.startTime === '06:01')
+      const hasBlock1 = workBlocksOnly.some(b => {
+        const startTime = b.startTime
+        // Block, der nicht mit 06:01 beginnt und eine Startzeit von 19:xx oder früher hat
+        return !startTime.startsWith('06:01') && (startTime.startsWith('19:') || startTime.localeCompare('19:00') < 0)
+      })
+      const hasBlock2 = workBlocksOnly.some(b => b.startTime.startsWith('06:01'))
       const hasNightShift = hasBlock1 && hasBlock2
       
       // Setze isNightShift basierend auf geladenen Einträgen
@@ -141,8 +146,27 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       setIsNightShift(hasNightShift)
       
       // Setze workBlocks - WICHTIG: Für Admins immer ALLE Blöcke anzeigen, damit sie gelöscht werden können
-      // Admins müssen alle Blöcke sehen und löschen können
-      setWorkBlocks(blocks)
+      // Bei Nachtdienst: Sortiere die Work-Blöcke so, dass der erste Block (19:00-23:00) vor dem zweiten (06:01-07:xx) kommt
+      let sortedBlocks = [...blocks]
+      if (hasNightShift && workBlocksOnly.length >= 2) {
+        sortedBlocks = blocks.sort((a, b) => {
+          // SLEEP-Einträge bleiben am Ende
+          if (a.entryType === 'SLEEP' || a.entryType === 'SLEEP_INTERRUPTION') return 1
+          if (b.entryType === 'SLEEP' || b.entryType === 'SLEEP_INTERRUPTION') return -1
+          
+          // Erster Block: Startzeit beginnt mit 19: (oder früher, aber nicht 06:01)
+          // Zweiter Block: Startzeit beginnt mit 06:01
+          const aIsSecondBlock = a.startTime.startsWith('06:01')
+          const bIsSecondBlock = b.startTime.startsWith('06:01')
+          
+          if (aIsSecondBlock && !bIsSecondBlock) return 1
+          if (!aIsSecondBlock && bIsSecondBlock) return -1
+          
+          // Beide sind erste Blöcke oder beide sind zweite Blöcke - nach Startzeit sortieren
+          return a.startTime.localeCompare(b.startTime)
+        })
+      }
+      setWorkBlocks(sortedBlocks)
       
       // Lade Unterbrechungen während des Schlafens
       // WICHTIG: Unterbrechungen werden am Startdatum gebucht
@@ -1078,9 +1102,13 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 {workBlocks
                   .filter(block => block.entryType !== 'SLEEP' && block.entryType !== 'SLEEP_INTERRUPTION')
                   .map((block, index) => {
-                  // Bei Nachtdienst: Erster Block endet immer um 23:00, zweiter Block startet immer um 06:01
-                  const effectiveStartTime = isNightShift && index === 1 ? '06:01' : block.startTime
-                  const effectiveEndTime = isNightShift && index === 0 ? '23:00' : block.endTime
+                  // Bei Nachtdienst: Identifiziere den Block-Typ basierend auf Startzeit
+                  const isFirstBlock = isNightShift && !block.startTime.startsWith('06:01')
+                  const isSecondBlock = isNightShift && block.startTime.startsWith('06:01')
+                  
+                  // Für die Berechnung: Verwende die tatsächlichen Zeiten
+                  const effectiveStartTime = block.startTime
+                  const effectiveEndTime = block.endTime
                   const blockHours = calculateBlockHours(effectiveStartTime, effectiveEndTime, index)
                   // Bei Nachtdienst gelten die 6-Stunden-Regel und Pausen-Regel nicht
                   // 6 Stunden = 360 Minuten, berechne Minuten direkt für präzisere Validierung
@@ -1106,7 +1134,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">
                           {isNightShift ? (
-                            index === 0 ? 'Abweichende Startzeit' : 'Abweichende Endzeit'
+                            isFirstBlock ? 'Abweichende Startzeit' : 'Abweichende Endzeit'
                           ) : (
                             `Block ${index + 1}`
                           )}
@@ -1181,18 +1209,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                             <Label>Start</Label>
                             <Input
                               type="time"
-                              value={isNightShift && index === 1 ? '06:01' : block.startTime}
+                              value={isSecondBlock ? '06:01' : block.startTime}
                               onChange={(e) => {
                                 // Bei Nachtdienst: Zweiter Block kann nicht geändert werden (immer 06:01)
-                                if (isNightShift && index === 1) {
+                                if (isSecondBlock) {
                                   return
                                 }
                                 updateWorkBlock(block.id, 'startTime', e.target.value)
                               }}
-                              disabled={isNightShift && index === 1}
-                              readOnly={isNightShift && index === 1}
+                              disabled={isSecondBlock}
+                              readOnly={isSecondBlock}
                             />
-                            {isNightShift && index === 1 && (
+                            {isSecondBlock && (
                               <p className="text-xs text-gray-500 mt-1">Bei Nachtdienst startet der zweite Block immer um 06:01 Uhr</p>
                             )}
                           </div>
@@ -1200,21 +1228,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                             <Label>Ende</Label>
                             <Input
                               type="time"
-                              value={isNightShift && index === 0 ? '23:00' : (block.endTime || '')}
+                              value={block.endTime || ''}
                               onChange={(e) => {
-                                // Bei Nachtdienst: Erster Block kann nicht geändert werden (immer 23:00)
-                                if (isNightShift && index === 0) {
-                                  return
-                                }
                                 updateWorkBlock(block.id, 'endTime', e.target.value)
                               }}
-                              disabled={isNightShift && index === 0}
-                              readOnly={isNightShift && index === 0}
+                              disabled={false}
+                              readOnly={false}
                             />
-                            {isNightShift && index === 0 && (
-                              <p className="text-xs text-gray-500 mt-1">Bei Nachtdienst endet der erste Block immer um 23:00 Uhr</p>
+                            {isFirstBlock && (
+                              <p className="text-xs text-gray-500 mt-1">Standard: 23:00 Uhr (abweichende Endzeiten werden gespeichert)</p>
                             )}
-                            {isNightShift && index === 1 && (
+                            {isSecondBlock && (
                               <p className="text-xs text-gray-500 mt-1">Abweichende Endzeit (Standard: 07:00)</p>
                             )}
                           </div>
