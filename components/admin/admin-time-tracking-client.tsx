@@ -741,25 +741,37 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         // Speichere/aktualisiere Unterbrechungen während des Schlafens
         // WICHTIG: Unterbrechungen werden am Startdatum gebucht (Schlafenszeit 00:00-06:00)
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:743',message:'Saving sleep interruptions',data:{sleepInterruptions,totalInterruptionMinutes,dateStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
+        
         if (totalInterruptionMinutes > 0) {
           // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag für das Startdatum existiert
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
             return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION'
           })
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:749',message:'Checking for existing interruption',data:{existingInterruption:existingInterruption?{id:existingInterruption.id,sleepInterruptionMinutes:existingInterruption.sleepInterruptionMinutes}:null,entriesCount:entries.length,selectedDate:selectedDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion
 
           if (existingInterruption) {
             // Aktualisiere bestehenden Eintrag
-            await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
+            const response = await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 sleepInterruptionMinutes: totalInterruptionMinutes,
               }),
             })
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:758',message:'PATCH sleep interruption response',data:{status:response.status,ok:response.ok,existingInterruptionId:existingInterruption.id,totalInterruptionMinutes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+            // #endregion
           } else {
             // Erstelle neuen Eintrag für das Startdatum
-            await fetch('/api/admin/time-entries', {
+            const response = await fetch('/api/admin/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -772,6 +784,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 sleepInterruptionMinutes: totalInterruptionMinutes,
               }),
             })
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:773',message:'POST sleep interruption response',data:{status:response.status,ok:response.ok,totalInterruptionMinutes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+            // #endregion
           }
         } else {
           // Lösche SLEEP_INTERRUPTION-Eintrag vom Startdatum falls vorhanden
