@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Calculator, Loader2 } from 'lucide-react'
+import { Calculator, Loader2, FileText } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
@@ -161,6 +161,61 @@ export default function CalculationsPage() {
     }
   }
 
+  const handleExportPDF = async () => {
+    if (selectedEmployees.size === 0) {
+      setError('Bitte wählen Sie mindestens einen Mitarbeiter aus')
+      return
+    }
+
+    if (!startDate || !endDate) {
+      setError('Bitte wählen Sie einen Datumsbereich aus')
+      return
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      setError('Das Startdatum muss vor dem Enddatum liegen')
+      return
+    }
+
+    if (results.length === 0) {
+      setError('Bitte führen Sie zuerst eine Berechnung durch')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/calculations/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employeeIds: Array.from(selectedEmployees),
+          startDate,
+          endDate,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Fehler beim Erstellen des PDFs')
+      }
+
+      // Erstelle Blob und öffne Download
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Berechnung_${startDate}_${endDate}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Fehler beim PDF-Export:', error)
+      setError(error instanceof Error ? error.message : 'Fehler beim Erstellen des PDFs')
+    }
+  }
+
   const totalHours = results.reduce((sum, r) => sum + r.totalHours, 0)
 
   return (
@@ -303,10 +358,25 @@ export default function CalculationsPage() {
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle>Ergebnis</CardTitle>
-                <CardDescription>
-                  {results.length > 0 && `Gesamt: ${totalHours.toFixed(2)} Stunden`}
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Ergebnis</CardTitle>
+                    <CardDescription>
+                      {results.length > 0 && `Gesamt: ${totalHours.toFixed(2)} Stunden`}
+                    </CardDescription>
+                  </div>
+                  {results.length > 0 && (
+                    <Button
+                      onClick={handleExportPDF}
+                      variant="outline"
+                      size="sm"
+                      className="ml-2"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      PDF
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {results.length === 0 ? (
