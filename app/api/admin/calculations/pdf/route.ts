@@ -128,11 +128,9 @@ export async function POST(request: NextRequest) {
         const logoBase64 = logoData.toString('base64')
         const mimeType = 'image/png'
         
-        // Logo mit korrektem Seitenverhältnis einfügen
-        // Das Logo sollte nicht verzerrt sein - verwende realistische Dimensionen
-        // Höhe: 25mm, Breite: wird proportional berechnet (ca. 70mm für typisches Logo mit Text)
-        // Das Seitenverhältnis wird automatisch beibehalten wenn nur Höhe angegeben wird
-        doc.addImage(logoBase64, mimeType, 20, 10, 70, 25)
+        // Logo quadratisch einfügen (gleiche Breite und Höhe)
+        // Quadratische Dimensionen: 40mm x 40mm
+        doc.addImage(logoBase64, mimeType, 20, 10, 40, 40)
         logoLoaded = true
         break
       } catch (error) {
@@ -142,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Header mit Logo oder Text
-    let currentY = logoLoaded ? 42 : 20
+    let currentY = logoLoaded ? 57 : 20 // 10mm oben + 40mm Logo + 7mm Abstand = 57mm
     
     if (!logoLoaded) {
       doc.setFontSize(20)
