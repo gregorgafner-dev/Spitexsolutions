@@ -187,11 +187,23 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const sleepInterruptionEntry = data.find((e: TimeEntry) => 
           e.entryType === 'SLEEP_INTERRUPTION'
         )
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:174',message:'Loading sleep interruptions',data:{hasNightShift,sleepInterruptionEntry:sleepInterruptionEntry?{id:sleepInterruptionEntry.id,sleepInterruptionMinutes:sleepInterruptionEntry.sleepInterruptionMinutes}:null,allEntries:data.filter((e:TimeEntry)=>e.entryType==='SLEEP_INTERRUPTION').map((e:TimeEntry)=>({id:e.id,sleepInterruptionMinutes:e.sleepInterruptionMinutes}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
+        
         if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
+          const interruptionHours = Math.floor(totalMinutes / 60)
+          const interruptionMinutes = totalMinutes % 60
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:182',message:'Setting sleep interruptions state',data:{totalMinutes,interruptionHours,interruptionMinutes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion
+          
           setSleepInterruptions({
-            hours: Math.floor(totalMinutes / 60),
-            minutes: totalMinutes % 60
+            hours: interruptionHours,
+            minutes: interruptionMinutes
           })
         } else {
           setSleepInterruptions({ hours: 0, minutes: 0 })
@@ -237,7 +249,13 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
-      return Math.max(0, sleepHours - interruptionHours)
+      const adjustedSleepHours = Math.max(0, sleepHours - interruptionHours)
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:244',message:'Calculating sleep hours',data:{date:date.toISOString(),dayEntriesCount:dayEntries.length,sleepHours,hasNightSleep,interruptionEntry:interruptionEntry?{id:interruptionEntry.id,sleepInterruptionMinutes:interruptionEntry.sleepInterruptionMinutes}:null,interruptionMinutes,interruptionHours,adjustedSleepHours},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      
+      return adjustedSleepHours
     }
     
     return sleepHours
@@ -267,6 +285,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
     const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
     const interruptionHours = interruptionMinutes / 60
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin-time-tracking-client.tsx:252',message:'Calculating total hours',data:{date:date.toISOString(),dayEntriesCount:dayEntries.length,workHours,interruptionEntry:interruptionEntry?{id:interruptionEntry.id,sleepInterruptionMinutes:interruptionEntry.sleepInterruptionMinutes}:null,interruptionMinutes,interruptionHours,totalHours:workHours+interruptionHours,dayEntries:dayEntries.map(e=>({id:e.id,startTime:e.startTime,endTime:e.endTime,entryType:e.entryType,breakMinutes:e.breakMinutes}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
     
     return workHours + interruptionHours
   }
