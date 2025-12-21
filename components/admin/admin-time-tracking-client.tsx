@@ -643,7 +643,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         
         // Bei Nachtdienst: Erster Block endet immer um 23:00, zweiter Block startet immer um 06:01
         const effectiveStartTime = isSecondBlock ? '06:01' : block.startTime
-        const effectiveEndTime = isFirstBlock ? (block.endTime || '23:00') : block.endTime
+        const effectiveEndTime = isFirstBlock ? '23:00' : block.endTime
         
         
         // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
@@ -1360,15 +1360,19 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                             <Label>Ende</Label>
                             <Input
                               type="time"
-                              value={block.endTime || ''}
+                              value={isFirstBlock ? '23:00' : (block.endTime || '')}
                               onChange={(e) => {
+                                // Bei Nachtdienst: Erster Block endet immer um 23:00, kann nicht geändert werden
+                                if (isFirstBlock) {
+                                  return
+                                }
                                 updateWorkBlock(block.id, 'endTime', e.target.value)
                               }}
-                              disabled={false}
-                              readOnly={false}
+                              disabled={isFirstBlock}
+                              readOnly={isFirstBlock}
                             />
                             {isFirstBlock && (
-                              <p className="text-xs text-gray-500 mt-1">Standard: 23:00 Uhr (abweichende Endzeiten werden gespeichert)</p>
+                              <p className="text-xs text-gray-500 mt-1">Bei Nachtdienst endet der erste Block immer um 23:00 Uhr</p>
                             )}
                             {isSecondBlock && (
                               <p className="text-xs text-gray-500 mt-1">Abweichende Endzeit (Standard: 07:00)</p>
