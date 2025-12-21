@@ -835,12 +835,15 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         const refreshResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${dateStr}`)
         const refreshData = refreshResponse.ok ? await refreshResponse.json() : []
         const refreshSleepInterruption = refreshData.find((e: TimeEntry) => e.entryType === 'SLEEP_INTERRUPTION')
-        if (refreshSleepInterruption && refreshSleepInterruption.sleepInterruptionMinutes && refreshSleepInterruption.sleepInterruptionMinutes > 0) {
-          const totalMinutes = refreshSleepInterruption.sleepInterruptionMinutes
+        if (refreshSleepInterruption && refreshSleepInterruption.sleepInterruptionMinutes !== undefined && refreshSleepInterruption.sleepInterruptionMinutes !== null) {
+          const totalMinutes = refreshSleepInterruption.sleepInterruptionMinutes || 0
           setSleepInterruptions({
             hours: Math.floor(totalMinutes / 60),
             minutes: totalMinutes % 60
           })
+        } else {
+          // Keine Schlafunterbrechung gefunden - setze auf 0
+          setSleepInterruptions({ hours: 0, minutes: 0 })
         }
       }
       
