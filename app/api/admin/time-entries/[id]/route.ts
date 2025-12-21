@@ -174,147 +174,166 @@ export async function DELETE(
       isNightShiftFirstBlock = endHour === 23 && endMinute === 0 // 19:00-23:00
     }
 
-    // Bei Nachtdienst: Prüfe auch den zugehörigen Block und lösche ihn, sowie alle SLEEP-Einträge
-    if (isNightShiftFirstBlock) {
-      // Erster Block (19:00-23:00): Finde und lösche den zugehörigen zweiten Block (06:01) am Folgetag
-      const nextDay = new Date(entryDate)
-      nextDay.setDate(nextDay.getDate() + 1)
+    // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
+    // Bei Nachtdienst: Lösche alle zugehörigen Einträge am gleichen Datum (und auch am Folgetag/Vortag für alte Einträge)
+    if (isNightShiftFirstBlock || isNightShiftSecondBlock) {
+      const dayStart = new Date(entryDate)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(entryDate)
+      dayEnd.setHours(23, 59, 59, 999)
       
-      // Prüfe ob Folgetag auch im laufenden Jahr liegt
-      if (nextDay >= yearStart) {
-        const nextDayStart = new Date(nextDay)
-        nextDayStart.setHours(0, 0, 0, 0)
-        const nextDayEnd = new Date(nextDay)
-        nextDayEnd.setHours(23, 59, 59, 999)
-        
-        // Suche nach allen Einträgen am Folgetag (Arbeitszeit und SLEEP)
-        const relatedEntries = await prisma.timeEntry.findMany({
-          where: {
-            employeeId: entry.employeeId,
-            date: {
-              gte: nextDayStart,
-              lte: nextDayEnd,
-            },
-          },
-        })
-        
-        // Finde und lösche Eintrag mit Startzeit 06:01 (zweiter Arbeitszeit-Block)
-        const workEntry = relatedEntries.find(e => {
-          const startTime = new Date(e.startTime)
-          return startTime.getHours() === 6 && startTime.getMinutes() === 1 && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION'
-        })
-        
-        if (workEntry) {
-          await prisma.timeEntry.delete({
-            where: { id: workEntry.id },
-          })
-        }
-        
-        // Finde und lösche SLEEP-Einträge am Folgetag (00:00-06:00)
-        const sleepEntries = relatedEntries.filter(e => e.entryType === 'SLEEP')
-        for (const sleepEntry of sleepEntries) {
-          await prisma.timeEntry.delete({
-            where: { id: sleepEntry.id },
-          })
-        }
-        
-        // Aktualisiere Monatssaldo für Folgetag
-        await updateMonthlyBalance(entry.employeeId, nextDay)
-      }
-      
-      // Lösche auch SLEEP-Einträge am aktuellen Tag (23:01-23:59)
-      const currentDayStart = new Date(entryDate)
-      currentDayStart.setHours(0, 0, 0, 0)
-      const currentDayEnd = new Date(entryDate)
-      currentDayEnd.setHours(23, 59, 59, 999)
-      
-      const currentDayEntries = await prisma.timeEntry.findMany({
+      // Hole alle Einträge am gleichen Tag
+      const allDayEntries = await prisma.timeEntry.findMany({
         where: {
           employeeId: entry.employeeId,
           date: {
-            gte: currentDayStart,
-            lte: currentDayEnd,
+            gte: dayStart,
+            lte: dayEnd,
           },
-          entryType: 'SLEEP',
         },
       })
       
-      for (const sleepEntry of currentDayEntries) {
-        await prisma.timeEntry.delete({
-          where: { id: sleepEntry.id },
+      // Finde und lösche den zugehörigen anderen Arbeitszeit-Block am gleichen Tag
+      if (isNightShiftFirstBlock) {
+        // Erster Block gelöscht: Lösche zweiten Block (06:01) am gleichen Tag
+        const secondBlock = allDayEntries.find(e => {
+          if (e.id === entry.id || e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
+          const startTime = new Date(e.startTime)
+          return startTime.getHours() === 6 && startTime.getMinutes() === 1
         })
-      }
-    } else if (isNightShiftSecondBlock) {
-      // Zweiter Block (06:01): Finde und lösche den zugehörigen ersten Block (19:00-23:00) am Vortag
-      const previousDay = new Date(entryDate)
-      previousDay.setDate(previousDay.getDate() - 1)
-      
-      // Prüfe ob Vortag auch im laufenden Jahr liegt
-      if (previousDay >= yearStart) {
-        const previousDayStart = new Date(previousDay)
-        previousDayStart.setHours(0, 0, 0, 0)
-        const previousDayEnd = new Date(previousDay)
-        previousDayEnd.setHours(23, 59, 59, 999)
-        
-        // Suche nach allen Einträgen am Vortag (Arbeitszeit und SLEEP)
-        const relatedEntries = await prisma.timeEntry.findMany({
-          where: {
-            employeeId: entry.employeeId,
-            date: {
-              gte: previousDayStart,
-              lte: previousDayEnd,
-            },
-          },
-        })
-        
-        // Finde und lösche Eintrag mit Startzeit 19:00 und Endzeit 23:00 (erster Arbeitszeit-Block)
-        const workEntry = relatedEntries.find(e => {
-          if (!e.endTime || e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
+        if (secondBlock) {
+          await prisma.timeEntry.delete({
+            where: { id: secondBlock.id },
+          })
+        }
+      } else if (isNightShiftSecondBlock) {
+        // Zweiter Block gelöscht: Lösche ersten Block (19:00-23:00) am gleichen Tag
+        const firstBlock = allDayEntries.find(e => {
+          if (e.id === entry.id || !e.endTime || e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
           const startTime = new Date(e.startTime)
           const endTime = new Date(e.endTime)
           return startTime.getHours() === 19 && startTime.getMinutes() === 0 &&
                  endTime.getHours() === 23 && endTime.getMinutes() === 0
         })
-        
-        if (workEntry) {
+        if (firstBlock) {
           await prisma.timeEntry.delete({
-            where: { id: workEntry.id },
+            where: { id: firstBlock.id },
           })
         }
-        
-        // Finde und lösche SLEEP-Einträge am Vortag (23:01-23:59)
-        const sleepEntries = relatedEntries.filter(e => e.entryType === 'SLEEP')
-        for (const sleepEntry of sleepEntries) {
-          await prisma.timeEntry.delete({
-            where: { id: sleepEntry.id },
-          })
-        }
-        
-        // Aktualisiere Monatssaldo für Vortag
-        await updateMonthlyBalance(entry.employeeId, previousDay)
       }
       
-      // Lösche auch SLEEP-Einträge am aktuellen Tag (00:00-06:00)
-      const currentDayStart = new Date(entryDate)
-      currentDayStart.setHours(0, 0, 0, 0)
-      const currentDayEnd = new Date(entryDate)
-      currentDayEnd.setHours(23, 59, 59, 999)
-      
-      const currentDayEntries = await prisma.timeEntry.findMany({
-        where: {
-          employeeId: entry.employeeId,
-          date: {
-            gte: currentDayStart,
-            lte: currentDayEnd,
-          },
-          entryType: 'SLEEP',
-        },
-      })
-      
-      for (const sleepEntry of currentDayEntries) {
+      // Lösche alle SLEEP-Einträge am gleichen Tag
+      const sleepEntries = allDayEntries.filter(e => e.entryType === 'SLEEP' && e.id !== entry.id)
+      for (const sleepEntry of sleepEntries) {
         await prisma.timeEntry.delete({
           where: { id: sleepEntry.id },
         })
+      }
+      
+      // Lösche alle SLEEP_INTERRUPTION-Einträge am gleichen Tag
+      const sleepInterruptionEntries = allDayEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION' && e.id !== entry.id)
+      for (const interruptionEntry of sleepInterruptionEntries) {
+        await prisma.timeEntry.delete({
+          where: { id: interruptionEntry.id },
+        })
+      }
+      
+      // FALLBACK: Für alte Einträge, die noch nach dem alten System (über zwei Tage) gespeichert sind:
+      // Prüfe auch Folgetag (bei erstem Block) bzw. Vortag (bei zweitem Block)
+      if (isNightShiftFirstBlock) {
+        // Prüfe Folgetag für alte Einträge
+        const nextDay = new Date(entryDate)
+        nextDay.setDate(nextDay.getDate() + 1)
+        if (nextDay >= yearStart) {
+          const nextDayStart = new Date(nextDay)
+          nextDayStart.setHours(0, 0, 0, 0)
+          const nextDayEnd = new Date(nextDay)
+          nextDayEnd.setHours(23, 59, 59, 999)
+          
+          const nextDayEntries = await prisma.timeEntry.findMany({
+            where: {
+              employeeId: entry.employeeId,
+              date: {
+                gte: nextDayStart,
+                lte: nextDayEnd,
+              },
+            },
+          })
+          
+          // Lösche zweiten Block am Folgetag (falls vorhanden)
+          const secondBlockNextDay = nextDayEntries.find(e => {
+            if (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
+            const startTime = new Date(e.startTime)
+            return startTime.getHours() === 6 && startTime.getMinutes() === 1
+          })
+          if (secondBlockNextDay) {
+            await prisma.timeEntry.delete({
+              where: { id: secondBlockNextDay.id },
+            })
+          }
+          
+          // Lösche SLEEP-Einträge am Folgetag
+          const sleepEntriesNextDay = nextDayEntries.filter(e => e.entryType === 'SLEEP')
+          for (const sleepEntry of sleepEntriesNextDay) {
+            await prisma.timeEntry.delete({
+              where: { id: sleepEntry.id },
+            })
+          }
+          
+          // Lösche SLEEP_INTERRUPTION am Folgetag
+          const interruptionEntriesNextDay = nextDayEntries.filter(e => e.entryType === 'SLEEP_INTERRUPTION')
+          for (const interruptionEntry of interruptionEntriesNextDay) {
+            await prisma.timeEntry.delete({
+              where: { id: interruptionEntry.id },
+            })
+          }
+          
+          await updateMonthlyBalance(entry.employeeId, nextDay)
+        }
+      } else if (isNightShiftSecondBlock) {
+        // Prüfe Vortag für alte Einträge
+        const previousDay = new Date(entryDate)
+        previousDay.setDate(previousDay.getDate() - 1)
+        if (previousDay >= yearStart) {
+          const previousDayStart = new Date(previousDay)
+          previousDayStart.setHours(0, 0, 0, 0)
+          const previousDayEnd = new Date(previousDay)
+          previousDayEnd.setHours(23, 59, 59, 999)
+          
+          const previousDayEntries = await prisma.timeEntry.findMany({
+            where: {
+              employeeId: entry.employeeId,
+              date: {
+                gte: previousDayStart,
+                lte: previousDayEnd,
+              },
+            },
+          })
+          
+          // Lösche ersten Block am Vortag (falls vorhanden)
+          const firstBlockPrevDay = previousDayEntries.find(e => {
+            if (!e.endTime || e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return false
+            const startTime = new Date(e.startTime)
+            const endTime = new Date(e.endTime)
+            return startTime.getHours() === 19 && startTime.getMinutes() === 0 &&
+                   endTime.getHours() === 23 && endTime.getMinutes() === 0
+          })
+          if (firstBlockPrevDay) {
+            await prisma.timeEntry.delete({
+              where: { id: firstBlockPrevDay.id },
+            })
+          }
+          
+          // Lösche SLEEP-Einträge am Vortag
+          const sleepEntriesPrevDay = previousDayEntries.filter(e => e.entryType === 'SLEEP')
+          for (const sleepEntry of sleepEntriesPrevDay) {
+            await prisma.timeEntry.delete({
+              where: { id: sleepEntry.id },
+            })
+          }
+          
+          await updateMonthlyBalance(entry.employeeId, previousDay)
+        }
       }
     }
 
@@ -324,29 +343,8 @@ export async function DELETE(
     })
 
     // Aktualisiere Monatssaldo nach Löschung
-    if (entry.endTime) {
-      await updateMonthlyBalance(employeeId, entryDate)
-      
-      // Bei Nachtdienst: Aktualisiere auch den Monatssaldo für den anderen Tag
-      if (isNightShiftSecondBlock) {
-        // Zweiter Block gelöscht: Aktualisiere auch Vortag
-        const previousDay = new Date(entryDate)
-        previousDay.setDate(previousDay.getDate() - 1)
-        if (previousDay >= yearStart) {
-          await updateMonthlyBalance(employeeId, previousDay)
-        }
-      } else if (isNightShiftFirstBlock) {
-        // Erster Block gelöscht: Aktualisiere auch Folgetag
-        const nextDay = new Date(entryDate)
-        nextDay.setDate(nextDay.getDate() + 1)
-        if (nextDay >= yearStart) {
-          await updateMonthlyBalance(employeeId, nextDay)
-        }
-      }
-    } else {
-      // Auch wenn kein endTime, aktualisiere Monatssaldo für das Datum
-      await updateMonthlyBalance(employeeId, entryDate)
-    }
+    // WICHTIG: Alle Nachtdienst-Einträge sind am gleichen Datum, daher nur einmal aktualisieren
+    await updateMonthlyBalance(employeeId, entryDate)
 
     return NextResponse.json({ success: true })
   } catch (error) {
