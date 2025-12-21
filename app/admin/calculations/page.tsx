@@ -47,9 +47,35 @@ export default function CalculationsPage() {
         const response = await fetch('/api/admin/employees')
         if (!response.ok) throw new Error('Fehler beim Laden der Mitarbeiter')
         const data = await response.json()
-        setEmployees(data)
+        
+        // Sortiere Mitarbeiter nach Nachname (mit Umlaut-Behandlung)
+        const sortedEmployees = [...data].sort((a: Employee, b: Employee) => {
+          // Normalisiere Umlaute für bessere Sortierung
+          const normalize = (str: string) => 
+            str.toLowerCase()
+               .replace(/ä/g, 'ae')
+               .replace(/ö/g, 'oe')
+               .replace(/ü/g, 'ue')
+               .replace(/ß/g, 'ss')
+          
+          const lastNameA = normalize(a.user.lastName)
+          const lastNameB = normalize(b.user.lastName)
+          
+          if (lastNameA < lastNameB) return -1
+          if (lastNameA > lastNameB) return 1
+          
+          // Bei gleichem Nachname nach Vorname sortieren
+          const firstNameA = normalize(a.user.firstName)
+          const firstNameB = normalize(b.user.firstName)
+          
+          if (firstNameA < firstNameB) return -1
+          if (firstNameA > firstNameB) return 1
+          return 0
+        })
+        
+        setEmployees(sortedEmployees)
         // Alle Mitarbeiter standardmäßig auswählen
-        setSelectedEmployees(new Set(data.map((emp: Employee) => emp.id)))
+        setSelectedEmployees(new Set(sortedEmployees.map((emp: Employee) => emp.id)))
       } catch (error) {
         console.error('Fehler beim Laden der Mitarbeiter:', error)
         setError('Fehler beim Laden der Mitarbeiter')
