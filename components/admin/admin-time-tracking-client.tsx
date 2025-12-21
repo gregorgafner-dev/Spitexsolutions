@@ -179,18 +179,36 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           e.entryType === 'SLEEP_INTERRUPTION'
         )
         
+        console.log('Admin: Lade Schlafunterbrechung', {
+          hasNightShift,
+          dataLength: data.length,
+          sleepInterruptionEntry: sleepInterruptionEntry ? {
+            id: sleepInterruptionEntry.id,
+            sleepInterruptionMinutes: sleepInterruptionEntry.sleepInterruptionMinutes
+          } : null,
+          allSLEEP_INTERRUPTION: data.filter((e: TimeEntry) => e.entryType === 'SLEEP_INTERRUPTION').map((e: TimeEntry) => ({
+            id: e.id,
+            sleepInterruptionMinutes: e.sleepInterruptionMinutes
+          }))
+        })
         
         if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
           const interruptionHours = Math.floor(totalMinutes / 60)
           const interruptionMinutes = totalMinutes % 60
           
+          console.log('Admin: Setze Schlafunterbrechung State', {
+            totalMinutes,
+            interruptionHours,
+            interruptionMinutes
+          })
           
           setSleepInterruptions({
             hours: interruptionHours,
             minutes: interruptionMinutes
           })
         } else {
+          console.log('Admin: Keine Schlafunterbrechung gefunden, setze auf 0')
           setSleepInterruptions({ hours: 0, minutes: 0 })
         }
       } else {
@@ -703,6 +721,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         // WICHTIG: Unterbrechungen werden am Startdatum gebucht (Schlafenszeit 00:00-06:00)
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
         
+        console.log('Admin: Speichere Schlafunterbrechung', {
+          sleepInterruptions,
+          totalInterruptionMinutes,
+          dateStr
+        })
+        
         // Lade aktuelle Einträge vom Tag, um nach bestehender Schlafunterbrechung zu suchen
         const currentDayEntriesResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${dateStr}`)
         const currentDayEntries = currentDayEntriesResponse.ok ? await currentDayEntriesResponse.json() : []
@@ -710,19 +734,36 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           e.entryType === 'SLEEP_INTERRUPTION'
         )
         
+        console.log('Admin: Suche nach bestehender Schlafunterbrechung', {
+          currentDayEntriesLength: currentDayEntries.length,
+          existingInterruption: existingInterruption ? {
+            id: existingInterruption.id,
+            sleepInterruptionMinutes: existingInterruption.sleepInterruptionMinutes
+          } : null
+        })
+        
         if (totalInterruptionMinutes > 0) {
           if (existingInterruption) {
             // Aktualisiere bestehenden Eintrag
-            await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
+            console.log('Admin: Aktualisiere bestehende Schlafunterbrechung', {
+              id: existingInterruption.id,
+              totalInterruptionMinutes
+            })
+            const response = await fetch(`/api/admin/time-entries/${existingInterruption.id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 sleepInterruptionMinutes: totalInterruptionMinutes,
               }),
             })
+            console.log('Admin: PATCH Response', { status: response.status, ok: response.ok })
           } else {
             // Erstelle neuen Eintrag für das Startdatum
-            await fetch('/api/admin/time-entries', {
+            console.log('Admin: Erstelle neue Schlafunterbrechung', {
+              totalInterruptionMinutes,
+              dateStr
+            })
+            const response = await fetch('/api/admin/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -735,6 +776,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 sleepInterruptionMinutes: totalInterruptionMinutes,
               }),
             })
+            console.log('Admin: POST Response', { status: response.status, ok: response.ok })
+            const createdEntry = await response.json()
+            console.log('Admin: Erstellter Eintrag', createdEntry)
           }
         } else {
           // Lösche SLEEP_INTERRUPTION-Eintrag vom Startdatum falls vorhanden
