@@ -452,19 +452,27 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
     
+    // Hilfsfunktion: Prüft ob ein Block ein Nachtdienst-Block ist
+    const isNightShiftBlock = (block: WorkBlock): boolean => {
+      // Erster Nachtdienst-Block: Startzeit 19:xx (oder früher, aber nicht 06:01) UND Endzeit 23:00
+      const isFirstNightBlock = !block.startTime.startsWith('06:01') && 
+                                (block.startTime.startsWith('19:') || block.startTime.localeCompare('19:00') < 0) &&
+                                block.endTime === '23:00'
+      // Zweiter Nachtdienst-Block: Startzeit 06:01
+      const isSecondNightBlock = block.startTime.startsWith('06:01')
+      return isFirstNightBlock || isSecondNightBlock
+    }
+
     // Verwende die gefilterten Blöcke für die Anzeige, aber alle Blöcke für das Speichern
-    // Wenn Nachtdienst nicht aktiviert ist, müssen wir trotzdem alle Blöcke speichern können
     // SLEEP-Einträge werden nie gespeichert (werden automatisch erstellt)
-    let blocksToSave = isNightShift 
-      ? workBlocks.filter(block => block.entryType !== 'SLEEP' && block.entryType !== 'SLEEP_INTERRUPTION')
-      : workBlocks.filter(block => {
-          // Beim Speichern: Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke
-          // Keine SLEEP-Einträge speichern (werden automatisch erstellt)
-          if (block.entryType === 'SLEEP' || block.entryType === 'SLEEP_INTERRUPTION') return false
-          const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                   (block.startTime === '06:01')
-          return !isNightShiftBlock
-        })
+    // Wenn Nachtdienst aktiviert ist, können sowohl Nachtdienst-Blöcke als auch normale Blöcke gespeichert werden
+    let blocksToSave = workBlocks.filter(block => {
+      // Keine SLEEP-Einträge speichern (werden automatisch erstellt)
+      if (block.entryType === 'SLEEP' || block.entryType === 'SLEEP_INTERRUPTION') return false
+      // Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke (keine Nachtdienst-Blöcke)
+      if (!isNightShift && isNightShiftBlock(block)) return false
+      return true
+    })
     
     // Bei Nachtdienst: Stelle sicher, dass blocksToSave korrekt sortiert ist (erster Block vor zweitem Block)
     if (isNightShift && blocksToSave.length >= 2) {
@@ -481,10 +489,11 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
     // Bei Nachtdienst: Speichere Standard-Zeiten wenn keine Abweichungen
     if (isNightShift) {
-      // Prüfe ob Abweichungen vorhanden sind
-      const hasDeviations = blocksToSave.some(block => {
+      // Prüfe ob Abweichungen vorhanden sind (nur für Nachtdienst-Blöcke)
+      const nightShiftBlocks = blocksToSave.filter(block => isNightShiftBlock(block))
+      const hasDeviations = nightShiftBlocks.some(block => {
         // Erster Block: Startzeit kann abweichen (aber Endzeit ist immer 23:00)
-        if (block.startTime && block.startTime !== '19:00') return true
+        if (block.startTime && block.startTime !== '19:00' && block.endTime === '23:00') return true
         // Zweiter Block: Endzeit kann abweichen (aber Startzeit ist immer 06:01)
         if (block.startTime === '06:01' && block.endTime && block.endTime !== '07:00') return true
         return false
@@ -493,13 +502,26 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       // Prüfe auch auf Unterbrechungen
       const hasInterruptions = sleepInterruptions.hours > 0 || sleepInterruptions.minutes > 0
 
-      // Wenn keine Abweichungen und keine Unterbrechungen, speichere Standard-Zeiten
-      if (!hasDeviations && !hasInterruptions && blocksToSave.length === 2) {
+      // Wenn keine Abweichungen und keine Unterbrechungen, speichere Standard-Zeiten für Nachtdienst
+      // Normale Blöcke werden separat gespeichert
+      if (!hasDeviations && !hasInterruptions && nightShiftBlocks.length === 2) {
         // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
-        // Lösche alle bestehenden Einträge für diesen Tag (inkl. alte Folgetag-Einträge für Migration)
+        // Lösche nur bestehende Nachtdienst-Einträge für diesen Tag (inkl. alte Folgetag-Einträge für Migration)
+        // Normale Einträge bleiben erhalten
         const existingEntries = entries.filter(e => {
           const entryDate = new Date(e.date)
-          return isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))
+          const isOnSelectedOrNextDay = isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))
+          if (!isOnSelectedOrNextDay) return false
+          
+          // Prüfe ob es ein Nachtdienst-Eintrag ist
+          if (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return true
+          if (e.endTime) {
+            const startTime = format(parseISO(e.startTime), 'HH:mm')
+            const endTime = format(parseISO(e.endTime), 'HH:mm')
+            const isNightBlock = (startTime.startsWith('19:') && endTime === '23:00') || startTime === '06:01'
+            return isNightBlock
+          }
+          return false
         })
 
         for (const entry of existingEntries) {
@@ -581,7 +603,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
     try {
       // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
-      // Lösche alle bestehenden Einträge für diesen Tag (inkl. alte Folgetag-Einträge für Migration)
+      // Lösche bestehende Einträge, die nicht in blocksToSave vorhanden sind
+      // Unterscheide zwischen Nachtdienst-Einträgen und normalen Einträgen
       const existingEntries = entries.filter(e => {
         const entryDate = new Date(e.date)
         return isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))
@@ -589,7 +612,22 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
       // Behalte nur die IDs, die in blocksToSave vorhanden sind
       const blockIds = blocksToSave.filter(b => !b.id.startsWith('new-')).map(b => b.id)
-      const entriesToDelete = existingEntries.filter(e => !blockIds.includes(e.id))
+      
+      // Lösche nur Einträge, die nicht in blocksToSave sind
+      // Für Nachtdienst-Einträge: Prüfe auch auf SLEEP und SLEEP_INTERRUPTION
+      const entriesToDelete = existingEntries.filter(e => {
+        if (blockIds.includes(e.id)) return false // Behalte, wenn in blocksToSave
+        
+        // Wenn Nachtdienst aktiv, lösche auch SLEEP und SLEEP_INTERRUPTION, die nicht mehr benötigt werden
+        if (isNightShift && (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION')) {
+          // Prüfe ob es noch Nachtdienst-Blöcke gibt
+          const hasNightBlocks = blocksToSave.some(b => isNightShiftBlock(b))
+          if (!hasNightBlocks) return true // Lösche SLEEP-Einträge wenn kein Nachtdienst mehr
+        }
+        
+        // Für normale Einträge: Lösche wenn nicht in blocksToSave
+        return true
+      })
 
       for (const entry of entriesToDelete) {
         await fetch(`/api/admin/time-entries/${entry.id}`, {
@@ -598,16 +636,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       }
 
       // Prüfe Gesamtarbeitszeit und Pausen zwischen Blöcken
-      // Bei Nachtdienst gelten diese Validierungen nicht, da die Arbeitszeit über zwei Tage verteilt ist
-      if (!isNightShift) {
-        const totalHours = calculateTotalWorkHours(blocksToSave)
+      // Nur für normale Blöcke (nicht für Nachtdienst-Blöcke)
+      const normalBlocks = blocksToSave.filter(block => !isNightShiftBlock(block))
+      if (normalBlocks.length > 0) {
+        const totalHours = calculateTotalWorkHours(normalBlocks)
         if (totalHours > 6) {
           // Sortiere Blöcke nach Startzeit
-          const sortedBlocks = [...blocksToSave]
+          const sortedBlocks = [...normalBlocks]
             .filter(b => b.startTime && b.endTime)
             .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
-          // Prüfe Pausen zwischen aufeinanderfolgenden Blöcken
+          // Prüfe Pausen zwischen aufeinanderfolgenden normalen Blöcken
           for (let i = 0; i < sortedBlocks.length - 1; i++) {
             const currentBlock = sortedBlocks[i]
             const nextBlock = sortedBlocks[i + 1]
@@ -615,8 +654,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             if (currentBlock.endTime && nextBlock.startTime) {
               const breakMins = calculateBreakMinutes(currentBlock.endTime, nextBlock.startTime)
               if (breakMins < 45) {
-                const blockIndex1 = sortedBlocks.findIndex(b => b.id === currentBlock.id) + 1
-                const blockIndex2 = sortedBlocks.findIndex(b => b.id === nextBlock.id) + 1
+                const blockIndex1 = blocksToSave.findIndex(b => b.id === currentBlock.id) + 1
+                const blockIndex2 = blocksToSave.findIndex(b => b.id === nextBlock.id) + 1
                 setError(`Die Pause zwischen Block ${blockIndex1} und Block ${blockIndex2} beträgt nur ${breakMins} Minuten. Bei mehr als 6 Stunden Gesamtarbeitszeit ist eine verordnete Essenspause von mindestens 45 Minuten erforderlich.`)
                 return
               }
@@ -638,7 +677,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
 
         // Bei Nachtdienst: Identifiziere Block-Typ basierend auf Startzeit, nicht Index
-        const isFirstBlock = isNightShift && !block.startTime.startsWith('06:01')
+        // Nur echte Nachtdienst-Blöcke (nicht normale Blöcke)
+        const isFirstBlock = isNightShift && !block.startTime.startsWith('06:01') && block.endTime === '23:00'
         const isSecondBlock = isNightShift && block.startTime.startsWith('06:01')
         
         // Bei Nachtdienst: Erster Block endet immer um 23:00, zweiter Block startet immer um 06:01
@@ -1235,17 +1275,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                   .filter(block => block.entryType !== 'SLEEP' && block.entryType !== 'SLEEP_INTERRUPTION')
                   .map((block, index) => {
                   // Bei Nachtdienst: Identifiziere den Block-Typ basierend auf Startzeit
-                  const isFirstBlock = isNightShift && !block.startTime.startsWith('06:01')
+                  // Nur echte Nachtdienst-Blöcke (nicht normale Blöcke)
+                  const isFirstBlock = isNightShift && !block.startTime.startsWith('06:01') && block.endTime === '23:00'
                   const isSecondBlock = isNightShift && block.startTime.startsWith('06:01')
                   
                   // Für die Berechnung: Verwende die tatsächlichen Zeiten
                   const effectiveStartTime = block.startTime
                   const effectiveEndTime = block.endTime
                   const blockHours = calculateBlockHours(effectiveStartTime, effectiveEndTime, index)
-                  // Bei Nachtdienst gelten die 6-Stunden-Regel und Pausen-Regel nicht
-                  // 6 Stunden = 360 Minuten, berechne Minuten direkt für präzisere Validierung
+                  // Bei Nachtdienst-Blöcken gelten die 6-Stunden-Regel und Pausen-Regel nicht
+                  // Für normale Blöcke: 6 Stunden = 360 Minuten, berechne Minuten direkt für präzisere Validierung
                   const blockMinutes = blockHours * 60
-                  const exceedsMaxHours = !isNightShift && blockMinutes > 360
+                  const exceedsMaxHours = !isFirstBlock && !isSecondBlock && blockMinutes > 360
                   
                   // Prüfe Pause zum nächsten Block (nur Work-Blöcke)
                   const workBlocksOnly = workBlocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
