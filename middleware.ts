@@ -28,7 +28,8 @@ export default withAuth(
     // #endregion
     if (path === '/login' || path === '/admin/login' || path.startsWith('/employee') || path.startsWith('/admin')) {
       const cookieNames = req.cookies.getAll().map((c) => c.name).filter((n) => n.includes('next-auth') || n.includes('nextauth'))
-      console.log('[MW] auth-check', { path, isPublic: isPublicRoute(path), tokenPresent: !!token, role: (token as any)?.role ?? null })
+      const hasSessionTokenCookie = cookieNames.some((n) => n.includes('session-token'))
+      console.log('[MW] auth-check', { path, isPublic: isPublicRoute(path), tokenPresent: !!token, role: (token as any)?.role ?? null, hasSessionTokenCookie })
       console.log('[MW] cookies', { path, cookieNames })
     }
 
@@ -57,9 +58,13 @@ export default withAuth(
     return NextResponse.next()
   },
   {
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
       authorized: ({ token, req }) => {
         const path = req.nextUrl.pathname
+        if (path.startsWith('/admin') || path.startsWith('/employee') || path === '/login' || path === '/admin/login') {
+          console.log('[MW] authorized()', { path, tokenPresent: !!token, role: (token as any)?.role ?? null })
+        }
         
         // Public routes - IMMER erlauben, auch ohne Token
         if (isPublicRoute(path)) {
