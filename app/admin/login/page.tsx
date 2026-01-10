@@ -30,12 +30,20 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
-      console.log('[Admin Login] Starte Login-Versuch für:', email)
+      // #region agent log H1
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:entry',message:'admin login submit',data:{hasEmail:!!email,hasPassword:!!password},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
+      console.log('[Admin Login] Starte Login-Versuch', { hasEmail: !!email, hasPassword: !!password })
       
       // Timeout nach 10 Sekunden
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Login-Timeout: Die Anfrage hat zu lange gedauert')), 10000)
       })
+
+      // #region agent log H2
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:beforeSignIn',message:'calling next-auth signIn(credentials)',data:{redirect:false},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
 
       const signInPromise = signIn('credentials', {
         email,
@@ -46,6 +54,9 @@ export default function AdminLoginPage() {
       const result = await Promise.race([signInPromise, timeoutPromise]) as any
 
       console.log('[Admin Login] Ergebnis:', result)
+      // #region agent log H3
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterSignIn',message:'signIn resolved',data:{ok:!!result?.ok,hasError:!!result?.error,status:result?.status??null,url:result?.url??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
 
       if (result?.error) {
         console.error('Login-Fehler:', result.error)
@@ -58,7 +69,10 @@ export default function AdminLoginPage() {
         // Warte kurz und aktualisiere die Session
         await new Promise(resolve => setTimeout(resolve, 300))
         const session = await getSession()
-        console.log('[Admin Login] Session nach Login:', session)
+        console.log('[Admin Login] Session nach Login vorhanden:', !!session, 'role:', session?.user?.role)
+        // #region agent log H4
+        fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterGetSession',message:'getSession after login',data:{sessionPresent:!!session,role:session?.user?.role??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
         
         if (session) {
           // Verwende router.push für client-side navigation
@@ -74,6 +88,9 @@ export default function AdminLoginPage() {
         setError('Login fehlgeschlagen. Bitte versuchen Sie es erneut.')
       }
     } catch (error) {
+      // #region agent log H3
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:catch',message:'admin login exception',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       console.error('Login-Exception:', error)
       setError(`Ein Fehler ist aufgetreten: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
     } finally {

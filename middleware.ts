@@ -23,6 +23,13 @@ export default withAuth(
     const isAdmin = token?.role === 'ADMIN'
     const isEmployee = token?.role === 'EMPLOYEE'
 
+    // #region agent log H4
+    fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware.ts:middleware',message:'middleware check',data:{path,isPublic:isPublicRoute(path),tokenPresent:!!token,role:(token as any)?.role??null,isAdmin,isEmployee},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+    if (path === '/login' || path === '/admin/login' || path.startsWith('/employee') || path.startsWith('/admin')) {
+      console.log('[MW] auth-check', { path, isPublic: isPublicRoute(path), tokenPresent: !!token, role: (token as any)?.role ?? null })
+    }
+
     // Öffentliche Routen IMMER durchlassen
     if (isPublicRoute(path)) {
       return NextResponse.next()
@@ -35,11 +42,13 @@ export default withAuth(
 
     // Admin routes
     if (path.startsWith('/admin') && !isAdmin) {
+      console.log('[MW] redirect -> /admin/login', { path, tokenPresent: !!token, role: (token as any)?.role ?? null })
       return NextResponse.redirect(new URL('/admin/login', req.url))
     }
 
     // Employee routes
     if (path.startsWith('/employee') && !isEmployee) {
+      console.log('[MW] redirect -> /login', { path, tokenPresent: !!token, role: (token as any)?.role ?? null })
       return NextResponse.redirect(new URL('/login', req.url))
     }
 

@@ -31,7 +31,11 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      console.log('[Login] Starte Login-Versuch für:', email)
+      // #region agent log H1
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:entry',message:'employee login submit',data:{hasEmail:!!email,hasPassword:!!password,loadingBefore:false},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
+      console.log('[Login] Starte Login-Versuch', { hasEmail: !!email, hasPassword: !!password })
       console.log('[Login] Email vorhanden:', !!email)
       console.log('[Login] Password vorhanden:', !!password)
       
@@ -41,6 +45,9 @@ export default function LoginPage() {
       })
 
       console.log('[Login] Rufe signIn auf...')
+      // #region agent log H2
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:beforeSignIn',message:'calling next-auth signIn(credentials)',data:{redirect:false,callbackUrl:'/employee/dashboard'},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
       
       const signInPromise = signIn('credentials', {
         email,
@@ -53,6 +60,9 @@ export default function LoginPage() {
 
       console.log('[Login] Ergebnis:', result)
       console.log('[Login] Ergebnis-Details:', JSON.stringify(result, null, 2))
+      // #region agent log H3
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:afterSignIn',message:'signIn resolved',data:{ok:!!result?.ok,hasError:!!result?.error,status:result?.status??null,url:result?.url??null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
 
       if (result?.error) {
         console.error('Login-Fehler:', result.error)
@@ -70,6 +80,9 @@ export default function LoginPage() {
         setError('Login fehlgeschlagen. Bitte versuchen Sie es erneut.')
       }
     } catch (error) {
+      // #region agent log H3
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:catch',message:'login exception',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       console.error('Login-Exception:', error)
       setError(`Ein Fehler ist aufgetreten: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
     } finally {

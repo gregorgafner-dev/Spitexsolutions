@@ -31,6 +31,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# cursor / local IDE state
+.cursor/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

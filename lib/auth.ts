@@ -14,12 +14,16 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req) {
         try {
+          // #region agent log H2
+          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:entry',message:'authorize(credentials) called',data:{hasEmail:!!credentials?.email,hasPassword:!!credentials?.password},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion
+
           if (!credentials?.email || !credentials?.password) {
             console.log('[NextAuth] Fehlende Credentials')
             return null
           }
 
-          console.log('[NextAuth] Versuche Login für:', credentials.email)
+          console.log('[NextAuth] Versuche Login (credentials vorhanden)')
           
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
@@ -29,8 +33,12 @@ export const authOptions: NextAuthOptions = {
             },
           })
 
+          // #region agent log H2
+          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:afterUserLookup',message:'user lookup done',data:{userFound:!!user,role:user?.role??null,hasEmployee:!!user?.employee,hasAdmin:!!user?.admin},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion
+
           if (!user) {
-            console.log('[NextAuth] User nicht gefunden:', credentials.email)
+            console.log('[NextAuth] User nicht gefunden')
             return null
           }
 
@@ -41,12 +49,16 @@ export const authOptions: NextAuthOptions = {
             user.password
           )
 
+          // #region agent log H2
+          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:afterPasswordCompare',message:'password compare done',data:{isPasswordValid:!!isPasswordValid,role:user.role},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion
+
           if (!isPasswordValid) {
             console.log('[NextAuth] Passwort ungültig')
             return null
           }
 
-          console.log('[NextAuth] Login erfolgreich für:', credentials.email)
+          console.log('[NextAuth] Login erfolgreich')
           
           return {
             id: user.id,
@@ -57,6 +69,9 @@ export const authOptions: NextAuthOptions = {
             adminId: user.admin?.id,
           }
         } catch (error) {
+          // #region agent log H2
+          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:catch',message:'authorize threw',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion
           console.error('[NextAuth] Fehler in authorize:', error)
           return null
         }
@@ -69,6 +84,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role
         token.employeeId = user.employeeId
         token.adminId = user.adminId
+        console.log('[NextAuth] jwt callback set role:', user.role)
       }
       return token
     },
@@ -78,6 +94,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as 'ADMIN' | 'EMPLOYEE'
         session.user.employeeId = token.employeeId as string | undefined
         session.user.adminId = token.adminId as string | undefined
+        console.log('[NextAuth] session callback role:', session.user.role)
       }
       return session
     },

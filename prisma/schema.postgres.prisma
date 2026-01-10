@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -187,4 +187,5 @@ model Message {
   @@index([employeeId, createdAt])
   @@index([read, createdAt])
 }
+
 
