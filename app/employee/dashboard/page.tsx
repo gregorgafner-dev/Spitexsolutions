@@ -11,8 +11,15 @@ export default async function EmployeeDashboard() {
   const session = await getSession()
 
   if (!session || session.user.role !== 'EMPLOYEE' || !session.user.employeeId) {
+    console.log('[EmployeeDashboard] redirect -> /login', {
+      sessionPresent: !!session,
+      role: session?.user?.role ?? null,
+      hasEmployeeId: !!session?.user?.employeeId,
+    })
     redirect('/login')
   }
+
+  console.log('[EmployeeDashboard] session ok', { role: session.user.role, hasEmployeeId: true })
 
   const now = new Date()
   const currentYear = now.getFullYear()

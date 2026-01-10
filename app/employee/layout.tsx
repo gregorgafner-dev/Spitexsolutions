@@ -10,6 +10,10 @@ export default async function EmployeeLayout({
   const session = await getSession()
   
   if (!session || session.user.role !== 'EMPLOYEE') {
+    console.log('[EmployeeLayout] redirect -> /login', {
+      sessionPresent: !!session,
+      role: session?.user?.role ?? null,
+    })
     redirect('/login')
   }
 

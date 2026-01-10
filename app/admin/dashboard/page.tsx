@@ -12,8 +12,14 @@ export default async function AdminDashboard() {
   const session = await getSession()
 
   if (!session || session.user.role !== 'ADMIN') {
+    console.log('[AdminDashboard] redirect -> /admin/login', {
+      sessionPresent: !!session,
+      role: session?.user?.role ?? null,
+    })
     redirect('/admin/login')
   }
+
+  console.log('[AdminDashboard] session ok', { role: session.user.role })
 
   const employeeCount = await prisma.employee.count()
   const serviceCount = await prisma.service.count()
