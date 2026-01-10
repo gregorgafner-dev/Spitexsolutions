@@ -21,6 +21,13 @@ export default function AdminLoginPage() {
 
   // Stelle sicher, dass loading beim Mount zurückgesetzt wird
   useEffect(() => {
+    // #region agent log H5
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const keys = Array.from(params.keys()).slice(0, 10)
+      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:useEffect:mount',message:'admin login page mounted',data:{path:window.location.pathname,hasQuery:window.location.search.length>0,queryKeys:keys},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H5'})}).catch(()=>{});
+    }
+    // #endregion
     setLoading(false)
   }, [])
 
