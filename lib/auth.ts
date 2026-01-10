@@ -3,6 +3,20 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './db'
 import bcrypt from 'bcryptjs'
 
+// Debug: Konfiguration sichtbar machen (ohne Secrets/PII)
+console.log('[AuthConfig]', {
+  nodeEnv: process.env.NODE_ENV,
+  nextauthUrlPresent: !!process.env.NEXTAUTH_URL,
+  nextauthUrlHost: (() => {
+    try {
+      return process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).host : null
+    } catch {
+      return 'invalid'
+    }
+  })(),
+  nextauthSecretPresent: !!process.env.NEXTAUTH_SECRET,
+})
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV !== 'production',

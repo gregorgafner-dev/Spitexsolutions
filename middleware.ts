@@ -31,6 +31,7 @@ export default withAuth(
       const hasSessionTokenCookie = cookieNames.some((n) => n.includes('session-token'))
       console.log('[MW] auth-check', { path, isPublic: isPublicRoute(path), tokenPresent: !!token, role: (token as any)?.role ?? null, hasSessionTokenCookie })
       console.log('[MW] cookies', { path, cookieNames })
+      console.log('[MW] env', { nextauthSecretPresent: !!process.env.NEXTAUTH_SECRET, nextauthUrlPresent: !!process.env.NEXTAUTH_URL })
     }
 
     // Öffentliche Routen IMMER durchlassen
