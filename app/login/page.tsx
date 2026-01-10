@@ -18,11 +18,15 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const canIngest =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
   // Stelle sicher, dass loading beim Mount zurückgesetzt wird
   useEffect(() => {
     console.log('[Login] Komponente wurde geladen (Mounted)')
     // #region agent log H5
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && canIngest) {
       const params = new URLSearchParams(window.location.search)
       const keys = Array.from(params.keys()).slice(0, 10)
       fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:useEffect:mount',message:'login page mounted',data:{path:window.location.pathname,hasQuery:window.location.search.length>0,queryKeys:keys},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H5'})}).catch(()=>{});
@@ -39,7 +43,7 @@ export default function LoginPage() {
 
     try {
       // #region agent log H1
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:entry',message:'employee login submit',data:{hasEmail:!!email,hasPassword:!!password,loadingBefore:false},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H1'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:entry',message:'employee login submit',data:{hasEmail:!!email,hasPassword:!!password,loadingBefore:false},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H1'})}).catch(()=>{});
       // #endregion
 
       console.log('[Login] Starte Login-Versuch', { hasEmail: !!email, hasPassword: !!password })
@@ -53,7 +57,7 @@ export default function LoginPage() {
 
       console.log('[Login] Rufe signIn auf...')
       // #region agent log H2
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:beforeSignIn',message:'calling next-auth signIn(credentials)',data:{redirect:false,callbackUrl:'/employee/dashboard'},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H2'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:beforeSignIn',message:'calling next-auth signIn(credentials)',data:{redirect:false,callbackUrl:'/employee/dashboard'},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H2'})}).catch(()=>{});
       // #endregion
       
       const signInPromise = signIn('credentials', {
@@ -68,7 +72,7 @@ export default function LoginPage() {
       console.log('[Login] Ergebnis:', result)
       console.log('[Login] Ergebnis-Details:', JSON.stringify(result, null, 2))
       // #region agent log H3
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:afterSignIn',message:'signIn resolved',data:{ok:!!result?.ok,hasError:!!result?.error,status:result?.status??null,url:result?.url??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:afterSignIn',message:'signIn resolved',data:{ok:!!result?.ok,hasError:!!result?.error,status:result?.status??null,url:result?.url??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
       // #endregion
 
       if (result?.error) {
@@ -88,7 +92,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       // #region agent log H3
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:catch',message:'login exception',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:handleSubmit:catch',message:'login exception',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
       // #endregion
       console.error('Login-Exception:', error)
       setError(`Ein Fehler ist aufgetreten: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)

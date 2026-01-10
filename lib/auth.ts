@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV !== 'production',
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -15,7 +16,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials, req) {
         try {
           // #region agent log H2
-          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:entry',message:'authorize(credentials) called',data:{hasEmail:!!credentials?.email,hasPassword:!!credentials?.password},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          if (process.env.NODE_ENV !== 'production') fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:entry',message:'authorize(credentials) called',data:{hasEmail:!!credentials?.email,hasPassword:!!credentials?.password},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
           // #endregion
 
           if (!credentials?.email || !credentials?.password) {
@@ -34,7 +35,7 @@ export const authOptions: NextAuthOptions = {
           })
 
           // #region agent log H2
-          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:afterUserLookup',message:'user lookup done',data:{userFound:!!user,role:user?.role??null,hasEmployee:!!user?.employee,hasAdmin:!!user?.admin},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          if (process.env.NODE_ENV !== 'production') fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:afterUserLookup',message:'user lookup done',data:{userFound:!!user,role:user?.role??null,hasEmployee:!!user?.employee,hasAdmin:!!user?.admin},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
           // #endregion
 
           if (!user) {
@@ -50,7 +51,7 @@ export const authOptions: NextAuthOptions = {
           )
 
           // #region agent log H2
-          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:afterPasswordCompare',message:'password compare done',data:{isPasswordValid:!!isPasswordValid,role:user.role},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          if (process.env.NODE_ENV !== 'production') fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:afterPasswordCompare',message:'password compare done',data:{isPasswordValid:!!isPasswordValid,role:user.role},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
           // #endregion
 
           if (!isPasswordValid) {
@@ -70,7 +71,7 @@ export const authOptions: NextAuthOptions = {
           }
         } catch (error) {
           // #region agent log H2
-          fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:catch',message:'authorize threw',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          if (process.env.NODE_ENV !== 'production') fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/auth.ts:authorize:catch',message:'authorize threw',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
           // #endregion
           console.error('[NextAuth] Fehler in authorize:', error)
           return null
@@ -78,6 +79,14 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  events: {
+    async signIn({ user }) {
+      console.log('[NextAuth] event signIn', { role: (user as any)?.role ?? null })
+    },
+    async signOut() {
+      console.log('[NextAuth] event signOut')
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

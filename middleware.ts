@@ -24,10 +24,12 @@ export default withAuth(
     const isEmployee = token?.role === 'EMPLOYEE'
 
     // #region agent log H4
-    fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware.ts:middleware',message:'middleware check',data:{path,isPublic:isPublicRoute(path),tokenPresent:!!token,role:(token as any)?.role??null,isAdmin,isEmployee},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
+    if (process.env.NODE_ENV !== 'production') fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware.ts:middleware',message:'middleware check',data:{path,isPublic:isPublicRoute(path),tokenPresent:!!token,role:(token as any)?.role??null,isAdmin,isEmployee},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
     // #endregion
     if (path === '/login' || path === '/admin/login' || path.startsWith('/employee') || path.startsWith('/admin')) {
+      const cookieNames = req.cookies.getAll().map((c) => c.name).filter((n) => n.includes('next-auth') || n.includes('nextauth'))
       console.log('[MW] auth-check', { path, isPublic: isPublicRoute(path), tokenPresent: !!token, role: (token as any)?.role ?? null })
+      console.log('[MW] cookies', { path, cookieNames })
     }
 
     // Öffentliche Routen IMMER durchlassen

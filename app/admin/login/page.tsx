@@ -19,10 +19,14 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const canIngest =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
   // Stelle sicher, dass loading beim Mount zurückgesetzt wird
   useEffect(() => {
     // #region agent log H5
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && canIngest) {
       const params = new URLSearchParams(window.location.search)
       const keys = Array.from(params.keys()).slice(0, 10)
       fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:useEffect:mount',message:'admin login page mounted',data:{path:window.location.pathname,hasQuery:window.location.search.length>0,queryKeys:keys},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H5'})}).catch(()=>{});
@@ -38,7 +42,7 @@ export default function AdminLoginPage() {
 
     try {
       // #region agent log H1
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:entry',message:'admin login submit',data:{hasEmail:!!email,hasPassword:!!password},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H1'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:entry',message:'admin login submit',data:{hasEmail:!!email,hasPassword:!!password},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H1'})}).catch(()=>{});
       // #endregion
 
       console.log('[Admin Login] Starte Login-Versuch', { hasEmail: !!email, hasPassword: !!password })
@@ -49,7 +53,7 @@ export default function AdminLoginPage() {
       })
 
       // #region agent log H2
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:beforeSignIn',message:'calling next-auth signIn(credentials)',data:{redirect:false},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H2'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:beforeSignIn',message:'calling next-auth signIn(credentials)',data:{redirect:false},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H2'})}).catch(()=>{});
       // #endregion
 
       const signInPromise = signIn('credentials', {
@@ -62,7 +66,7 @@ export default function AdminLoginPage() {
 
       console.log('[Admin Login] Ergebnis:', result)
       // #region agent log H3
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterSignIn',message:'signIn resolved',data:{ok:!!result?.ok,hasError:!!result?.error,status:result?.status??null,url:result?.url??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterSignIn',message:'signIn resolved',data:{ok:!!result?.ok,hasError:!!result?.error,status:result?.status??null,url:result?.url??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
       // #endregion
 
       if (result?.error) {
@@ -78,7 +82,7 @@ export default function AdminLoginPage() {
         const session = await getSession()
         console.log('[Admin Login] Session nach Login vorhanden:', !!session, 'role:', session?.user?.role)
         // #region agent log H4
-        fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterGetSession',message:'getSession after login',data:{sessionPresent:!!session,role:session?.user?.role??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H4'})}).catch(()=>{});
+        if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterGetSession',message:'getSession after login',data:{sessionPresent:!!session,role:session?.user?.role??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H4'})}).catch(()=>{});
         // #endregion
         
         if (session) {
@@ -96,7 +100,7 @@ export default function AdminLoginPage() {
       }
     } catch (error) {
       // #region agent log H3
-      fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:catch',message:'admin login exception',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
+      if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:catch',message:'admin login exception',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H3'})}).catch(()=>{});
       // #endregion
       console.error('Login-Exception:', error)
       setError(`Ein Fehler ist aufgetreten: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
