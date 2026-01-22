@@ -59,6 +59,28 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   const [isNightShift, setIsNightShift] = useState(false)
   const [sleepInterruptions, setSleepInterruptions] = useState({ hours: 0, minutes: 0 })
 
+  const debugDateKeys = new Set(['2026-01-12', '2026-01-15', '2026-01-16'])
+  const ymdKey = (d: Date) => format(d, 'yyyy-MM-dd')
+  const shouldDebugDate = (d: Date) => debugDateKeys.has(ymdKey(d))
+
+  const debugLog = (location: string, message: string, data: any, hypothesisId: string) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+  }
+
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
   const daysInMonth = getDaysInMonth(currentMonth)
@@ -147,6 +169,20 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         return et.getHours() === 23 && et.getMinutes() === 0
       })
 
+      if (shouldDebugDate(date)) {
+        debugLog(
+          'components/admin/admin-time-tracking-client.tsx:loadEntriesForDate',
+          'loadEntriesForDate() loaded current day',
+          {
+            dateStr,
+            hasNightShiftStartBlock,
+            currentCount: data.length,
+            currentTypes: data.map((e: TimeEntry) => e.entryType),
+          },
+          'B'
+        )
+      }
+
       // Fallback für alte, gesplittete Nachtdienst-Daten:
       // 06:01 / 00:00-06:00 / Unterbrechung waren auf dem Folgetag gebucht.
       // Diese hängen wir für Anzeige/Löschbarkeit an den Starttag an (nur wenn entry.date == startTime-Kalendertag).
@@ -166,6 +202,26 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           const entryDate = new Date(e.date)
           return isSameDay(entryDate, nextDate)
         })
+      }
+
+      if (shouldDebugDate(date)) {
+        debugLog(
+          'components/admin/admin-time-tracking-client.tsx:loadEntriesForDate',
+          'loadEntriesForDate() loaded next day (for old split carryover)',
+          {
+            dateStr,
+            nextDateStr,
+            nextCount: nextDayEntries.length,
+            nextSamples: nextDayEntries.slice(0, 10).map((e: TimeEntry) => ({
+              entryType: e.entryType,
+              date: e.date,
+              startTime: e.startTime,
+              endTime: e.endTime,
+              sleepInterruptionMinutes: e.sleepInterruptionMinutes ?? null,
+            })),
+          },
+          'A'
+        )
       }
 
       const oldSplitCarryOverBlocks: WorkBlock[] = nextDayEntries
@@ -192,6 +248,19 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
           entryType: e.entryType || 'WORK',
         }))
+
+      if (shouldDebugDate(date)) {
+        debugLog(
+          'components/admin/admin-time-tracking-client.tsx:loadEntriesForDate',
+          'computed oldSplitCarryOverBlocks',
+          {
+            dateStr,
+            carryCount: oldSplitCarryOverBlocks.length,
+            carryBlocks: oldSplitCarryOverBlocks.map(b => ({ startTime: b.startTime, endTime: b.endTime, entryType: b.entryType })),
+          },
+          'A'
+        )
+      }
       
       
       console.log('Admin: Geladene Blöcke', { 
@@ -342,6 +411,26 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
     const nextDayEntries = getEntriesForDate(nextDay).filter(isOldSplitEntry)
 
+    if (shouldDebugDate(date)) {
+      debugLog(
+        'components/admin/admin-time-tracking-client.tsx:getOldSplitCarryOverEntriesForStartDate',
+        'nextDayEntries considered for carryover (old split)',
+        {
+          date: ymdKey(date),
+          nextDay: ymdKey(nextDay),
+          nextDayEntriesCount: nextDayEntries.length,
+          nextDayEntries: nextDayEntries.slice(0, 10).map(e => ({
+            entryType: e.entryType,
+            date: e.date,
+            startTime: e.startTime,
+            endTime: e.endTime,
+            sleepInterruptionMinutes: e.sleepInterruptionMinutes ?? null,
+          })),
+        },
+        'A'
+      )
+    }
+
     const work0601 = nextDayEntries.filter(e => {
       if (e.entryType !== 'WORK' || !e.endTime) return false
       const st = parseISO(e.startTime)
@@ -374,7 +463,27 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       return false
     })
 
-    return [...fromDay, ...carry.sleep00]
+    const result = [...fromDay, ...carry.sleep00]
+    if (shouldDebugDate(date)) {
+      debugLog(
+        'components/admin/admin-time-tracking-client.tsx:getNightShiftSleepEntriesForStartDate',
+        'sleep entries used for date',
+        {
+          date: ymdKey(date),
+          fromDayCount: fromDay.length,
+          carrySleepCount: carry.sleep00.length,
+          resultCount: result.length,
+          result: result.map(e => ({
+            entryType: e.entryType,
+            date: e.date,
+            startTime: e.startTime,
+            endTime: e.endTime,
+          })),
+        },
+        'A'
+      )
+    }
+    return result
   }
 
   const getNightShiftInterruptionEntryForStartDate = (date: Date): TimeEntry | null => {
@@ -401,7 +510,28 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       return true
     })
 
-    return [...filtered, ...carry.work0601]
+    const result = [...filtered, ...carry.work0601]
+    if (shouldDebugDate(date)) {
+      debugLog(
+        'components/admin/admin-time-tracking-client.tsx:getNightShiftWorkEntriesForStartDate',
+        'work entries used for date',
+        {
+          date: ymdKey(date),
+          filteredCount: filtered.length,
+          carryWorkCount: carry.work0601.length,
+          resultCount: result.length,
+          removedOld0601FromDay: workEntries
+            .filter(e => e.entryType === 'WORK')
+            .filter(e => {
+              const st = parseISO(e.startTime)
+              return st.getHours() === 6 && st.getMinutes() === 1 && isOldSplitEntry(e)
+            })
+            .map(e => ({ date: e.date, startTime: e.startTime, endTime: e.endTime })),
+        },
+        'B'
+      )
+    }
+    return result
   }
 
   const getSleepHoursForDate = (date: Date) => {
