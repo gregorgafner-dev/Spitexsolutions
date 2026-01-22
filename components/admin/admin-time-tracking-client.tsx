@@ -120,6 +120,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     try {
       const dateStr = format(date, 'yyyy-MM-dd')
       const nextDate = addDays(date, 1)
+      const nextDateStr = format(nextDate, 'yyyy-MM-dd')
       
       // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
       // Lade nur Einträge vom aktuellen Tag
@@ -138,15 +139,36 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           entryType: entry.entryType || 'WORK',
         }))
 
+      // Erkenne Nachtdienst-Startblock am aktuellen Tag (starkes Signal: Endzeit 23:00)
+      const hasNightShiftStartBlock = data.some((e: TimeEntry) => {
+        if (e.entryType !== 'WORK' || !e.endTime) return false
+        const st = parseISO(e.startTime)
+        const et = parseISO(e.endTime)
+        return et.getHours() === 23 && et.getMinutes() === 0 && st.getHours() >= 17 && st.getHours() <= 22
+      })
+
       // Fallback für alte, gesplittete Nachtdienst-Daten:
       // 06:01 / 00:00-06:00 / Unterbrechung waren auf dem Folgetag gebucht.
       // Diese hängen wir für Anzeige/Löschbarkeit an den Starttag an (nur wenn entry.date == startTime-Kalendertag).
-      const nextDayEntriesFromState = entries.filter(e => {
-        const entryDate = new Date(e.date)
-        return isSameDay(entryDate, nextDate)
-      })
+      let nextDayEntries: TimeEntry[] = []
+      if (hasNightShiftStartBlock) {
+        try {
+          const nextResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${nextDateStr}`)
+          nextDayEntries = nextResponse.ok ? await nextResponse.json() : []
+        } catch {
+          nextDayEntries = []
+        }
+      }
 
-      const oldSplitCarryOverBlocks: WorkBlock[] = nextDayEntriesFromState
+      // Fallback (z.B. wenn API-Call fehlschlägt): nutze den bereits geladenen Monats-State
+      if (nextDayEntries.length === 0) {
+        nextDayEntries = entries.filter(e => {
+          const entryDate = new Date(e.date)
+          return isSameDay(entryDate, nextDate)
+        })
+      }
+
+      const oldSplitCarryOverBlocks: WorkBlock[] = nextDayEntries
         .filter((e: TimeEntry) => {
           const entryDate = parseISO(e.date)
           const startIso = parseISO(e.startTime)
@@ -158,7 +180,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           if (e.entryType === 'SLEEP' && e.endTime) {
             const st = parseISO(e.startTime)
             const et = parseISO(e.endTime)
-            return st.getHours() === 0 && st.getMinutes() === 0 && et.getHours() === 6 && et.getMinutes() === 0
+            // Schlaf 00:00-06:00 (Ende kann in Ausnahmefällen abweichen, daher <= 07:00 tolerant)
+            return st.getHours() === 0 && st.getMinutes() === 0 && et.getHours() <= 7
           }
           if (e.entryType === 'SLEEP_INTERRUPTION') return true
           return false
@@ -238,7 +261,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
         // Fallback: alte Split-Daten -> Unterbrechung kann auf dem Folgetag gebucht sein
         if (!sleepInterruptionEntry) {
-          const nextDayInterruption = nextDayEntriesFromState.find((e: TimeEntry) => {
+          const nextDayInterruption = nextDayEntries.find((e: TimeEntry) => {
             if (e.entryType !== 'SLEEP_INTERRUPTION') return false
             const entryDate = parseISO(e.date)
             const startIso = parseISO(e.startTime)
