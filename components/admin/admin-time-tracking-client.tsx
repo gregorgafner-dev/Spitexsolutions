@@ -140,24 +140,24 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }))
 
       // Erkenne Nachtdienst-Startblock am aktuellen Tag (starkes Signal: Endzeit 23:00)
+      // (Nur für optimierte Nachlade-Strategien; die Zuordnung alter Split-Einträge erfolgt unabhängig davon)
       const hasNightShiftStartBlock = data.some((e: TimeEntry) => {
         if (e.entryType !== 'WORK' || !e.endTime) return false
-        const st = parseISO(e.startTime)
         const et = parseISO(e.endTime)
-        return et.getHours() === 23 && et.getMinutes() === 0 && st.getHours() >= 17 && st.getHours() <= 22
+        return et.getHours() === 23 && et.getMinutes() === 0
       })
 
       // Fallback für alte, gesplittete Nachtdienst-Daten:
       // 06:01 / 00:00-06:00 / Unterbrechung waren auf dem Folgetag gebucht.
       // Diese hängen wir für Anzeige/Löschbarkeit an den Starttag an (nur wenn entry.date == startTime-Kalendertag).
       let nextDayEntries: TimeEntry[] = []
-      if (hasNightShiftStartBlock) {
-        try {
-          const nextResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${nextDateStr}`)
-          nextDayEntries = nextResponse.ok ? await nextResponse.json() : []
-        } catch {
-          nextDayEntries = []
-        }
+      // Zuverlässig: Folgetag immer kurz nachladen, damit alte Split-Einträge (00:00-06:00, 06:01, Unterbrechung)
+      // unabhängig vom Monats-State verfügbar sind.
+      try {
+        const nextResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${nextDateStr}`)
+        nextDayEntries = nextResponse.ok ? await nextResponse.json() : []
+      } catch {
+        nextDayEntries = []
       }
 
       // Fallback (z.B. wenn API-Call fehlschlägt): nutze den bereits geladenen Monats-State
@@ -337,22 +337,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     return isSameDay(entryDate, startIso)
   }
 
-  const hasNightShiftStartForDate = (date: Date): boolean => {
-    const dayEntries = getEntriesForDate(date)
-    return dayEntries.some(e => {
-      if (e.entryType !== 'WORK' || !e.endTime) return false
-      const st = parseISO(e.startTime)
-      const et = parseISO(e.endTime)
-      // Endzeit 23:00 ist das starke Signal (Startzeit kann abweichen)
-      return et.getHours() === 23 && et.getMinutes() === 0 && st.getHours() >= 17 && st.getHours() <= 22
-    })
-  }
-
   const getOldSplitCarryOverEntriesForStartDate = (date: Date) => {
     const nextDay = addDays(date, 1)
-    if (!hasNightShiftStartForDate(date)) {
-      return { work0601: [] as TimeEntry[], sleep00: [] as TimeEntry[], interruption: null as TimeEntry | null }
-    }
 
     const nextDayEntries = getEntriesForDate(nextDay).filter(isOldSplitEntry)
 
