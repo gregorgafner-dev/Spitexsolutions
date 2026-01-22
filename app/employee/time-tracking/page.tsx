@@ -461,6 +461,11 @@ export default function TimeTrackingPage() {
         .filter((entry: TimeEntry) => {
           if (entry.endTime === null || entry.entryType === 'SLEEP') return false
           const startTime = format(parseISO(entry.startTime), 'HH:mm')
+          // Nur alte Daten: früher waren 06:01-Blöcke auf dem Folgetag gebucht (date == startTime-Kalendertag).
+          // Damit wir nicht aus Versehen den 06:01-Block eines "echten" Folgetags-Nachtdienstes übernehmen:
+          const entryDate = parseISO(entry.date)
+          const startIso = parseISO(entry.startTime)
+          if (!isSameDay(entryDate, startIso)) return false
           // Prüfe ob Startzeit 06:01 ist (flexibel)
           return startTime === '06:01' || startTime.startsWith('06:01')
         })
@@ -564,11 +569,19 @@ export default function TimeTrackingPage() {
       }
       
       // Lade Unterbrechungen während des Schlafens
-      // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht, daher aus nextData laden
       if (hasNightShift) {
-        const sleepInterruptionEntry = nextData.find((e: TimeEntry) => 
-          e.entryType === 'SLEEP_INTERRUPTION'
-        )
+        // Neues System: Unterbrechungen werden am Startdatum (selectedDate) gebucht.
+        // Fallback: alte Daten können noch auf dem Folgetag gebucht sein.
+        const sleepInterruptionEntry =
+          currentData.find((e: TimeEntry) => e.entryType === 'SLEEP_INTERRUPTION') ||
+          nextData.find((e: TimeEntry) => {
+            if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+            // Nur alte Daten: date == startTime-Kalendertag (auf Folgetag gebucht)
+            const entryDate = parseISO(e.date)
+            const startIso = parseISO(e.startTime)
+            return isSameDay(entryDate, startIso)
+          })
+
         if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
           setSleepInterruptions({
@@ -617,55 +630,30 @@ export default function TimeTrackingPage() {
   }
 
   const getSleepHoursForDate = (date: Date) => {
-    // WICHTIG: Für Nachtdienste: SLEEP-Einträge können vom aktuellen Tag (23:01-23:59) 
-    // ODER vom Folgetag (00:00-06:00) stammen, die zu diesem Tag gehören
-    // ABER: Bei mehreren aufeinanderfolgenden Nachtdiensten müssen wir prüfen, welche SLEEP-Einträge
-    // wirklich zu diesem Tag gehören
-    
     const nextDay = addDays(date, 1)
     
-    // Hole SLEEP-Einträge vom aktuellen Tag (23:01-23:59:59) - gehören immer zu diesem Tag
-    const dayEntries = getEntriesForDate(date).filter(e => {
+    // Neues System: Alle Nachtdienst-Einträge (inkl. 00:00-06:00) werden auf dem Startdatum gebucht.
+    // Fallback: Alte Daten können noch auf dem Folgetag gebucht sein.
+    const sameDaySleepEntries = getEntriesForDate(date).filter(e => {
       if (!e.endTime || e.entryType !== 'SLEEP') return false
       const startTime = format(parseISO(e.startTime), 'HH:mm')
-      // Nur SLEEP-Einträge, die um 23:01 beginnen (gehören zu diesem Tag)
-      return startTime === '23:01' || startTime.startsWith('23:01')
+      return startTime.startsWith('23:01') || startTime.startsWith('00:00')
     })
     
-    // Prüfe ob am aktuellen Tag ein 19:00-23:00 Block existiert (Nachtdienst beginnt an diesem Tag)
-    // ODER ob am Folgetag ein 06:01-Block existiert (vom aktuellen Tag-Nachtdienst)
-    // Nur dann gehören die SLEEP-Einträge 00:00-06:00 vom Folgetag zu diesem Tag
-    const hasNightShiftStartBlock = getEntriesForDate(date).some(e => {
-      if (!e.endTime || e.entryType !== 'WORK') return false
-      const startTime = format(parseISO(e.startTime), 'HH:mm')
-      const endTime = format(parseISO(e.endTime), 'HH:mm')
-      return (startTime === '19:00' || startTime.startsWith('19:')) && 
-             (endTime === '23:00' || endTime.startsWith('23:'))
-    })
-    
-    // Prüfe auch, ob am Folgetag ein 06:01-Block existiert (vom aktuellen Tag-Nachtdienst)
-    const hasNightShiftEndBlock = getEntriesForDate(nextDay).some(e => {
-      if (!e.endTime || e.entryType !== 'WORK') return false
-      const startTime = format(parseISO(e.startTime), 'HH:mm')
-      return startTime === '06:01' || startTime.startsWith('06:01')
-    })
-    
-    // Hole SLEEP-Einträge vom Folgetag (00:00-06:00) NUR wenn am aktuellen Tag ein 19:00-23:00 Block existiert
-    // ODER wenn am Folgetag ein 06:01-Block existiert (vom aktuellen Tag-Nachtdienst)
-    // Das bedeutet, dass diese SLEEP-Einträge zum Nachtdienst gehören, der am aktuellen Tag begann
-    const nextDaySleepEntries = (hasNightShiftStartBlock || hasNightShiftEndBlock) ? getEntriesForDate(nextDay).filter(e => {
-      if (!e.endTime || e.entryType !== 'SLEEP') return false
-      const startTime = format(parseISO(e.startTime), 'HH:mm')
-      // Nur Einträge, die um 00:00 beginnen (Schlafenszeit vom Folgetag, die zu diesem Tag gehört)
-      return startTime === '00:00' || startTime.startsWith('00:00')
-    }) : []
-    
-    // WICHTIG: Die SLEEP-Einträge 00:00-06:00 vom aktuellen Tag gehören NICHT zu diesem Tag,
-    // sondern zum Vortag-Nachtdienst! Sie werden bereits am Vortag gezählt.
-    // Daher werden sie hier NICHT addiert.
-    
-    // Kombiniere nur die SLEEP-Einträge, die wirklich zu diesem Tag gehören
-    const allSleepEntries = [...dayEntries, ...nextDaySleepEntries]
+    const has00OnSameDay = sameDaySleepEntries.some(e => format(parseISO(e.startTime), 'HH:mm').startsWith('00:00'))
+    const nextDaySleepEntries = has00OnSameDay
+      ? []
+      : getEntriesForDate(nextDay).filter(e => {
+          if (!e.endTime || e.entryType !== 'SLEEP') return false
+          // Nur alte Daten: 00:00-06:00 war auf dem Folgetag gebucht (date == startTime-Kalendertag)
+          const entryDate = parseISO(e.date)
+          const startIso = parseISO(e.startTime)
+          if (!isSameDay(entryDate, startIso)) return false
+          const startTime = format(parseISO(e.startTime), 'HH:mm')
+          return startTime.startsWith('00:00')
+        })
+
+    const allSleepEntries = has00OnSameDay ? sameDaySleepEntries : [...sameDaySleepEntries, ...nextDaySleepEntries]
     
     const sleepHours = allSleepEntries.reduce((total, entry) => {
       if (entry.endTime) {
@@ -679,18 +667,23 @@ export default function TimeTrackingPage() {
     }, 0)
     
     // Subtrahiere Unterbrechungen während des Schlafens
-    // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
-    // Für die Schlafenszeit 00:00-06:00 (vom Vortag, aber zu diesem Tag gehörend) müssen die Unterbrechungen vom gleichen Tag abgezogen werden
-    // Für die Schlafenszeit 23:01-23:59 (aktueller Tag) gibt es keine Unterbrechungen
     const hasNightSleep = allSleepEntries.some(e => {
       if (!e.endTime) return false
       const startTime = format(parseISO(e.startTime), 'HH:mm')
-      return startTime === '00:00'
+      return startTime.startsWith('00:00')
     })
     
     if (hasNightSleep) {
-      // Für die Schlafenszeit 00:00-06:00: Unterbrechungen vom gleichen Tag abziehen
-      const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      // Neues System: Unterbrechungen am Startdatum (date).
+      // Fallback: alte Daten können auf dem Folgetag liegen.
+      const interruptionEntry =
+        getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION') ||
+        getEntriesForDate(nextDay).find(e => {
+          if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+          const entryDate = parseISO(e.date)
+          const startIso = parseISO(e.startTime)
+          return isSameDay(entryDate, startIso)
+        })
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
       return Math.max(0, sleepHours - interruptionHours)
@@ -700,10 +693,15 @@ export default function TimeTrackingPage() {
   }
 
   const getSleepInterruptionHoursForDate = (date: Date) => {
-    // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
-    // Für die Anzeige am aktuellen Tag müssen wir die Unterbrechungen vom Folgetag holen
     const nextDay = addDays(date, 1)
-    const interruptionEntry = getEntriesForDate(nextDay).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+    const interruptionEntry =
+      getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION') ||
+      getEntriesForDate(nextDay).find(e => {
+        if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+        const entryDate = parseISO(e.date)
+        const startIso = parseISO(e.startTime)
+        return isSameDay(entryDate, startIso)
+      })
     return (interruptionEntry?.sleepInterruptionMinutes || 0) / 60
   }
 
@@ -711,16 +709,9 @@ export default function TimeTrackingPage() {
     // WICHTIG: Nur gespeicherte Einträge berücksichtigen, NICHT workBlocks (noch nicht gespeicherte Blöcke)
     // Die Zeiten sollen erst im Kalender erscheinen, nachdem sie gespeichert wurden
     const dayEntries = getEntriesForDate(date).filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
-    
-    // WICHTIG: Bei mehreren aufeinanderfolgenden Nachtdiensten müssen am Folgetag BEIDE Blöcke gezählt werden:
-    // - 06:01-07:00 vom Vortag-Nachtdienst (wird auf den Folgetag gebucht)
-    // - 19:00-23:00 vom aktuellen Tag-Nachtdienst (wird auf den aktuellen Tag gebucht)
-    // Beispiel: Montag 19:00-23:00 → Dienstag 06:01-07:00 + Dienstag 19:00-23:00 → beide werden am Dienstag gezählt
-    
-    // Berechne Stunden für aktuellen Tag (alle Einträge, die auf diesem Tag gebucht sind)
-    // Dies schließt ein:
-    // - 19:00-23:00 Blöcke, die am aktuellen Tag beginnen
-    // - 06:01-07:00 Blöcke, die vom Vortag-Nachtdienst stammen (aber auf den Folgetag gebucht sind)
+
+    // Neues System: Arbeitszeit inkl. 06:01-Block ist am Startdatum gebucht.
+    // Fallback: alte Daten können den 06:01-Block noch am Folgetag gebucht haben.
     const workHours = dayEntries.reduce((total, entry) => {
       if (entry.endTime) {
         const start = parseISO(entry.startTime)
@@ -733,14 +724,18 @@ export default function TimeTrackingPage() {
     }, 0)
     
     // Addiere Unterbrechungen während des Schlafens zur Arbeitszeit
-    // WICHTIG: Unterbrechungen werden IMMER und NUR auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
-    // Sie müssen NUR zur Arbeitszeit am Folgetag addiert werden (wo sie gebucht sind)
-    // Am Erfassungstag (19:00-23:00) werden sie NICHT addiert, weil sie dort nicht gebucht sind
-    const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+    const nextDay = addDays(date, 1)
+    const interruptionEntry =
+      getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION') ||
+      getEntriesForDate(nextDay).find(e => {
+        if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+        const entryDate = parseISO(e.date)
+        const startIso = parseISO(e.startTime)
+        return isSameDay(entryDate, startIso)
+      })
     const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
     const interruptionHours = interruptionMinutes / 60
-    
-    // Addiere Unterbrechungen zur Arbeitszeit (nur wenn sie auf diesem Tag gebucht sind, also am Folgetag)
+
     return workHours + interruptionHours
   }
 
@@ -1072,10 +1067,11 @@ export default function TimeTrackingPage() {
       
       if (!hasDeviations && !hasInterruptions && hasBothBlocks) {
         try {
-          // Lösche alle bestehenden Einträge für diesen Tag und Folgetag
+          // Lösche alle bestehenden Einträge für dieses Buchungsdatum (Startdatum).
+          // (Im neuen System liegen keine Nachtdienst-Einträge mehr auf dem Folgetag.)
           const existingEntries = entries.filter(e => {
             const entryDate = new Date(e.date)
-            return isSameDay(entryDate, selectedDate) || isSameDay(entryDate, addDays(selectedDate, 1))
+            return isSameDay(entryDate, selectedDate)
           })
 
           for (const entry of existingEntries) {
@@ -1161,13 +1157,13 @@ export default function TimeTrackingPage() {
           // Warte kurz
           await new Promise(resolve => setTimeout(resolve, 200))
 
-          // Speichere SLEEP-Eintrag für Folgetag (00:00-06:00)
-          console.log('Erstelle zweiten SLEEP-Block:', { date: nextDateStr, startTime: '00:00', endTime: '06:00' })
+          // Speichere SLEEP-Eintrag (00:00-06:00) auf Startdatum (Buchungsdatum = dateStr)
+          console.log('Erstelle zweiten SLEEP-Block:', { bookingDate: dateStr, startTime: '00:00', endTime: '06:00' })
           const sleepBlock2Response = await fetch('/api/employee/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              date: nextDateStr,
+              date: dateStr,
               startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
               endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
               breakMinutes: 0,
@@ -1198,13 +1194,13 @@ export default function TimeTrackingPage() {
           // Warte kurz
           await new Promise(resolve => setTimeout(resolve, 200))
 
-          // Speichere Standard-Zeiten für Folgetag - Block 2 (06:01-07:00)
-          console.log('Erstelle zweiten WORK-Block:', { date: nextDateStr, startTime: '06:01', endTime: '07:00' })
+          // Speichere zweiten WORK-Block (06:01-07:00) auf Startdatum (Buchungsdatum = dateStr)
+          console.log('Erstelle zweiten WORK-Block:', { bookingDate: dateStr, startTime: '06:01', endTime: '07:00' })
           const workBlock2Response = await fetch('/api/employee/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              date: nextDateStr,
+              date: dateStr,
               startTime: new Date(`${nextDateStr}T06:01:00`).toISOString(),
               endTime: new Date(`${nextDateStr}T07:00:00`).toISOString(),
               breakMinutes: 0,
@@ -1338,10 +1334,11 @@ export default function TimeTrackingPage() {
         }
       }
       
-      // Lösche alle bestehenden Einträge für diesen Tag (und Folgetag bei Nachtdienst)
+      // Lösche alle bestehenden Einträge für dieses Buchungsdatum (Startdatum).
+      // WICHTIG: Im neuen System werden Nachtdienst-Einträge nicht mehr auf dem Folgetag gespeichert.
       const existingEntries = entries.filter(e => {
         const entryDate = new Date(e.date)
-        return isSameDay(entryDate, selectedDate) || (isNightShift && isSameDay(entryDate, addDays(selectedDate, 1)))
+        return isSameDay(entryDate, selectedDate)
       })
 
       // Behalte nur die IDs, die in blocksToSave vorhanden sind
@@ -1653,7 +1650,8 @@ export default function TimeTrackingPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              date: blockDate,
+              // Buchungsdatum ist immer das Startdatum (dateStr), auch wenn der Zeitstempel im Folgetag liegt
+              date: dateStr,
               startTime: startDateTime.toISOString(),
               endTime: endDateTime.toISOString(),
               breakMinutes: 0,
@@ -1871,21 +1869,28 @@ export default function TimeTrackingPage() {
           // Warte kurz, damit der erste Eintrag verarbeitet ist
           await new Promise(resolve => setTimeout(resolve, 100))
 
-          // Erstelle SLEEP-Eintrag für Folgetag (00:00-06:00 = 6 Stunden) NUR wenn noch keiner existiert
-          // Wenn bereits ein Nachtdienst vom Vortag existiert, sind die SLEEP-Einträge bereits vorhanden
-          const existingSleepOnNextDay = nextDayEntries.some(e => {
+          // Erstelle SLEEP-Eintrag (00:00-06:00) NUR wenn noch keiner existiert.
+          // Neues System: Buchungsdatum = dateStr, auch wenn der Zeitstempel am Folgetag liegt.
+          // Fallback: alte Daten können noch auf nextDayEntries liegen.
+          const existingSleep00 = nextDayEntries.some(e => {
+            if (e.entryType !== 'SLEEP' || !e.endTime) return false
+            const startTime = format(parseISO(e.startTime), 'HH:mm')
+            return startTime === '00:00' || startTime.startsWith('00:00')
+          }) || entries.some(e => {
+            const entryDate = new Date(e.date)
+            if (!isSameDay(entryDate, selectedDate)) return false
             if (e.entryType !== 'SLEEP' || !e.endTime) return false
             const startTime = format(parseISO(e.startTime), 'HH:mm')
             return startTime === '00:00' || startTime.startsWith('00:00')
           })
           
-          if (!existingSleepOnNextDay) {
-            console.log('Erstelle SLEEP-Eintrag für Folgetag:', nextDateStr, '00:00-06:00')
+          if (!existingSleep00) {
+            console.log('Erstelle SLEEP-Eintrag (00:00-06:00) auf Buchungsdatum:', dateStr)
             const sleepResponse2 = await fetch('/api/employee/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                date: nextDateStr,
+                date: dateStr,
                 startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
                 endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
                 breakMinutes: 0,
@@ -1929,13 +1934,13 @@ export default function TimeTrackingPage() {
         }
 
         // Speichere/aktualisiere Unterbrechungen während des Schlafens
-        // WICHTIG: Unterbrechungen werden immer auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
+        // Neues System: Unterbrechungen werden am Startdatum (Buchungsdatum = dateStr) gebucht
         const totalInterruptionMinutes = sleepInterruptions.hours * 60 + sleepInterruptions.minutes
         if (totalInterruptionMinutes > 0) {
-          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag für den Folgetag existiert
+          // Prüfe ob bereits ein SLEEP_INTERRUPTION-Eintrag für das Startdatum existiert
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
-            return isSameDay(entryDate, addDays(selectedDate, 1)) && e.entryType === 'SLEEP_INTERRUPTION'
+            return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION'
           })
 
           if (existingInterruption) {
@@ -1948,12 +1953,12 @@ export default function TimeTrackingPage() {
               }),
             })
           } else {
-            // Erstelle neuen Eintrag für den Folgetag
+            // Erstelle neuen Eintrag für das Startdatum
             await fetch('/api/employee/time-entries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                date: nextDateStr,
+                date: dateStr,
                 startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
                 endTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
                 breakMinutes: 0,
@@ -1963,10 +1968,10 @@ export default function TimeTrackingPage() {
             })
           }
         } else {
-          // Lösche SLEEP_INTERRUPTION-Eintrag vom Folgetag falls vorhanden
+          // Lösche SLEEP_INTERRUPTION-Eintrag vom Startdatum falls vorhanden
           const existingInterruption = entries.find(e => {
             const entryDate = new Date(e.date)
-            return isSameDay(entryDate, addDays(selectedDate, 1)) && e.entryType === 'SLEEP_INTERRUPTION'
+            return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION'
           })
           if (existingInterruption) {
             await fetch(`/api/employee/time-entries/${existingInterruption.id}`, {
@@ -2246,14 +2251,17 @@ export default function TimeTrackingPage() {
                           {/* Zeige Schlafenszeit und Unterbrechungen nur wenn Nachtdienst-Einträge vorhanden */}
                           {(() => {
                             const hasSleepEntries = dayEntries.some(e => e.entryType === 'SLEEP')
-                            // WICHTIG: Unterbrechungen werden auf den Folgetag gebucht (Schlafenszeit 00:00-06:00)
-                            // Für die Anzeige: Am aktuellen Tag zeigen wir die Unterbrechungen vom Folgetag (wo sie gebucht sind)
-                            // Am Folgetag zeigen wir die Unterbrechungen, die dort gebucht sind
                             const nextDay = addDays(day, 1)
-                            const interruptionEntryNext = getEntriesForDate(nextDay).find(e => e.entryType === 'SLEEP_INTERRUPTION')
                             const interruptionEntryCurrent = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
-                            // Verwende Unterbrechungen vom Folgetag (falls vorhanden) oder vom aktuellen Tag
-                            const interruptionEntry = interruptionEntryNext || interruptionEntryCurrent
+                            // Neues System: Unterbrechungen am Startdatum gebucht.
+                            // Fallback: alte Daten können noch am Folgetag liegen (date == startTime-Kalendertag).
+                            const interruptionEntryNext = getEntriesForDate(nextDay).find(e => {
+                              if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+                              const entryDate = parseISO(e.date)
+                              const startIso = parseISO(e.startTime)
+                              return isSameDay(entryDate, startIso)
+                            })
+                            const interruptionEntry = interruptionEntryCurrent || interruptionEntryNext
                             const interruptionHours = (interruptionEntry?.sleepInterruptionMinutes || 0) / 60
                             const sleepHours = getSleepHoursForDate(day)
                             if (hasSleepEntries || interruptionHours > 0) {

@@ -16,7 +16,9 @@
     "db:restore": "tsx scripts/restore-database.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "db:init-worktime": "tsx scripts/init-worktime-config.ts"
+    "db:init-worktime": "tsx scripts/init-worktime-config.ts",
+    "db:fix-nightshift-january:dry": "tsx scripts/fix-nightshift-booking-date.ts --from 2026-01-01 --to 2026-02-01 --dry-run",
+    "db:fix-nightshift-january": "tsx scripts/fix-nightshift-booking-date.ts --from 2026-01-01 --to 2026-02-01 --apply"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",

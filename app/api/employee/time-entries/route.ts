@@ -91,34 +91,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Date required' }, { status: 400 })
     }
 
-    // Prüfe ob das Datum noch bearbeitbar ist (nur für Mitarbeiter, nicht für Admins)
+    // Buchungsdatum: Nachtdienst wird vollständig auf dem erfassten Datum gebucht.
+    // Deshalb gilt die Editierbarkeitsprüfung immer für das übergebene Datum (date).
     const dateObj = new Date(date)
-    
-    // WICHTIG: Bei SLEEP-Einträgen vom Folgetag (00:00-06:00) ist das Datum der Folgetag,
-    // aber der Nachtdienst begann am Vortag. Prüfe die Editierbarkeit des Vortags.
-    const startTimeDate = startTime ? new Date(startTime) : null
-    const isSleepEntryOnNextDay = entryType === 'SLEEP' && startTimeDate && startTimeDate.getHours() === 0 && startTimeDate.getMinutes() === 0
-    const isNightShiftSecondBlock = startTimeDate && startTimeDate.getHours() === 6 && startTimeDate.getMinutes() === 1
-    
-    // Bei SLEEP-Einträgen vom Folgetag (00:00-06:00) oder Nachtdienst-Blöcken (06:01): 
-    // Prüfe die Editierbarkeit des Vortags (wo der Nachtdienst begann)
-    if (isSleepEntryOnNextDay || isNightShiftSecondBlock) {
-      const previousDay = new Date(dateObj)
-      previousDay.setDate(previousDay.getDate() - 1)
-      if (!isDateEditableForEmployee(previousDay, false)) {
-        return NextResponse.json(
-          { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
-          { status: 403 }
-        )
-      }
-    } else if (entryType !== 'SLEEP' && entryType !== 'SLEEP_INTERRUPTION') {
-      // Normale Einträge (nicht SLEEP): Prüfe Editierbarkeit des aktuellen Datums
-      if (!isDateEditableForEmployee(dateObj, false)) {
-        return NextResponse.json(
-          { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
-          { status: 403 }
-        )
-      }
+    dateObj.setHours(0, 0, 0, 0)
+    if (!isDateEditableForEmployee(dateObj, false)) {
+      return NextResponse.json(
+        { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
+        { status: 403 }
+      )
     }
 
     // Bei SLEEP_INTERRUPTION: startTime und endTime sind optional
@@ -245,43 +226,9 @@ export async function POST(request: NextRequest) {
       entryType: entry.entryType,
     })
 
-    // Aktualisiere Monatssaldo für das Datum des Eintrags
+    // Aktualisiere Monatssaldo für das Buchungsdatum (date)
     const { updateMonthlyBalance } = await import('@/lib/update-monthly-balance')
     await updateMonthlyBalance(session.user.employeeId, dateObj)
-
-    // Bei Nachtdienst: Aktualisiere auch den Monatssaldo für den anderen Tag
-    if (endTime) {
-      const startTimeDate = new Date(startTime)
-      const endTimeDate = new Date(endTime)
-      const startHour = startTimeDate.getHours()
-      const startMinute = startTimeDate.getMinutes()
-      const endHour = endTimeDate.getHours()
-      const endMinute = endTimeDate.getMinutes()
-      
-      // Wenn Startzeit 06:01 ist, handelt es sich um den zweiten Block eines Nachtdienstes
-      // Der Nachtdienst begann am Vortag, also aktualisiere auch den Monatssaldo für den Vortag
-      if (startHour === 6 && startMinute === 1) {
-        const previousDay = new Date(dateObj)
-        previousDay.setDate(previousDay.getDate() - 1)
-        await updateMonthlyBalance(session.user.employeeId, previousDay)
-      }
-      
-      // Wenn Startzeit 19:00 und Endzeit 23:00 ist, handelt es sich um den ersten Block eines Nachtdienstes
-      // Der Nachtdienst geht in den Folgetag, also aktualisiere auch den Monatssaldo für den Folgetag
-      if (startHour === 19 && startMinute === 0 && endHour === 23 && endMinute === 0) {
-        const nextDay = new Date(dateObj)
-        nextDay.setDate(nextDay.getDate() + 1)
-        await updateMonthlyBalance(session.user.employeeId, nextDay)
-      }
-      
-      // Bei SLEEP-Einträgen vom Folgetag (00:00-06:00): Aktualisiere auch den Monatssaldo für den Vortag
-      // (wo der Nachtdienst begann)
-      if (entryType === 'SLEEP' && startHour === 0 && startMinute === 0 && endHour === 6 && endMinute === 0) {
-        const previousDay = new Date(dateObj)
-        previousDay.setDate(previousDay.getDate() - 1)
-        await updateMonthlyBalance(session.user.employeeId, previousDay)
-      }
-    }
 
     console.log('[API] Zeiteintrag wird zurückgegeben:', { id: entry.id, entryType: entry.entryType })
     return NextResponse.json(entry)

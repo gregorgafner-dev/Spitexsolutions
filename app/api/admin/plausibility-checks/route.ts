@@ -159,48 +159,23 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Bei Nachtdienst: Addiere auch Stunden vom Folgetag (06:01-Block)
-        // Prüfe ob es ein Nachtdienst ist (19:00-23:00 Block vorhanden)
-        const hasNightShiftStart = workEntriesWithEndTime.some(e => {
-          if (!e.endTime) return false
-          const startTime = format(parseISO(e.startTime.toISOString()), 'HH:mm')
-          const endTime = format(parseISO(e.endTime.toISOString()), 'HH:mm')
-          return startTime === '19:00' && endTime === '23:00'
-        })
-
-        if (hasNightShiftStart) {
-          // Lade Einträge vom Folgetag
-          const nextDay = new Date(date)
-          nextDay.setDate(nextDay.getDate() + 1)
-          const nextDayEntries = timeEntries.filter(e => isSameDay(e.date, nextDay))
-          
-          // Addiere Stunden vom Folgetag (06:01-Block)
-          for (const entry of nextDayEntries) {
-            if (entry.endTime && entry.entryType === 'WORK') {
-              const startTime = format(parseISO(entry.startTime.toISOString()), 'HH:mm')
-              if (startTime === '06:01' || startTime.startsWith('06:01')) {
-                totalWorkHours += calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
-              }
-            }
-          }
-
-          // Prüfung 3: Bei Nachtdienst: Mehr als 3h Schlafunterbrechung
-          const sleepInterruptionEntry = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
-          if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
-            const interruptionHours = sleepInterruptionEntry.sleepInterruptionMinutes / 60
-            if (interruptionHours > 3) {
-              issues.push({
-                id: `${employee.id}-${dateKey}-too-much-sleep-interruption`,
-                employeeId: employee.id,
-                employeeName: `${employee.user.firstName} ${employee.user.lastName}`,
-                date: dateKey,
-                type: 'TOO_MUCH_SLEEP_INTERRUPTION',
-                message: `Mehr als 3h Schlafunterbrechung bei Nachtdienst (${interruptionHours.toFixed(2)}h)`,
-                details: {
-                  interruptionHours,
-                },
-              })
-            }
+        // Prüfung 3: Bei Nachtdienst: Mehr als 3h Schlafunterbrechung
+        // Neues System: Nachtdienst wird komplett auf dem Startdatum gebucht.
+        const sleepInterruptionEntry = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
+        if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
+          const interruptionHours = sleepInterruptionEntry.sleepInterruptionMinutes / 60
+          if (interruptionHours > 3) {
+            issues.push({
+              id: `${employee.id}-${dateKey}-too-much-sleep-interruption`,
+              employeeId: employee.id,
+              employeeName: `${employee.user.firstName} ${employee.user.lastName}`,
+              date: dateKey,
+              type: 'TOO_MUCH_SLEEP_INTERRUPTION',
+              message: `Mehr als 3h Schlafunterbrechung bei Nachtdienst (${interruptionHours.toFixed(2)}h)`,
+              details: {
+                interruptionHours,
+              },
+            })
           }
         }
 
