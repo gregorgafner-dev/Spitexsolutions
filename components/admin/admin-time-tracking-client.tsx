@@ -119,6 +119,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     if (!selectedEmployeeId) return
     try {
       const dateStr = format(date, 'yyyy-MM-dd')
+      const nextDate = addDays(date, 1)
       
       // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
       // Lade nur Einträge vom aktuellen Tag
@@ -136,6 +137,38 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           endTime: entry.endTime ? format(parseISO(entry.endTime), 'HH:mm') : null,
           entryType: entry.entryType || 'WORK',
         }))
+
+      // Fallback für alte, gesplittete Nachtdienst-Daten:
+      // 06:01 / 00:00-06:00 / Unterbrechung waren auf dem Folgetag gebucht.
+      // Diese hängen wir für Anzeige/Löschbarkeit an den Starttag an (nur wenn entry.date == startTime-Kalendertag).
+      const nextDayEntriesFromState = entries.filter(e => {
+        const entryDate = new Date(e.date)
+        return isSameDay(entryDate, nextDate)
+      })
+
+      const oldSplitCarryOverBlocks: WorkBlock[] = nextDayEntriesFromState
+        .filter((e: TimeEntry) => {
+          const entryDate = parseISO(e.date)
+          const startIso = parseISO(e.startTime)
+          if (!isSameDay(entryDate, startIso)) return false
+          if (e.entryType === 'WORK' && e.endTime) {
+            const st = parseISO(e.startTime)
+            return st.getHours() === 6 && st.getMinutes() === 1
+          }
+          if (e.entryType === 'SLEEP' && e.endTime) {
+            const st = parseISO(e.startTime)
+            const et = parseISO(e.endTime)
+            return st.getHours() === 0 && st.getMinutes() === 0 && et.getHours() === 6 && et.getMinutes() === 0
+          }
+          if (e.entryType === 'SLEEP_INTERRUPTION') return true
+          return false
+        })
+        .map((e: TimeEntry) => ({
+          id: e.id,
+          startTime: format(parseISO(e.startTime), 'HH:mm'),
+          endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
+          entryType: e.entryType || 'WORK',
+        }))
       
       
       console.log('Admin: Geladene Blöcke', { 
@@ -143,10 +176,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         blocks 
       })
       
+      const allBlocksForDetection = [...blocks, ...oldSplitCarryOverBlocks]
+
       // Prüfe ob es ein Nachtdienst ist (19:00-23:00 und 06:01-07:xx vorhanden)
       // Nur wenn beide typischen Nachtdienst-Blöcke vorhanden sind (SLEEP-Einträge ignorieren)
       // Erkenne auch abweichende Zeiten: Block mit Startzeit 19:xx (oder früher, aber nicht 06:01) und Block mit Startzeit 06:01
-      const workBlocksOnly = blocks.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
+      const workBlocksOnly = allBlocksForDetection.filter(b => b.entryType !== 'SLEEP' && b.entryType !== 'SLEEP_INTERRUPTION')
       const hasBlock1 = workBlocksOnly.some(b => {
         const startTime = b.startTime
         // Block, der nicht mit 06:01 beginnt und eine Startzeit von 19:xx oder früher hat
@@ -161,9 +196,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       
       // Setze workBlocks - WICHTIG: Für Admins immer ALLE Blöcke anzeigen, damit sie gelöscht werden können
       // Bei Nachtdienst: Sortiere die Work-Blöcke so, dass der erste Block (19:00-23:00) vor dem zweiten (06:01-07:xx) kommt
-      let sortedBlocks = [...blocks]
+      let sortedBlocks = [...blocks, ...oldSplitCarryOverBlocks]
       if (hasNightShift && workBlocksOnly.length >= 2) {
-        sortedBlocks = blocks.sort((a, b) => {
+        sortedBlocks = sortedBlocks.sort((a, b) => {
           // SLEEP-Einträge bleiben am Ende
           if (a.entryType === 'SLEEP' || a.entryType === 'SLEEP_INTERRUPTION') return 1
           if (b.entryType === 'SLEEP' || b.entryType === 'SLEEP_INTERRUPTION') return -1
@@ -199,6 +234,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             return isSameDay(entryDate, date) && entry.entryType === 'SLEEP_INTERRUPTION'
           })
           sleepInterruptionEntry = entriesForDate[0] || null
+        }
+
+        // Fallback: alte Split-Daten -> Unterbrechung kann auf dem Folgetag gebucht sein
+        if (!sleepInterruptionEntry) {
+          const nextDayInterruption = nextDayEntriesFromState.find((e: TimeEntry) => {
+            if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+            const entryDate = parseISO(e.date)
+            const startIso = parseISO(e.startTime)
+            return isSameDay(entryDate, startIso)
+          })
+          sleepInterruptionEntry = nextDayInterruption || null
         }
         
         console.log('Admin: Lade Schlafunterbrechung', {
@@ -260,8 +306,97 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     return filtered
   }
 
+  // Altes Nachtdienst-Modell (historische Daten): Einträge wurden auf dem "echten" Kalendertag gebucht,
+  // d.h. entry.date == startTime-Kalendertag. Im neuen Modell ist entry.date das Startdatum, startTime kann am Folgetag liegen.
+  const isOldSplitEntry = (e: TimeEntry): boolean => {
+    const entryDate = parseISO(e.date)
+    const startIso = parseISO(e.startTime)
+    return isSameDay(entryDate, startIso)
+  }
+
+  const hasNightShiftStartForDate = (date: Date): boolean => {
+    const dayEntries = getEntriesForDate(date)
+    return dayEntries.some(e => {
+      if (e.entryType !== 'WORK' || !e.endTime) return false
+      const st = parseISO(e.startTime)
+      const et = parseISO(e.endTime)
+      // Endzeit 23:00 ist das starke Signal (Startzeit kann abweichen)
+      return et.getHours() === 23 && et.getMinutes() === 0 && st.getHours() >= 17 && st.getHours() <= 22
+    })
+  }
+
+  const getOldSplitCarryOverEntriesForStartDate = (date: Date) => {
+    const nextDay = addDays(date, 1)
+    if (!hasNightShiftStartForDate(date)) {
+      return { work0601: [] as TimeEntry[], sleep00: [] as TimeEntry[], interruption: null as TimeEntry | null }
+    }
+
+    const nextDayEntries = getEntriesForDate(nextDay).filter(isOldSplitEntry)
+
+    const work0601 = nextDayEntries.filter(e => {
+      if (e.entryType !== 'WORK' || !e.endTime) return false
+      const st = parseISO(e.startTime)
+      return st.getHours() === 6 && st.getMinutes() === 1
+    })
+
+    const sleep00 = nextDayEntries.filter(e => {
+      if (e.entryType !== 'SLEEP' || !e.endTime) return false
+      const st = parseISO(e.startTime)
+      const et = parseISO(e.endTime)
+      return st.getHours() === 0 && st.getMinutes() === 0 && et.getHours() === 6 && et.getMinutes() === 0
+    })
+
+    const interruption = nextDayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION') ?? null
+
+    return { work0601, sleep00, interruption }
+  }
+
+  const getNightShiftSleepEntriesForStartDate = (date: Date): TimeEntry[] => {
+    const dayEntries = getEntriesForDate(date)
+    const carry = getOldSplitCarryOverEntriesForStartDate(date)
+
+    const sleepEntries = dayEntries.filter(e => e.entryType === 'SLEEP' && e.endTime !== null)
+    const fromDay = sleepEntries.filter(e => {
+      const st = parseISO(e.startTime)
+      // 23:01 gehört immer zum Startdatum
+      if (st.getHours() === 23 && st.getMinutes() === 1) return true
+      // 00:00-06:00 gehört zum Startdatum nur im neuen Modell (date != startTime day)
+      if (st.getHours() === 0 && st.getMinutes() === 0) return !isOldSplitEntry(e)
+      return false
+    })
+
+    return [...fromDay, ...carry.sleep00]
+  }
+
+  const getNightShiftInterruptionEntryForStartDate = (date: Date): TimeEntry | null => {
+    const dayEntries = getEntriesForDate(date)
+    // Neues Modell: Unterbrechungen sind am Startdatum gebucht (date != startTime day)
+    const current = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION' && !isOldSplitEntry(e))
+    if (current) return current
+    // Fallback: alte Daten -> Unterbrechung am Folgetag
+    return getOldSplitCarryOverEntriesForStartDate(date).interruption
+  }
+
+  const getNightShiftWorkEntriesForStartDate = (date: Date): TimeEntry[] => {
+    const dayEntries = getEntriesForDate(date)
+    const carry = getOldSplitCarryOverEntriesForStartDate(date)
+
+    const workEntries = dayEntries.filter(e => e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION' && e.endTime !== null)
+    const filtered = workEntries.filter(e => {
+      // Alte Daten: 06:01 am gleichen Tag gehört zum Vortag-Nachtdienst -> nicht dem Startdatum
+      if (e.entryType !== 'WORK') return true
+      const st = parseISO(e.startTime)
+      if (st.getHours() === 6 && st.getMinutes() === 1 && isOldSplitEntry(e)) {
+        return false
+      }
+      return true
+    })
+
+    return [...filtered, ...carry.work0601]
+  }
+
   const getSleepHoursForDate = (date: Date) => {
-    const dayEntries = getEntriesForDate(date).filter(e => e.endTime !== null && e.entryType === 'SLEEP')
+    const dayEntries = getNightShiftSleepEntriesForStartDate(date)
     const sleepHours = dayEntries.reduce((total, entry) => {
       if (entry.endTime) {
         const start = parseISO(entry.startTime)
@@ -283,7 +418,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     if (hasNightSleep) {
       // Für die Schlafenszeit 00:00-06:00: Unterbrechungen vom gleichen Tag abziehen
-      const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+      const interruptionEntry = getNightShiftInterruptionEntryForStartDate(date)
       const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
       const interruptionHours = interruptionMinutes / 60
       const adjustedSleepHours = Math.max(0, sleepHours - interruptionHours)
@@ -297,12 +432,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
   const getSleepInterruptionHoursForDate = (date: Date) => {
     // WICHTIG: Unterbrechungen werden am Startdatum gebucht (Schlafenszeit 00:00-06:00)
-    const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+    const interruptionEntry = getNightShiftInterruptionEntryForStartDate(date)
     return (interruptionEntry?.sleepInterruptionMinutes || 0) / 60
   }
 
   const getTotalHoursForDate = (date: Date) => {
-    const dayEntries = getEntriesForDate(date).filter(e => e.endTime !== null && e.entryType !== 'SLEEP' && e.entryType !== 'SLEEP_INTERRUPTION')
+    const dayEntries = getNightShiftWorkEntriesForStartDate(date)
     const workHours = dayEntries.reduce((total, entry) => {
       if (entry.endTime) {
         const start = parseISO(entry.startTime)
@@ -316,7 +451,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     // Addiere Unterbrechungen während des Schlafens zur Arbeitszeit
     // WICHTIG: Unterbrechungen werden am Startdatum gebucht
-    const interruptionEntry = getEntriesForDate(date).find(e => e.entryType === 'SLEEP_INTERRUPTION')
+    const interruptionEntry = getNightShiftInterruptionEntryForStartDate(date)
     const interruptionMinutes = interruptionEntry?.sleepInterruptionMinutes || 0
     const interruptionHours = interruptionMinutes / 60
     
@@ -1048,11 +1183,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                           </div>
                           {/* Zeige Schlafenszeit und Unterbrechungen nur wenn Nachtdienst-Einträge vorhanden */}
                           {(() => {
-                            const hasSleepEntries = dayEntries.some(e => e.entryType === 'SLEEP')
-                            // WICHTIG: Unterbrechungen werden am Startdatum gebucht (Schlafenszeit 00:00-06:00)
-                            const interruptionEntry = dayEntries.find(e => e.entryType === 'SLEEP_INTERRUPTION')
-                            const interruptionHours = (interruptionEntry?.sleepInterruptionMinutes || 0) / 60
                             const sleepHours = getSleepHoursForDate(day)
+                            const interruptionHours = getSleepInterruptionHoursForDate(day)
+                            const hasSleepEntries = sleepHours > 0
                             if (hasSleepEntries || interruptionHours > 0) {
                               // Konvertiere Stunden in Stunden:Minuten Format für bessere Lesbarkeit
                               const sleepMinutes = Math.round(sleepHours * 60)
@@ -1228,10 +1361,19 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                         // Lade Unterbrechungen (am Startdatum)
                         // Verwende currentData, da alle Einträge am Startdatum gebucht werden
                         const allData = [...currentData, ...nextData]
-                        const sleepInterruptionEntry = allData.find((e: TimeEntry) => {
-                          const entryDate = new Date(e.date)
-                          return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION'
-                        })
+                        const sleepInterruptionEntry =
+                          // Neues Modell: Unterbrechung am Startdatum (date != startTime day)
+                          allData.find((e: TimeEntry) => {
+                            const entryDate = parseISO(e.date)
+                            const startIso = parseISO(e.startTime)
+                            return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP_INTERRUPTION' && !isSameDay(entryDate, startIso)
+                          }) ||
+                          // Fallback: altes Modell -> Unterbrechung am Folgetag (date == startTime day)
+                          allData.find((e: TimeEntry) => {
+                            const entryDate = parseISO(e.date)
+                            const startIso = parseISO(e.startTime)
+                            return e.entryType === 'SLEEP_INTERRUPTION' && isSameDay(entryDate, startIso)
+                          })
                         if (sleepInterruptionEntry && sleepInterruptionEntry.sleepInterruptionMinutes) {
                           const totalMinutes = sleepInterruptionEntry.sleepInterruptionMinutes
                           setSleepInterruptions({
@@ -1730,7 +1872,13 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
                 {/* Zeige SLEEP-Einträge separat, damit sie gelöscht werden können */}
                 {(() => {
-                  const sleepBlocks = workBlocks.filter(block => block.entryType === 'SLEEP')
+                  const sleepEntries = getNightShiftSleepEntriesForStartDate(selectedDate)
+                  const sleepBlocks: WorkBlock[] = sleepEntries.map(e => ({
+                    id: e.id,
+                    startTime: format(parseISO(e.startTime), 'HH:mm'),
+                    endTime: e.endTime ? format(parseISO(e.endTime), 'HH:mm') : null,
+                    entryType: 'SLEEP',
+                  }))
                   if (sleepBlocks.length === 0) return null
                   
                   return (
@@ -1769,7 +1917,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                 {(() => {
                   // Prüfe ob Nachtdienst-Einträge vorhanden sind (auch wenn Checkbox nicht aktiviert ist)
                   const dayEntries = getEntriesForDate(selectedDate)
-                  const hasSleepEntries = dayEntries.some(e => e.entryType === 'SLEEP')
+                  const sleepHours = getSleepHoursForDate(selectedDate)
+                  const interruptionHours = getSleepInterruptionHoursForDate(selectedDate)
+                  const hasSleepEntries = sleepHours > 0
                   const hasNightShiftWork = dayEntries.some(e => 
                     e.entryType !== 'SLEEP' && 
                     e.entryType !== 'SLEEP_INTERRUPTION' &&
@@ -1781,12 +1931,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                     const endTime = format(parseISO(e.endTime), 'HH:mm')
                     return (startTime === '19:00' && endTime === '23:00') || startTime === '06:01'
                   })
-                  const showTimeOverview = isNightShift || hasSleepEntries || hasNightShiftPattern
+                  const showTimeOverview = isNightShift || hasSleepEntries || interruptionHours > 0 || hasNightShiftPattern
                   
                   if (!showTimeOverview) return null
-                  
-                  const sleepHours = getSleepHoursForDate(selectedDate)
-                  const interruptionHours = getSleepInterruptionHoursForDate(selectedDate)
                   
                   return (
                     <Card className="mt-4">
