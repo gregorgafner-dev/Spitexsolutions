@@ -5,6 +5,7 @@ import { calculateWorkHours, violatesMaxWorkBlock, isValidBreak, isHolidayOrSund
 import { isDateEditableForEmployee } from '@/lib/date-validation'
 import { checkOverlappingBlocks, checkNegativeWorkTime, checkMissingEndTime } from '@/lib/time-entry-validation'
 import { updateMonthlyBalance } from '@/lib/update-monthly-balance'
+import { formatInTimeZone } from 'date-fns-tz'
 
 export async function PATCH(
   request: NextRequest,
@@ -170,26 +171,30 @@ export async function DELETE(
     const startTimeDate = new Date(entry.startTime)
     const endTimeDate = entry.endTime ? new Date(entry.endTime) : null
 
-    const sameYMD = (a: Date, b: Date) =>
-      a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+    const ZONE = 'Europe/Zurich'
+    const ymdZ = (d: Date) => formatInTimeZone(d, ZONE, 'yyyy-MM-dd')
+    const hmZ = (d: Date) => formatInTimeZone(d, ZONE, 'HH:mm')
+    const hourZ = (d: Date) => parseInt(formatInTimeZone(d, ZONE, 'H'), 10)
+    const minuteZ = (d: Date) => parseInt(formatInTimeZone(d, ZONE, 'm'), 10)
+    const sameYMDZ = (a: Date, b: Date) => ymdZ(a) === ymdZ(b)
 
     const isNightShiftSecondBlock =
-      entry.entryType === 'WORK' && startTimeDate.getHours() === 6 && startTimeDate.getMinutes() === 1
+      entry.entryType === 'WORK' && hmZ(startTimeDate) === '06:01'
 
     const isNightShiftFirstBlock =
       entry.entryType === 'WORK' &&
       !!endTimeDate &&
       // Startzeit kann abweichen (z.B. 18:xx), Endzeit ist bei Nachtdienst immer 23:00
-      endTimeDate.getHours() === 23 &&
-      endTimeDate.getMinutes() === 0 &&
-      startTimeDate.getHours() >= 17 &&
-      startTimeDate.getHours() <= 22
+      hmZ(endTimeDate) === '23:00' &&
+      hourZ(startTimeDate) >= 17 &&
+      hourZ(startTimeDate) <= 22
 
     const isNightShiftSleep =
       entry.entryType === 'SLEEP' &&
       !!endTimeDate &&
-      ((startTimeDate.getHours() === 23 && startTimeDate.getMinutes() === 1 && endTimeDate.getHours() === 23 && endTimeDate.getMinutes() === 59) ||
-        (startTimeDate.getHours() === 0 && startTimeDate.getMinutes() === 0 && endTimeDate.getHours() === 6 && endTimeDate.getMinutes() === 0))
+      ((hmZ(startTimeDate) === '23:01' && hmZ(endTimeDate) === '23:59') ||
+        // tolerant: Ende kann in Ausnahmefällen abweichen (z.B. 06:59)
+        (hmZ(startTimeDate) === '00:00' && hourZ(endTimeDate) <= 7))
 
     const isNightShiftInterruption = entry.entryType === 'SLEEP_INTERRUPTION'
 
@@ -197,9 +202,9 @@ export async function DELETE(
 
     // Kompatibilität: alte Daten waren auf den Folgetag "gebucht" (date == startTime-Kalendertag).
     // Dann muss das Buchungsdatum für 06:01 / 00:00-06:00 um einen Tag zurück verschoben werden.
-    const isOldSplitBooking = sameYMD(entryDate, startTimeDate)
+    const isOldSplitBooking = sameYMDZ(entryDate, startTimeDate)
     let bookingDate = new Date(entryDate)
-    if (isOldSplitBooking && (isNightShiftSecondBlock || (isNightShiftSleep && startTimeDate.getHours() === 0))) {
+    if (isOldSplitBooking && (isNightShiftSecondBlock || (isNightShiftSleep && hmZ(startTimeDate) === '00:00'))) {
       bookingDate.setDate(bookingDate.getDate() - 1)
       bookingDate.setHours(0, 0, 0, 0)
     }
@@ -227,19 +232,18 @@ export async function DELETE(
     const isNightShiftRelatedEntry = (e: typeof entry) => {
       const st = new Date(e.startTime)
       const et = e.endTime ? new Date(e.endTime) : null
-      const isSecond = e.entryType === 'WORK' && st.getHours() === 6 && st.getMinutes() === 1
+      const isSecond = e.entryType === 'WORK' && hmZ(st) === '06:01'
       const isFirst =
         e.entryType === 'WORK' &&
         !!et &&
-        et.getHours() === 23 &&
-        et.getMinutes() === 0 &&
-        st.getHours() >= 17 &&
-        st.getHours() <= 22
+        hmZ(et) === '23:00' &&
+        hourZ(st) >= 17 &&
+        hourZ(st) <= 22
       const isSleep =
         e.entryType === 'SLEEP' &&
         !!et &&
-        ((st.getHours() === 23 && st.getMinutes() === 1 && et.getHours() === 23 && et.getMinutes() === 59) ||
-          (st.getHours() === 0 && st.getMinutes() === 0 && et.getHours() === 6 && et.getMinutes() === 0))
+        ((hmZ(st) === '23:01' && hmZ(et) === '23:59') ||
+          (hmZ(st) === '00:00' && hourZ(et) <= 7))
       const isInterruption = e.entryType === 'SLEEP_INTERRUPTION'
       return isFirst || isSecond || isSleep || isInterruption
     }
@@ -276,8 +280,8 @@ export async function DELETE(
         for (const e of nextEntries) {
           const st = new Date(e.startTime)
           const et = e.endTime ? new Date(e.endTime) : null
-          const isCarryOverWork = e.entryType === 'WORK' && st.getHours() === 6 && st.getMinutes() === 1
-          const isCarryOverSleep = e.entryType === 'SLEEP' && !!et && st.getHours() === 0 && st.getMinutes() === 0 && et.getHours() === 6 && et.getMinutes() === 0
+          const isCarryOverWork = e.entryType === 'WORK' && hmZ(st) === '06:01'
+          const isCarryOverSleep = e.entryType === 'SLEEP' && !!et && hmZ(st) === '00:00' && hourZ(et) <= 7
           const isCarryOverInterruption = e.entryType === 'SLEEP_INTERRUPTION'
           if (isCarryOverWork || isCarryOverSleep || isCarryOverInterruption) {
             idsToDelete.add(e.id)
