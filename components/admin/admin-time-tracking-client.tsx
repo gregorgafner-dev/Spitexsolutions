@@ -725,6 +725,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     setError('')
     
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    const nextDateStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd')
 
     // #region agent log
     debugLog(
@@ -853,7 +854,6 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         }
 
         // Speichere alle Standard-Zeiten am Startdatum (Buchungsdatum=dateStr)
-        const nextDateStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd')
         // Block 1: 19:00-23:00
         const payloadW1 = {
           employeeId: selectedEmployeeId,
@@ -901,8 +901,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           employeeId: selectedEmployeeId,
           date: dateStr,
           // NOTE: Zeitstempel kann am Folgetag liegen (nextDateStr), Buchungsdatum bleibt dateStr
-          startTime: new Date(`${dateStr}T00:00:00`).toISOString(),
-          endTime: new Date(`${dateStr}T06:00:00`).toISOString(),
+          startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+          endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
           breakMinutes: 0,
           entryType: 'SLEEP',
         }
@@ -923,8 +923,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           employeeId: selectedEmployeeId,
           date: dateStr,
           // NOTE: Zeitstempel kann am Folgetag liegen (nextDateStr), Buchungsdatum bleibt dateStr
-          startTime: new Date(`${dateStr}T06:01:00`).toISOString(),
-          endTime: new Date(`${dateStr}T07:00:00`).toISOString(),
+          startTime: new Date(`${nextDateStr}T06:01:00`).toISOString(),
+          endTime: new Date(`${nextDateStr}T07:00:00`).toISOString(),
           breakMinutes: 0,
           entryType: 'WORK',
         }
@@ -1168,8 +1168,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             body: JSON.stringify({
               employeeId: selectedEmployeeId,
               date: dateStr,
-              startTime: new Date(`${dateStr}T00:00:00`).toISOString(),
-              endTime: new Date(`${dateStr}T06:00:00`).toISOString(),
+              // Zeitstempel liegt am Folgetag, Buchungsdatum bleibt dateStr
+              startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+              endTime: new Date(`${nextDateStr}T06:00:00`).toISOString(),
               breakMinutes: 0,
               entryType: 'SLEEP',
             }),
@@ -1228,8 +1229,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               body: JSON.stringify({
                 employeeId: selectedEmployeeId,
                 date: dateStr,
-                startTime: new Date(`${dateStr}T00:00:00`).toISOString(),
-                endTime: new Date(`${dateStr}T00:00:00`).toISOString(),
+                // Zeitstempel liegt am Folgetag, Buchungsdatum bleibt dateStr
+                startTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
+                endTime: new Date(`${nextDateStr}T00:00:00`).toISOString(),
                 breakMinutes: 0,
                 entryType: 'SLEEP_INTERRUPTION',
                 sleepInterruptionMinutes: totalInterruptionMinutes,
