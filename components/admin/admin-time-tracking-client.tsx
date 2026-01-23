@@ -59,7 +59,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   const [isNightShift, setIsNightShift] = useState(false)
   const [sleepInterruptions, setSleepInterruptions] = useState({ hours: 0, minutes: 0 })
 
-  const debugDateKeys = new Set(['2026-01-12', '2026-01-15', '2026-01-16'])
+  const debugDateKeys = new Set(['2026-01-12', '2026-01-15', '2026-01-16', '2026-01-20', '2026-01-21'])
   const ymdKey = (d: Date) => format(d, 'yyyy-MM-dd')
   const shouldDebugDate = (d: Date) => debugDateKeys.has(ymdKey(d))
 
@@ -852,70 +852,89 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           // #endregion
         }
 
-        // Speichere alle Standard-Zeiten am Startdatum
+        // Speichere alle Standard-Zeiten am Startdatum (Buchungsdatum=dateStr)
+        const nextDateStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd')
         // Block 1: 19:00-23:00
+        const payloadW1 = {
+          employeeId: selectedEmployeeId,
+          date: dateStr,
+          startTime: new Date(`${dateStr}T19:00:00`).toISOString(),
+          endTime: new Date(`${dateStr}T23:00:00`).toISOString(),
+          breakMinutes: 0,
+          entryType: 'WORK',
+        }
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'payload nightshift WORK 19-23', { dateStr, payload: payloadW1 }, 'S2')
+        // #endregion
         const resW1 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            employeeId: selectedEmployeeId,
-            date: dateStr,
-            startTime: new Date(`${dateStr}T19:00:00`).toISOString(),
-            endTime: new Date(`${dateStr}T23:00:00`).toISOString(),
-            breakMinutes: 0,
-            entryType: 'WORK',
-          }),
+          body: JSON.stringify(payloadW1),
         })
         // #region agent log
         debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift WORK 19-23', { dateStr, status: resW1.status }, 'S2')
         // #endregion
 
         // SLEEP: 23:01-23:59
+        const payloadS1 = {
+          employeeId: selectedEmployeeId,
+          date: dateStr,
+          startTime: new Date(`${dateStr}T23:01:00`).toISOString(),
+          endTime: new Date(`${dateStr}T23:59:00`).toISOString(),
+          breakMinutes: 0,
+          entryType: 'SLEEP',
+        }
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'payload nightshift SLEEP 23:01-23:59', { dateStr, payload: payloadS1 }, 'S2')
+        // #endregion
         const resS1 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            employeeId: selectedEmployeeId,
-            date: dateStr,
-            startTime: new Date(`${dateStr}T23:01:00`).toISOString(),
-            endTime: new Date(`${dateStr}T23:59:00`).toISOString(),
-            breakMinutes: 0,
-            entryType: 'SLEEP',
-          }),
+          body: JSON.stringify(payloadS1),
         })
         // #region agent log
         debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift SLEEP 23:01-23:59', { dateStr, status: resS1.status }, 'S2')
         // #endregion
 
         // SLEEP: 00:00-06:00 (am Startdatum)
+        const payloadS2 = {
+          employeeId: selectedEmployeeId,
+          date: dateStr,
+          // NOTE: Zeitstempel kann am Folgetag liegen (nextDateStr), Buchungsdatum bleibt dateStr
+          startTime: new Date(`${dateStr}T00:00:00`).toISOString(),
+          endTime: new Date(`${dateStr}T06:00:00`).toISOString(),
+          breakMinutes: 0,
+          entryType: 'SLEEP',
+        }
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'payload nightshift SLEEP 00:00-06:00', { dateStr, payload: payloadS2 }, 'S2')
+        // #endregion
         const resS2 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            employeeId: selectedEmployeeId,
-            date: dateStr,
-            startTime: new Date(`${dateStr}T00:00:00`).toISOString(),
-            endTime: new Date(`${dateStr}T06:00:00`).toISOString(),
-            breakMinutes: 0,
-            entryType: 'SLEEP',
-          }),
+          body: JSON.stringify(payloadS2),
         })
         // #region agent log
         debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift SLEEP 00:00-06:00', { dateStr, status: resS2.status }, 'S2')
         // #endregion
 
         // Block 2: 06:01-07:00 (am Startdatum)
+        const payloadW2 = {
+          employeeId: selectedEmployeeId,
+          date: dateStr,
+          // NOTE: Zeitstempel kann am Folgetag liegen (nextDateStr), Buchungsdatum bleibt dateStr
+          startTime: new Date(`${dateStr}T06:01:00`).toISOString(),
+          endTime: new Date(`${dateStr}T07:00:00`).toISOString(),
+          breakMinutes: 0,
+          entryType: 'WORK',
+        }
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'payload nightshift WORK 06:01-07:00', { dateStr, payload: payloadW2 }, 'S2')
+        // #endregion
         const resW2 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            employeeId: selectedEmployeeId,
-            date: dateStr,
-            startTime: new Date(`${dateStr}T06:01:00`).toISOString(),
-            endTime: new Date(`${dateStr}T07:00:00`).toISOString(),
-            breakMinutes: 0,
-            entryType: 'WORK',
-          }),
+          body: JSON.stringify(payloadW2),
         })
         // #region agent log
         debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift WORK 06:01-07:00', { dateStr, status: resW2.status }, 'S2')
