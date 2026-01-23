@@ -399,30 +399,20 @@ export default function TimeTrackingPage() {
       
       // WICHTIG: Füge Einträge vom Folgetag und SLEEP-Einträge vom Vortag zu entries hinzu (für Anzeige der Stunden)
       // Dies ist wichtig für Nachtdienste, die über zwei Tage gehen
-      // WICHTIG: Merge die Einträge, damit bereits geladene Einträge von anderen Tagen erhalten bleiben
+      // WICHTIG: Beim Reload müssen Einträge für aktueller/folgender/voriger Tag vollständig ersetzt werden,
+      // sonst bleiben gelöschte Einträge als "Ghost" im State und führen bei erneutem Löschen zu 404.
       setEntries(prevEntries => {
         // Kombiniere alle neuen Einträge
         const allNewEntries = [...currentData, ...nextData, ...previousDaySleepEntries]
         
         // Erstelle eine Map der neuen Einträge nach ID für schnellen Zugriff
-        const newEntriesMap = new Map(allNewEntries.map((e: TimeEntry) => [e.id, e]))
-        
-        // Entferne alte Einträge für aktuellen Tag, Folgetag und Vortag, die durch neue Einträge ersetzt werden
+        // Entferne alle alten Einträge für aktuellen Tag, Folgetag und Vortag (Reload ersetzt diese Tage komplett)
         const filtered = prevEntries.filter(e => {
           const entryDate = new Date(e.date)
           const isCurrentDay = isSameDay(entryDate, date)
           const isNextDay = isSameDay(entryDate, addDays(date, 1))
           const isPreviousDay = isSameDay(entryDate, subDays(date, 1))
-          
-          // Behalte Einträge, die nicht zu diesen Tagen gehören
-          if (!isCurrentDay && !isNextDay && !isPreviousDay) {
-            return true
-          }
-          
-          // Wenn der Eintrag zu einem dieser Tage gehört, prüfe ob er durch einen neuen Eintrag ersetzt wird
-          // Wenn ja, entferne ihn (wird durch neuen Eintrag ersetzt)
-          // Wenn nein, behalte ihn (könnte von einem anderen Nachtdienst stammen)
-          return !newEntriesMap.has(e.id)
+          return !isCurrentDay && !isNextDay && !isPreviousDay
         })
         
         // Füge neue Einträge hinzu (inkl. SLEEP-Einträge vom Vortag)
