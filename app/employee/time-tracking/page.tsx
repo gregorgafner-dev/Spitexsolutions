@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea'
 import { AlertCircle, Clock, Plus, ChevronLeft, ChevronRight, X, MessageSquare } from 'lucide-react'
 import { isDateEditableForEmployee } from '@/lib/date-validation'
+import { computeNightShiftRelatedEntryIdsForEmployeeDelete } from '@/lib/nightshift-delete-selection'
 interface TimeEntry {
   id: string
   date: string
@@ -810,103 +811,11 @@ export default function TimeTrackingPage() {
       setEntries(prevEntries => {
         // Bei Nachtdienst: Entferne auch zugehörige Einträge (beide Blöcke, SLEEP-Einträge)
         if (isNightShiftMode) {
-          // Finde alle zugehörigen Einträge
-          const relatedEntryIds = new Set<string>([entryId])
-          
-          // Finde den anderen Block des Nachtdienstes
-          if (blockToDelete) {
-            const isFirstBlock = blockToDelete.startTime === '19:00' || blockToDelete.startTime.startsWith('19:')
-            const isSecondBlock = blockToDelete.startTime === '06:01' || blockToDelete.startTime.startsWith('06:01')
-            
-            if (isFirstBlock) {
-              // Erster Block gelöscht - finde zweiten Block (06:01 am Folgetag)
-              const secondBlock = prevEntries.find(e => {
-                const entryDate = new Date(e.date)
-                if (!isSameDay(entryDate, nextDay) || e.entryType !== 'WORK' || !e.endTime) return false
-                const startTime = format(parseISO(e.startTime), 'HH:mm')
-                return startTime === '06:01' || startTime.startsWith('06:01')
-              })
-              if (secondBlock) relatedEntryIds.add(secondBlock.id)
-            } else if (isSecondBlock) {
-              // Zweiter Block gelöscht - finde ersten Block (19:00 am aktuellen Tag)
-              const firstBlock = prevEntries.find(e => {
-                const entryDate = new Date(e.date)
-                if (!isSameDay(entryDate, selectedDate) || e.entryType !== 'WORK' || !e.endTime) return false
-                const startTime = format(parseISO(e.startTime), 'HH:mm')
-                const endTime = format(parseISO(e.endTime), 'HH:mm')
-                return (startTime === '19:00' || startTime.startsWith('19:')) && 
-                       (endTime === '23:00' || endTime.startsWith('23:'))
-              })
-              if (firstBlock) relatedEntryIds.add(firstBlock.id)
-            }
-            
-            // Finde SLEEP-Einträge (23:01-23:59 am aktuellen Tag und 00:00-06:00 am Folgetag)
-            prevEntries.forEach(e => {
-              const entryDate = new Date(e.date)
-              const isCurrentDay = isSameDay(entryDate, selectedDate)
-              const isNextDay = isSameDay(entryDate, nextDay)
-              
-              if (e.entryType === 'SLEEP' && (isCurrentDay || isNextDay)) {
-                const startTime = format(parseISO(e.startTime), 'HH:mm')
-                if ((isCurrentDay && (startTime === '23:01' || startTime.startsWith('23:01'))) ||
-                    (isNextDay && (startTime === '00:00' || startTime.startsWith('00:00')))) {
-                  relatedEntryIds.add(e.id)
-                }
-              }
-              
-              // Finde auch SLEEP_INTERRUPTION-Einträge am Folgetag
-              if (e.entryType === 'SLEEP_INTERRUPTION' && isNextDay) {
-                relatedEntryIds.add(e.id)
-              }
-            })
-          } else if (entryToDelete) {
-            // Wenn blockToDelete nicht gefunden wurde, aber entryToDelete existiert
-            const startTimeStr = format(parseISO(entryToDelete.startTime), 'HH:mm')
-            const endTimeStr = entryToDelete.endTime ? format(parseISO(entryToDelete.endTime), 'HH:mm') : ''
-            const isFirstBlock = (startTimeStr === '19:00' || startTimeStr.startsWith('19:')) && 
-                                (endTimeStr === '23:00' || endTimeStr.startsWith('23:'))
-            const isSecondBlock = startTimeStr === '06:01' || startTimeStr.startsWith('06:01')
-            
-            if (isFirstBlock) {
-              // Finde zweiten Block
-              const secondBlock = prevEntries.find(e => {
-                const entryDate = new Date(e.date)
-                if (!isSameDay(entryDate, nextDay) || e.entryType !== 'WORK' || !e.endTime) return false
-                const st = format(parseISO(e.startTime), 'HH:mm')
-                return st === '06:01' || st.startsWith('06:01')
-              })
-              if (secondBlock) relatedEntryIds.add(secondBlock.id)
-            } else if (isSecondBlock) {
-              // Finde ersten Block
-              const firstBlock = prevEntries.find(e => {
-                const entryDate = new Date(e.date)
-                if (!isSameDay(entryDate, selectedDate) || e.entryType !== 'WORK' || !e.endTime) return false
-                const st = format(parseISO(e.startTime), 'HH:mm')
-                const et = format(parseISO(e.endTime), 'HH:mm')
-                return (st === '19:00' || st.startsWith('19:')) && (et === '23:00' || et.startsWith('23:'))
-              })
-              if (firstBlock) relatedEntryIds.add(firstBlock.id)
-            }
-            
-            // Finde SLEEP-Einträge
-            prevEntries.forEach(e => {
-              const entryDate = new Date(e.date)
-              const isCurrentDay = isSameDay(entryDate, selectedDate)
-              const isNextDay = isSameDay(entryDate, nextDay)
-              
-              if (e.entryType === 'SLEEP' && (isCurrentDay || isNextDay)) {
-                const startTime = format(parseISO(e.startTime), 'HH:mm')
-                if ((isCurrentDay && (startTime === '23:01' || startTime.startsWith('23:01'))) ||
-                    (isNextDay && (startTime === '00:00' || startTime.startsWith('00:00')))) {
-                  relatedEntryIds.add(e.id)
-                }
-              }
-              
-              if (e.entryType === 'SLEEP_INTERRUPTION' && isNextDay) {
-                relatedEntryIds.add(e.id)
-              }
-            })
-          }
+          const relatedEntryIds = computeNightShiftRelatedEntryIdsForEmployeeDelete({
+            entryId,
+            selectedDate,
+            entries: prevEntries,
+          })
           
           // Entferne alle zugehörigen Einträge
           return prevEntries.filter(e => !relatedEntryIds.has(e.id))
