@@ -2464,10 +2464,13 @@ export default function TimeTrackingPage() {
                   .filter(block => {
                     // Wenn Nachtdienst aktiviert ist, zeige alle Blöcke
                     if (isNightShift) return true
-                    // Wenn Nachtdienst nicht aktiviert ist, zeige nur normale Blöcke (keine Nachtdienst-Blöcke)
+                    // Wenn Nachtdienst nicht aktiviert ist:
+                    // - Neue (noch nicht gespeicherte) Nachtdienst-Standardblöcke ausblenden
+                    // - Gespeicherte Nachtdienst-Blöcke trotzdem anzeigen, damit sie sichtbar/löschbar sind
                     const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
                                              (block.startTime === '06:01')
-                    return !isNightShiftBlock
+                    const isSaved = !block.id.startsWith('new-')
+                    return isSaved || !isNightShiftBlock
                   })
                   .map((block, index) => {
                   // Bei Nachtdienst: Erster Block endet immer um 23:00, zweiter Block startet immer um 06:01
@@ -2735,12 +2738,98 @@ export default function TimeTrackingPage() {
                 })}
 
                 {(() => {
+                  // Wenn nach einem (früher) unvollständigen Nachtdienst-Löschen nur noch SLEEP/SLEEP_INTERRUPTION übrig ist,
+                  // sollen diese Einträge trotzdem sichtbar und löschbar sein.
+                  const canDelete = isDateEditableForEmployee(selectedDate, false)
+                  if (!canDelete) return null
+
+                  const nextDay = addDays(selectedDate, 1)
+
+                  const sameDaySleepEntries = getEntriesForDate(selectedDate).filter(e => {
+                    if (e.entryType !== 'SLEEP' || !e.endTime) return false
+                    const st = format(parseISO(e.startTime), 'HH:mm')
+                    return st.startsWith('23:01') || st.startsWith('00:00')
+                  })
+
+                  const has00OnSameDay = sameDaySleepEntries.some(e => format(parseISO(e.startTime), 'HH:mm').startsWith('00:00'))
+                  const legacyNextDaySleepEntries = has00OnSameDay
+                    ? []
+                    : getEntriesForDate(nextDay).filter(e => {
+                        if (e.entryType !== 'SLEEP' || !e.endTime) return false
+                        const entryDate = parseISO(e.date)
+                        const startIso = parseISO(e.startTime)
+                        if (!isSameDay(entryDate, startIso)) return false
+                        const st = format(parseISO(e.startTime), 'HH:mm')
+                        return st.startsWith('00:00')
+                      })
+
+                  const allSleepEntries = [...sameDaySleepEntries, ...legacyNextDaySleepEntries]
+
+                  const interruptionEntry =
+                    getEntriesForDate(selectedDate).find(e => e.entryType === 'SLEEP_INTERRUPTION') ||
+                    getEntriesForDate(nextDay).find(e => {
+                      if (e.entryType !== 'SLEEP_INTERRUPTION') return false
+                      const entryDate = parseISO(e.date)
+                      const startIso = parseISO(e.startTime)
+                      return isSameDay(entryDate, startIso)
+                    }) ||
+                    null
+
+                  if (allSleepEntries.length === 0 && !interruptionEntry) return null
+
+                  return (
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Nachtdienst (Schlaf/Unterbrechung)</span>
+                      </div>
+
+                      {allSleepEntries.map(e => {
+                        const st = format(parseISO(e.startTime), 'HH:mm')
+                        const et = e.endTime ? format(parseISO(e.endTime), 'HH:mm') : ''
+                        return (
+                          <div key={e.id} className="flex items-center justify-between border rounded-md px-3 py-2">
+                            <div className="text-sm text-gray-700">Schlaf: {st}–{et}</div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteTimeEntry(e.id)}
+                              title="Eintrag löschen"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )
+                      })}
+
+                      {interruptionEntry && (
+                        <div className="flex items-center justify-between border rounded-md px-3 py-2">
+                          <div className="text-sm text-gray-700">
+                            Unterbrechung: {Math.round(interruptionEntry.sleepInterruptionMinutes || 0)} Min
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteTimeEntry(interruptionEntry.id)}
+                            title="Eintrag löschen"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {(() => {
                   // Berechne die angezeigten Blöcke (gefiltert)
                   const displayedBlocks = workBlocks.filter(block => {
                     if (isNightShift) return true
                     const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
                                              (block.startTime === '06:01')
-                    return !isNightShiftBlock
+                    const isSaved = !block.id.startsWith('new-')
+                    return isSaved || !isNightShiftBlock
                   })
                   
                   // Prüfe disabled-Bedingungen
