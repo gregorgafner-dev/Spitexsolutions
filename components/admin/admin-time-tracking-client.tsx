@@ -725,6 +725,20 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     setError('')
     
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
+
+    // #region agent log
+    debugLog(
+      'components/admin/admin-time-tracking-client.tsx:handleSave',
+      'handleSave() entry',
+      {
+        dateStr,
+        isNightShift,
+        workBlocks: workBlocks.map(b => ({ id: b.id, startTime: b.startTime, endTime: b.endTime, entryType: b.entryType })),
+        sleepInterruptions,
+      },
+      'S1'
+    )
+    // #endregion
     
     // Hilfsfunktion: Prüft ob ein Block ein Nachtdienst-Block ist
     const isNightShiftBlock = (block: WorkBlock): boolean => {
@@ -761,6 +775,18 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     console.log('handleSave called', { isNightShift, workBlocks, blocksToSave, sleepInterruptions })
 
+    // #region agent log
+    debugLog(
+      'components/admin/admin-time-tracking-client.tsx:handleSave',
+      'computed blocksToSave',
+      {
+        dateStr,
+        blocksToSave: blocksToSave.map(b => ({ id: b.id, startTime: b.startTime, endTime: b.endTime, entryType: b.entryType })),
+      },
+      'S1'
+    )
+    // #endregion
+
     // Bei Nachtdienst: Speichere Standard-Zeiten wenn keine Abweichungen
     if (isNightShift) {
       // Prüfe ob Abweichungen vorhanden sind (nur für Nachtdienst-Blöcke)
@@ -779,6 +805,20 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       // Wenn keine Abweichungen und keine Unterbrechungen, speichere Standard-Zeiten für Nachtdienst
       // Normale Blöcke werden separat gespeichert
       if (!hasDeviations && !hasInterruptions && nightShiftBlocks.length === 2) {
+        // #region agent log
+        debugLog(
+          'components/admin/admin-time-tracking-client.tsx:handleSave',
+          'nightshift standard path (no deviations)',
+          {
+            dateStr,
+            nightShiftBlocks: nightShiftBlocks.map(b => ({ startTime: b.startTime, endTime: b.endTime, entryType: b.entryType })),
+            hasDeviations,
+            hasInterruptions,
+          },
+          'S2'
+        )
+        // #endregion
+
         // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
         // Lösche nur bestehende Nachtdienst-Einträge für diesen Tag (inkl. alte Folgetag-Einträge für Migration)
         // Normale Einträge bleiben erhalten
@@ -799,14 +839,22 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         })
 
         for (const entry of existingEntries) {
-          await fetch(`/api/admin/time-entries/${entry.id}`, {
+          const delRes = await fetch(`/api/admin/time-entries/${entry.id}`, {
             method: 'DELETE',
           })
+          // #region agent log
+          debugLog(
+            'components/admin/admin-time-tracking-client.tsx:handleSave',
+            'DELETE old nightshift entry',
+            { dateStr, status: delRes.status },
+            'S2'
+          )
+          // #endregion
         }
 
         // Speichere alle Standard-Zeiten am Startdatum
         // Block 1: 19:00-23:00
-        await fetch('/api/admin/time-entries', {
+        const resW1 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -818,9 +866,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             entryType: 'WORK',
           }),
         })
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift WORK 19-23', { dateStr, status: resW1.status }, 'S2')
+        // #endregion
 
         // SLEEP: 23:01-23:59
-        await fetch('/api/admin/time-entries', {
+        const resS1 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -832,9 +883,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             entryType: 'SLEEP',
           }),
         })
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift SLEEP 23:01-23:59', { dateStr, status: resS1.status }, 'S2')
+        // #endregion
 
         // SLEEP: 00:00-06:00 (am Startdatum)
-        await fetch('/api/admin/time-entries', {
+        const resS2 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -846,9 +900,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             entryType: 'SLEEP',
           }),
         })
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift SLEEP 00:00-06:00', { dateStr, status: resS2.status }, 'S2')
+        // #endregion
 
         // Block 2: 06:01-07:00 (am Startdatum)
-        await fetch('/api/admin/time-entries', {
+        const resW2 = await fetch('/api/admin/time-entries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -860,6 +917,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
             entryType: 'WORK',
           }),
         })
+        // #region agent log
+        debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift WORK 06:01-07:00', { dateStr, status: resW2.status }, 'S2')
+        // #endregion
 
         // Speichere jetzt noch normale Blöcke (die nicht Nachtdienst-Blöcke sind)
         const normalBlocksToSave = blocksToSave.filter(block => !isNightShiftBlock(block))
@@ -884,6 +944,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     
     if (blocksToSave.length === 0) {
       setError('Bitte fügen Sie mindestens einen Arbeitsblock hinzu')
+      // #region agent log
+      debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'abort: no blocksToSave', { dateStr }, 'S3')
+      // #endregion
       return
     }
 
@@ -970,6 +1033,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         
         if (!block.startTime) {
           setError('Bitte füllen Sie alle Startzeiten aus')
+          // #region agent log
+          debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'abort: missing startTime', { dateStr, block }, 'S3')
+          // #endregion
           return
         }
 
@@ -988,6 +1054,9 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         
         if (!effectiveEndTime) {
           setError('Bitte füllen Sie alle Endzeiten aus')
+          // #region agent log
+          debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'abort: missing endTime', { dateStr, block, effectiveEndTime }, 'S3')
+          // #endregion
           return
         }
 
