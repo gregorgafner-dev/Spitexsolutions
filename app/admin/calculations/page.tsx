@@ -216,12 +216,18 @@ export default function CalculationsPage() {
     }
   }
 
-  const UI_BUILD = 'calc-breakdown-v2'
+  const UI_BUILD = 'calc-breakdown-v3'
 
   const totalWorkHours = results.reduce((sum, r) => sum + (r.hours || 0), 0)
   const totalSurchargeHours = results.reduce((sum, r) => sum + (r.surchargeHours || 0), 0)
   const totalHours = results.reduce((sum, r) => sum + (r.totalHours || 0), 0) // Arbeitszeit inkl. Zuschläge
   const totalSleepHours = results.reduce((sum, r) => sum + (r.sleepHours || 0), 0)
+  const totalHoursHourlyWage = results
+    .filter((r) => r.employmentType === 'HOURLY_WAGE')
+    .reduce((sum, r) => sum + (r.totalHours || 0), 0)
+  const totalHoursMonthlySalary = results
+    .filter((r) => r.employmentType === 'MONTHLY_SALARY')
+    .reduce((sum, r) => sum + (r.totalHours || 0), 0)
 
   useEffect(() => {
     if (results.length === 0) return
@@ -242,6 +248,8 @@ export default function CalculationsPage() {
           totalSurchargeHours,
           totalHours,
           totalSleepHours,
+          totalHoursHourlyWage,
+          totalHoursMonthlySalary,
         },
         timestamp: Date.now(),
       }),
@@ -254,8 +262,18 @@ export default function CalculationsPage() {
       totalSurchargeHours,
       totalHours,
       totalSleepHours,
+      totalHoursHourlyWage,
+      totalHoursMonthlySalary,
     })
-  }, [results, totalHours, totalSleepHours, totalSurchargeHours, totalWorkHours])
+  }, [
+    results,
+    totalHours,
+    totalSleepHours,
+    totalSurchargeHours,
+    totalWorkHours,
+    totalHoursHourlyWage,
+    totalHoursMonthlySalary,
+  ])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -404,6 +422,10 @@ export default function CalculationsPage() {
                       {results.length > 0 && (
                         <>
                           <div>Gesamt Arbeitszeit: {totalHours.toFixed(2)}h</div>
+                          <div className="ml-2 text-gray-700">
+                            <span className="text-gray-600">davon</span> Stundenlohn: {totalHoursHourlyWage.toFixed(2)}h · Monatslohn:{' '}
+                            {totalHoursMonthlySalary.toFixed(2)}h
+                          </div>
                           <div>Gesamt Schlafzeit: {totalSleepHours.toFixed(2)}h</div>
                           <div className="text-[10px] text-gray-400 mt-1">UI: {UI_BUILD}</div>
                         </>
@@ -478,6 +500,10 @@ export default function CalculationsPage() {
                         <div className="font-semibold text-lg">Gesamt: {totalHours.toFixed(2)}h</div>
                         <div className="text-sm text-gray-700 mt-1 space-y-0.5">
                           <div>Arbeitszeit: {totalHours.toFixed(2)}h</div>
+                          <div className="ml-2 text-gray-700">
+                            <span className="text-gray-600">davon</span> Stundenlohn: {totalHoursHourlyWage.toFixed(2)}h · Monatslohn:{' '}
+                            {totalHoursMonthlySalary.toFixed(2)}h
+                          </div>
                           <div>Schlafzeit: {totalSleepHours.toFixed(2)}h</div>
                         </div>
                       </div>
