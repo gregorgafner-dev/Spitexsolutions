@@ -217,6 +217,7 @@ export default function CalculationsPage() {
   }
 
   const totalHours = results.reduce((sum, r) => sum + r.totalHours, 0)
+  const totalSleepHours = results.reduce((sum, r) => sum + (r.sleepHours || 0), 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -430,8 +431,10 @@ export default function CalculationsPage() {
                     ))}
                     {results.length > 1 && (
                       <div className="pt-3 border-t mt-3">
-                        <div className="font-semibold text-lg">
-                          Gesamt: {totalHours.toFixed(2)}h
+                        <div className="font-semibold text-lg">Gesamt: {totalHours.toFixed(2)}h</div>
+                        <div className="text-sm text-gray-700 mt-1 space-y-0.5">
+                          <div>Arbeitszeit: {totalHours.toFixed(2)}h</div>
+                          <div>Schlafzeit: {totalSleepHours.toFixed(2)}h</div>
                         </div>
                       </div>
                     )}
