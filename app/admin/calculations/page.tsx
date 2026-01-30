@@ -216,7 +216,7 @@ export default function CalculationsPage() {
     }
   }
 
-  const UI_BUILD = 'calc-breakdown-v3'
+  const UI_BUILD = 'calc-breakdown-v4'
 
   const totalWorkHours = results.reduce((sum, r) => sum + (r.hours || 0), 0)
   const totalSurchargeHours = results.reduce((sum, r) => sum + (r.surchargeHours || 0), 0)
@@ -422,10 +422,8 @@ export default function CalculationsPage() {
                       {results.length > 0 && (
                         <>
                           <div>Gesamt Arbeitszeit: {totalHours.toFixed(2)}h</div>
-                          <div className="ml-2 text-gray-700">
-                            <span className="text-gray-600">davon</span> Stundenlohn: {totalHoursHourlyWage.toFixed(2)}h · Monatslohn:{' '}
-                            {totalHoursMonthlySalary.toFixed(2)}h
-                          </div>
+                          <div className="ml-2 text-gray-700">Arbeitszeit (Stundenlohn): {totalHoursHourlyWage.toFixed(2)}h</div>
+                          <div className="ml-2 text-gray-700">Arbeitszeit (Monatslohn): {totalHoursMonthlySalary.toFixed(2)}h</div>
                           <div>Gesamt Schlafzeit: {totalSleepHours.toFixed(2)}h</div>
                           <div className="text-[10px] text-gray-400 mt-1">UI: {UI_BUILD}</div>
                         </>
@@ -500,11 +498,10 @@ export default function CalculationsPage() {
                         <div className="font-semibold text-lg">Gesamt: {totalHours.toFixed(2)}h</div>
                         <div className="text-sm text-gray-700 mt-1 space-y-0.5">
                           <div>Arbeitszeit: {totalHours.toFixed(2)}h</div>
-                          <div className="ml-2 text-gray-700">
-                            <span className="text-gray-600">davon</span> Stundenlohn: {totalHoursHourlyWage.toFixed(2)}h · Monatslohn:{' '}
-                            {totalHoursMonthlySalary.toFixed(2)}h
-                          </div>
+                          <div className="ml-2 text-gray-700">Arbeitszeit (Stundenlohn): {totalHoursHourlyWage.toFixed(2)}h</div>
+                          <div className="ml-2 text-gray-700">Arbeitszeit (Monatslohn): {totalHoursMonthlySalary.toFixed(2)}h</div>
                           <div>Schlafzeit: {totalSleepHours.toFixed(2)}h</div>
+                          <div className="text-[10px] text-gray-400 mt-2">UI: {UI_BUILD}</div>
                         </div>
                       </div>
                     )}
