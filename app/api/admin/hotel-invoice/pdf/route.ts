@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { calculateWorkHours } from '@/lib/calculations'
 import { endOfMonth, format, startOfMonth } from 'date-fns'
 import { de } from 'date-fns/locale'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 const HOTEL_RECIPIENT_LINES = [
   'Zentrum Elisabeth',
@@ -42,6 +44,37 @@ function mustParseMonth(month: unknown): { year: number; monthIndex: number } {
     throw new Error('Ungültiger Monat.')
   }
   return { year: y, monthIndex: m - 1 }
+}
+
+async function loadHotelLogoBase64(): Promise<string | null> {
+  try {
+    const p = join(process.cwd(), 'public', 'hotel-logo.png')
+    const buf = await readFile(p)
+    return buf.toString('base64')
+  } catch {
+    return null
+  }
+}
+
+function drawHeader(doc: any, logoBase64: string | null) {
+  // Logo
+  if (logoBase64) {
+    // Original ratio ~ 644x186 -> 3.46
+    const w = 62
+    const h = w / 3.46
+    doc.addImage(logoBase64, 'PNG', 15, 10, w, h)
+  }
+
+  // Kopfzeile
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.text(HEADER_LINE, 15, 32, { maxWidth: 180 })
+
+  // Trennlinie
+  doc.setDrawColor(200, 200, 200)
+  doc.setLineWidth(0.3)
+  doc.line(15, 35, 195, 35)
+  doc.setDrawColor(0, 0, 0)
 }
 
 export async function POST(request: NextRequest) {
@@ -140,17 +173,16 @@ export async function POST(request: NextRequest) {
 
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+    const hotelLogoBase64 = await loadHotelLogoBase64()
 
     // ---------------- Page 1 ----------------
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.text(HEADER_LINE, 15, 12, { maxWidth: 180 })
+    drawHeader(doc, hotelLogoBase64)
 
     doc.setFontSize(10)
-    doc.text(`Rechnungsdatum ${format(new Date(), 'dd.MM.yy', { locale: de })}`, 15, 24)
+    doc.text(`Rechnungsdatum ${format(new Date(), 'dd.MM.yy', { locale: de })}`, 15, 48)
 
     doc.setFontSize(10)
-    let y = 36
+    let y = 60
     for (const line of HOTEL_RECIPIENT_LINES) {
       doc.text(line, 15, y)
       y += 5
@@ -168,7 +200,7 @@ export async function POST(request: NextRequest) {
     doc.text('Kosten Betreuung/Begleitung', 45, y)
     y += 6
     doc.text('Kosten Nachtwache', 45, y)
-    y += 8
+    y += 10
 
     doc.setFontSize(9.5)
     doc.text(CONTRACT_BASIS_LINE, 15, y)
@@ -180,34 +212,57 @@ export async function POST(request: NextRequest) {
       15,
       y
     )
-    y += 10
-
-    // Simple table header
-    doc.setFont('helvetica', 'bold')
-    doc.text('Rubrik', 15, y)
-    doc.text('Details', 75, y)
-    doc.text('CHF', 180, y, { align: 'right' })
-    doc.setFont('helvetica', 'normal')
-    y += 7
-
-    doc.text('Monatspauschale', 15, y)
-    doc.text('Reduktion gemäss Sitzung der Gesellschafter vom 15. Juli 2025', 75, y, { maxWidth: 95 })
-    doc.text(formatCHF(PAUSCHALE_CHF), 180, y, { align: 'right' })
     y += 12
 
-    doc.text('MwSt %', 15, y)
-    doc.text(MWST_SATZ_PROZENT.toFixed(1), 180, y, { align: 'right' })
-    y += 7
-
-    doc.text('MwSt Betrag', 15, y)
-    doc.text(formatCHF(mwstBetrag), 180, y, { align: 'right' })
-    y += 7
+    // Tabelle (Rubrik / Details / CHF) mit Linien und sauberem Umbruch
+    const xRubrik = 15
+    const xDetails = 70
+    const xCHF = 195
+    const detailsWidth = 110
 
     doc.setFont('helvetica', 'bold')
-    doc.text('Total inkl. MwSt', 15, y)
-    doc.text(formatCHF(pauschaleTotal), 180, y, { align: 'right' })
+    doc.setFontSize(9.5)
+    doc.text('Rubrik', xRubrik, y)
+    doc.text('Details', xDetails, y)
+    doc.text('CHF', xCHF, y, { align: 'right' })
+    y += 4
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(0.4)
+    doc.line(15, y, 195, y)
+    doc.setLineWidth(0.2)
+    doc.setDrawColor(200, 200, 200)
+    y += 6
+
+    const writeRow = (rubrik: string, details: string, chf: string | null, opts?: { bold?: boolean }) => {
+      doc.setFont('helvetica', opts?.bold ? 'bold' : 'normal')
+      doc.setFontSize(9.5)
+      doc.text(rubrik, xRubrik, y)
+
+      const detailLines = doc.splitTextToSize(details, detailsWidth)
+      doc.text(detailLines, xDetails, y)
+
+      if (chf !== null) {
+        doc.text(chf, xCHF, y, { align: 'right' })
+      }
+
+      const lineCount = Array.isArray(detailLines) ? detailLines.length : 1
+      const rowHeight = Math.max(6, lineCount * 4.2)
+      y += rowHeight
+      doc.setDrawColor(230, 230, 230)
+      doc.line(15, y - 2.5, 195, y - 2.5)
+      doc.setDrawColor(0, 0, 0)
+    }
+
+    writeRow('Monatspauschale', 'Reduktion gemäss Sitzung der Gesellschafter vom 15. Juli 2025', formatCHF(PAUSCHALE_CHF))
+    writeRow('MwSt %', '', MWST_SATZ_PROZENT.toFixed(1))
+    writeRow('MwSt Betrag', '', formatCHF(mwstBetrag))
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('Total inkl. MwSt', xRubrik, y + 2)
+    doc.text(formatCHF(pauschaleTotal), xCHF, y + 2, { align: 'right' })
     doc.setFont('helvetica', 'normal')
-    y += 12
+    y += 14
 
     doc.text('Für Ihre fristgerechte Zahlung danken wir Ihnen.', 15, y)
     y += 10
@@ -222,32 +277,32 @@ export async function POST(request: NextRequest) {
 
     // ---------------- Page 2 ----------------
     doc.addPage()
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.text(HEADER_LINE, 15, 12, { maxWidth: 180 })
+    drawHeader(doc, hotelLogoBase64)
 
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.text('Produktivität / Leerstunden', 15, 26)
+    doc.text('Produktivität / Leerstunden', 15, 48)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
-    doc.text('Kostenanteil Zentrum Elisabeth', 15, 34)
+    doc.text('Kostenanteil Zentrum Elisabeth', 15, 56)
 
     doc.setFontSize(10)
-    doc.text(String(year), 15, 46)
-    doc.text(`Monat ${format(monthDate, 'MMMM', { locale: de })}`, 15, 53)
+    doc.text(String(year), 15, 70)
+    doc.text(`Monat ${format(monthDate, 'MMMM', { locale: de })}`, 15, 78)
 
     // Table headings
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
-    doc.text('Arbeits-h', 110, 53, { align: 'right' })
-    doc.text('Schlaf-h', 170, 53, { align: 'right' })
+    doc.text('Arbeits-h', 120, 78, { align: 'right' })
+    doc.text('Schlaf-h', 175, 78, { align: 'right' })
     doc.setFont('helvetica', 'normal')
 
-    let y2 = 62
+    // Tabellenlayout (Seite 2)
+    let y2 = 90
     const xLabel = 15
-    const xWork = 110
-    const xSleep = 170
+    const xWork = 120
+    const xSleep = 175
+    const xAmountRight = 195
 
     const line = (label: string, work?: string, sleep?: string, opts?: { bold?: boolean }) => {
       if (opts?.bold) doc.setFont('helvetica', 'bold')
@@ -257,6 +312,12 @@ export async function POST(request: NextRequest) {
       if (sleep !== undefined) doc.text(sleep, xSleep, y2, { align: 'right' })
       y2 += 6
     }
+
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(0.4)
+    doc.line(15, 82, 195, 82)
+    doc.setLineWidth(0.2)
+    doc.setDrawColor(230, 230, 230)
 
     line("Std M'Arb Monatslohn", workMonthlySalary.toFixed(2), '0.00')
     line("Std M'Arb Stundenlohn", workHourlyWage.toFixed(2), totalSleepHours.toFixed(2))
@@ -272,36 +333,36 @@ export async function POST(request: NextRequest) {
     line('hiervon Anteil Zentrum Elisabeth % 50', (leerstundenWork * 0.5).toFixed(2), '')
     line('Anteil Zentrum Elisabeth % 100', '', leerstundenSleep.toFixed(2))
 
-    y2 += 4
+    y2 += 6
     const verrechnungArbeitTotal = leerstundenWork * RATE_ARBEIT_CHF_PRO_STD
     const verrechnungSchlafTotal = leerstundenSleep * RATE_SCHLAF_CHF_PRO_STD
 
     doc.setFont('helvetica', 'normal')
     doc.text('Verrechnung CHF/Std', xLabel, y2)
-    doc.text('Arbeit', xLabel + 50, y2)
+    doc.text('Arbeit', xLabel + 55, y2)
     doc.text(RATE_ARBEIT_CHF_PRO_STD.toFixed(2), xWork, y2, { align: 'right' })
-    doc.text(formatCHF(verrechnungArbeitTotal), 195, y2, { align: 'right' })
+    doc.text(formatCHF(verrechnungArbeitTotal), xAmountRight, y2, { align: 'right' })
     y2 += 7
 
     doc.text('Verrechnung CHF/Std', xLabel, y2)
-    doc.text('Schlaf', xLabel + 50, y2)
+    doc.text('Schlaf', xLabel + 55, y2)
     doc.text(RATE_SCHLAF_CHF_PRO_STD.toFixed(1), xWork, y2, { align: 'right' })
-    doc.text(formatCHF(verrechnungSchlafTotal), 195, y2, { align: 'right' })
-    y2 += 10
+    doc.text(formatCHF(verrechnungSchlafTotal), xAmountRight, y2, { align: 'right' })
+    y2 += 12
 
     doc.setFont('helvetica', 'bold')
     doc.text('Total Kosten Anteil Hotel', xLabel, y2)
-    doc.text(formatCHF(totalHotelCost), 195, y2, { align: 'right' })
+    doc.text(formatCHF(totalHotelCost), xAmountRight, y2, { align: 'right' })
     y2 += 7
 
     doc.setFont('helvetica', 'normal')
     doc.text('Vereinbarte Pauschale', xLabel, y2)
-    doc.text(formatCHF(PAUSCHALE_CHF), 195, y2, { align: 'right' })
+    doc.text(formatCHF(PAUSCHALE_CHF), xAmountRight, y2, { align: 'right' })
     y2 += 7
 
     doc.setFont('helvetica', 'bold')
     doc.text('Differenz', xLabel, y2)
-    doc.text(formatCHF(diffToPauschale), 195, y2, { align: 'right' })
+    doc.text(formatCHF(diffToPauschale), xAmountRight, y2, { align: 'right' })
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     const response = new NextResponse(pdfBuffer)
