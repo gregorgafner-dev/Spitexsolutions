@@ -55,6 +55,11 @@ const adminNavItems = [
     icon: FileText,
   },
   {
+    title: 'Rechnung Hotel',
+    href: '/admin/hotel-invoice',
+    icon: FileText,
+  },
+  {
     title: 'Berechnungen',
     href: '/admin/calculations',
     icon: Calculator,

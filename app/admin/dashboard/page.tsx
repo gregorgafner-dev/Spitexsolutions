@@ -252,6 +252,22 @@ export default async function AdminDashboard() {
           <Card className="flex flex-col">
             <CardHeader>
               <CardTitle className="flex items-center">
+                <FileText className="mr-2 h-5 w-5" />
+                Rechnung an Hotel
+              </CardTitle>
+              <CardDescription>Hotel-Rechnung als PDF generieren</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col flex-grow">
+              <div className="text-3xl font-bold mb-4">-</div>
+              <Link href="/admin/hotel-invoice" className="mt-auto">
+                <Button className="w-full">Rechnung erstellen</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle className="flex items-center">
                 <Clock className="mr-2 h-5 w-5" />
                 Zeiterfassung und Änderungen
               </CardTitle>
