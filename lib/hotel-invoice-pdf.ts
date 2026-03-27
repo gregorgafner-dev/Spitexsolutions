@@ -43,31 +43,11 @@ function formatCHF(amount: number): string {
   return `${withApos}.${frac}`
 }
 
-function debugLog(runId: string | undefined, hypothesisId: string, location: string, message: string, data: any) {
-  if (!runId) return
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-    body: JSON.stringify({
-      sessionId: '42d3e1',
-      runId,
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
-}
-
-function drawHeader(doc: any, logoBase64: string | null, runId?: string) {
+function drawHeader(doc: any, logoBase64: string | null) {
   if (logoBase64) {
     const w = 62
     const h = w / 3.46
     doc.addImage(logoBase64, 'PNG', 15, 10, w, h)
-    debugLog(runId, 'H2', 'lib/hotel-invoice-pdf.ts:drawHeader', 'logo', { w, h })
   }
 
   doc.setFont('helvetica', 'normal')
@@ -78,28 +58,24 @@ function drawHeader(doc: any, logoBase64: string | null, runId?: string) {
   doc.setLineWidth(0.3)
   doc.line(15, 35, 195, 35)
   doc.setDrawColor(0, 0, 0)
-  debugLog(runId, 'H1', 'lib/hotel-invoice-pdf.ts:drawHeader', 'headerLine', { y: 35, w: 0.3 })
 }
 
 export function renderHotelInvoicePdf(opts: {
   doc: any
   logoBase64: string | null
   params: HotelInvoiceRenderParams
-  debugRunId?: string
-  buildLabel?: string | null
 }) {
-  const { doc, logoBase64, params, debugRunId, buildLabel } = opts
+  const { doc, logoBase64, params } = opts
 
-  const drawFineSeparator = (yLine: number, id: string) => {
+  const drawFineSeparator = (yLine: number) => {
     doc.setDrawColor(190, 190, 190)
     doc.setLineWidth(0.15)
     doc.line(15, yLine, 195, yLine)
     doc.setDrawColor(0, 0, 0)
-    debugLog(debugRunId, 'H3', 'lib/hotel-invoice-pdf.ts:drawFineSeparator', 'fineLine', { id, y: yLine, w: 0.15 })
   }
 
   // ---------------- Page 1 ----------------
-  drawHeader(doc, logoBase64, debugRunId)
+  drawHeader(doc, logoBase64)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
@@ -158,7 +134,7 @@ export function renderHotelInvoicePdf(opts: {
   doc.setDrawColor(200, 200, 200)
   y += 6
 
-  const writeRow = (rubrik: string, details: string, chf: string | null, rowId: string) => {
+  const writeRow = (rubrik: string, details: string, chf: string | null) => {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9.5)
     doc.text(rubrik, xRubrik, y)
@@ -170,7 +146,6 @@ export function renderHotelInvoicePdf(opts: {
 
     const lineCount = Array.isArray(detailLines) ? detailLines.length : 1
     const rowHeight = Math.max(6, lineCount * 4.2)
-    const yBefore = y
     y += rowHeight
 
     doc.setDrawColor(230, 230, 230)
@@ -178,23 +153,15 @@ export function renderHotelInvoicePdf(opts: {
     // Linie näher an Text (Vorlage)
     doc.line(15, y - 4.2, 195, y - 4.2)
     doc.setDrawColor(0, 0, 0)
-    debugLog(debugRunId, 'H1', 'lib/hotel-invoice-pdf.ts:writeRow', 'rowLine', {
-      rowId,
-      yText: yBefore,
-      yLine: y - 4.2,
-      rowHeight,
-      lineCount,
-    })
   }
 
   writeRow(
     'Monatspauschale',
     'Reduktion gemäss Sitzung der Gesellschafter vom 15. Juli 2025',
-    formatCHF(12000),
-    'pauschale'
+    formatCHF(12000)
   )
-  writeRow('MwSt %', '', '8.1', 'mwst_pct')
-  writeRow('MwSt Betrag', '', formatCHF(params.mwstBetrag), 'mwst_amount')
+  writeRow('MwSt %', '', '8.1')
+  writeRow('MwSt Betrag', '', formatCHF(params.mwstBetrag))
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
@@ -216,7 +183,7 @@ export function renderHotelInvoicePdf(opts: {
 
   // ---------------- Page 2 ----------------
   doc.addPage()
-  drawHeader(doc, logoBase64, debugRunId)
+  drawHeader(doc, logoBase64)
 
   doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
@@ -261,19 +228,19 @@ export function renderHotelInvoicePdf(opts: {
   line('Std Total', (params.workMonthlySalary + params.workHourlyWage).toFixed(2), params.totalSleepHours.toFixed(2), {
     bold: true,
   })
-  drawFineSeparator(y2 - 2.5, 'after_std_total')
+  drawFineSeparator(y2 - 2.5)
 
   y2 += 2
   line('hiervon: Std KLV-verrechnet', params.klvHours.toFixed(2), '')
   line('Produktivität in %', `${params.productivity.toFixed(2)}%`, '')
   line('Leerstunden', params.leerstundenWork.toFixed(2), params.leerstundenSleep.toFixed(2))
-  drawFineSeparator(y2 - 2.5, 'after_leerstunden')
+  drawFineSeparator(y2 - 2.5)
 
   y2 += 2
   line('hiervon Anteil Spitex Domus % 50', (params.leerstundenWork * 0.5).toFixed(2), '')
   line('hiervon Anteil Zentrum Elisabeth % 50', (params.leerstundenWork * 0.5).toFixed(2), '')
   line('Anteil Zentrum Elisabeth % 100', '', params.leerstundenSleep.toFixed(2))
-  drawFineSeparator(y2 - 2.5, 'after_anteil_zentrum')
+  drawFineSeparator(y2 - 2.5)
 
   y2 += 6
 
@@ -290,7 +257,7 @@ export function renderHotelInvoicePdf(opts: {
   doc.text(formatCHF(params.verrechnungSchlafTotal), xAmountRight, y2, { align: 'right' })
   y2 += 12
 
-  drawFineSeparator(y2 - 6.5, 'before_total_kosten')
+  drawFineSeparator(y2 - 6.5)
 
   doc.setFont('helvetica', 'bold')
   doc.text('Total Kosten Anteil Hotel', xLabel, y2)
@@ -306,13 +273,5 @@ export function renderHotelInvoicePdf(opts: {
   doc.text('Differenz', xLabel, y2)
   doc.text(formatCHF(params.diffToPauschale), xAmountRight, y2, { align: 'right' })
 
-  if (debugRunId && buildLabel) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.setTextColor(140, 140, 140)
-    doc.text(`Build: ${buildLabel}`, 15, 290)
-    doc.setTextColor(0, 0, 0)
-    debugLog(debugRunId, 'H4', 'lib/hotel-invoice-pdf.ts:footer', 'buildLabel', { buildLabel })
-  }
 }
 

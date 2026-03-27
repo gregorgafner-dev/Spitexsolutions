@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null)
     const month = body?.month
     const klvHoursRaw = body?.klvHours
-    const debug = body?.debug === true
 
     const { year, monthIndex } = mustParseMonth(month)
     const klvHours = Number(klvHoursRaw)
@@ -150,13 +149,6 @@ export async function POST(request: NextRequest) {
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
     const hotelLogoBase64 = await loadHotelLogoBase64()
-    const debugRunId = debug ? 'hotel-invoice-ui-debug' : undefined
-    const buildLabel =
-      process.env.VERCEL_GIT_COMMIT_SHA ||
-      process.env.GITHUB_SHA ||
-      process.env.RENDER_GIT_COMMIT ||
-      process.env.COMMIT_SHA ||
-      null
 
     const renderParams: HotelInvoiceRenderParams = {
       now: new Date(),
@@ -179,7 +171,7 @@ export async function POST(request: NextRequest) {
       pauschaleTotal,
     }
 
-    renderHotelInvoicePdf({ doc, logoBase64: hotelLogoBase64, params: renderParams, debugRunId, buildLabel })
+    renderHotelInvoicePdf({ doc, logoBase64: hotelLogoBase64, params: renderParams })
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     const response = new NextResponse(pdfBuffer)
