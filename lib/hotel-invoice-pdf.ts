@@ -86,8 +86,9 @@ export function renderHotelInvoicePdf(opts: {
   logoBase64: string | null
   params: HotelInvoiceRenderParams
   debugRunId?: string
+  buildLabel?: string | null
 }) {
-  const { doc, logoBase64, params, debugRunId } = opts
+  const { doc, logoBase64, params, debugRunId, buildLabel } = opts
 
   const drawFineSeparator = (yLine: number, id: string) => {
     doc.setDrawColor(190, 190, 190)
@@ -304,5 +305,14 @@ export function renderHotelInvoicePdf(opts: {
   doc.setFont('helvetica', 'bold')
   doc.text('Differenz', xLabel, y2)
   doc.text(formatCHF(params.diffToPauschale), xAmountRight, y2, { align: 'right' })
+
+  if (debugRunId && buildLabel) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(140, 140, 140)
+    doc.text(`Build: ${buildLabel}`, 15, 290)
+    doc.setTextColor(0, 0, 0)
+    debugLog(debugRunId, 'H4', 'lib/hotel-invoice-pdf.ts:footer', 'buildLabel', { buildLabel })
+  }
 }
 

@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null)
     const month = body?.month
     const klvHoursRaw = body?.klvHours
+    const debug = body?.debug === true
 
     const { year, monthIndex } = mustParseMonth(month)
     const klvHours = Number(klvHoursRaw)
@@ -140,6 +141,8 @@ export async function POST(request: NextRequest) {
     const shareHotelSleepCost = leerstundenSleep * RATE_SCHLAF_CHF_PRO_STD * SHARE_SCHLAF_HOTEL
     const totalHotelCost = shareHotelWorkCost + shareHotelSleepCost
     const diffToPauschale = totalHotelCost - PAUSCHALE_CHF
+    const verrechnungArbeitTotal = leerstundenWork * RATE_ARBEIT_CHF_PRO_STD
+    const verrechnungSchlafTotal = leerstundenSleep * RATE_SCHLAF_CHF_PRO_STD
 
     const mwstBetrag = PAUSCHALE_CHF * MWST_SATZ
     const pauschaleTotal = PAUSCHALE_CHF + mwstBetrag
@@ -147,8 +150,13 @@ export async function POST(request: NextRequest) {
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
     const hotelLogoBase64 = await loadHotelLogoBase64()
-    const debugRunId =
-      process.env.NODE_ENV !== 'production' && process.env.DEBUG_HOTEL_INVOICE === '1' ? 'hotel-invoice-local' : undefined
+    const debugRunId = debug ? 'hotel-invoice-ui-debug' : undefined
+    const buildLabel =
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.GITHUB_SHA ||
+      process.env.RENDER_GIT_COMMIT ||
+      process.env.COMMIT_SHA ||
+      null
 
     const renderParams: HotelInvoiceRenderParams = {
       now: new Date(),
@@ -171,7 +179,7 @@ export async function POST(request: NextRequest) {
       pauschaleTotal,
     }
 
-    renderHotelInvoicePdf({ doc, logoBase64: hotelLogoBase64, params: renderParams, debugRunId })
+    renderHotelInvoicePdf({ doc, logoBase64: hotelLogoBase64, params: renderParams, debugRunId, buildLabel })
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     const response = new NextResponse(pdfBuffer)

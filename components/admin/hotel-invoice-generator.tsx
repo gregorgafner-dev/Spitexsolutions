@@ -23,6 +23,7 @@ export default function HotelInvoiceGenerator() {
     setError(null)
 
     const klv = Number(klvHours.replace(',', '.'))
+    const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1'
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
       setError('Bitte einen gültigen Monat wählen.')
       return
@@ -37,7 +38,7 @@ export default function HotelInvoiceGenerator() {
       const res = await fetch('/api/admin/hotel-invoice/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, klvHours: klv }),
+        body: JSON.stringify({ month, klvHours: klv, debug }),
       })
 
       if (!res.ok) {

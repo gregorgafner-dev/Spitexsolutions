@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { endOfMonth, startOfMonth } from 'date-fns'
-import { renderHotelInvoicePdf, type HotelInvoiceRenderParams } from '../lib/hotel-invoice-pdf.ts'
+import { renderHotelInvoicePdf, type HotelInvoiceRenderParams } from '../lib/hotel-invoice-pdf'
 
 async function main() {
   const jspdfMod: any = await import('jspdf')
