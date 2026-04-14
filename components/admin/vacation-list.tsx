@@ -63,6 +63,27 @@ interface VacationListProps {
 }
 
 const STANDARD_VACATION_DAYS = 25
+const DEBUG_SESSION_ID = '42d3e1'
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f'
+
+function debugSend(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+  // #region agent log
+  if (typeof window === 'undefined') return
+  fetch(DEBUG_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': DEBUG_SESSION_ID },
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      runId: 'vacation-ui',
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+}
 
 export default function VacationList({ employees, vacations, employeesWithCarryover = [] }: VacationListProps) {
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
@@ -78,6 +99,39 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
   const [loading, setLoading] = useState(false)
 
   const currentYear = new Date().getFullYear()
+
+  useEffect(() => {
+    // #region agent log
+    debugSend('H_render', 'components/admin/vacation-list.tsx:mount', 'VacationList mount', {
+      currentYear,
+      employeesCount: employees.length,
+    })
+    // #endregion
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    // #region agent log
+    const targets = new Set([
+      'Samantha Schiavo',
+      'Almina Figueiro Macedo',
+      'Adelina Halimi',
+      'Barbara Kost-Schär',
+      'Anna Joelle Furrer',
+    ])
+    for (const e of employees) {
+      const name = `${e.user.firstName} ${e.user.lastName}`.trim()
+      if (!targets.has(name)) continue
+      const b = e.vacationBalances.find((vb) => vb.year === currentYear) || null
+      debugSend('H_render', 'components/admin/vacation-list.tsx:renderTargets', 'Target balance rendered', {
+        employeeId: e.id,
+        year: currentYear,
+        totalDays: b?.totalDays ?? null,
+        usedDays: b?.usedDays ?? null,
+      })
+    }
+    // #endregion
+  }, [employees, currentYear])
 
   // Event Listener für Carryover-Dialog
   useEffect(() => {
@@ -119,6 +173,17 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
     if (mode === 'full') {
       setFullTotalDays(balance?.totalDays ?? STANDARD_VACATION_DAYS)
     }
+
+    // #region agent log
+    debugSend('H_open', 'components/admin/vacation-list.tsx:openBalanceDialog', 'Open balance dialog', {
+      employeeId: employee.id,
+      mode,
+      currentYear,
+      existingTotalDays: balance?.totalDays ?? null,
+      existingUsedDays: balance?.usedDays ?? null,
+      existingStartDate: balance?.startDate ? true : false,
+    })
+    // #endregion
 
     setError('')
     setIsBalanceDialogOpen(true)
@@ -189,6 +254,16 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
         startDateValue = null
       }
 
+      // #region agent log
+      debugSend('H_save', 'components/admin/vacation-list.tsx:handleConfirmBalance', 'Saving vacation balance', {
+        employeeId: selectedEmployee.id,
+        year: currentYear,
+        balanceMode,
+        totalDays,
+        startDateValue: startDateValue ? true : false,
+      })
+      // #endregion
+
       const response = await fetch('/api/admin/vacation-balances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,11 +276,38 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
       })
 
       if (!response.ok) {
-        const data = await response.json()
+        let data: any = null
+        try {
+          data = await response.json()
+        } catch {
+          data = null
+        }
+        // #region agent log
+        debugSend('H_save', 'components/admin/vacation-list.tsx:handleConfirmBalance:bad', 'Save failed', {
+          employeeId: selectedEmployee.id,
+          status: response.status,
+          hasJson: Boolean(data),
+        })
+        // #endregion
         setError(data.error || 'Ein Fehler ist aufgetreten')
         setLoading(false)
         return
       }
+
+      let okJson: any = null
+      try {
+        okJson = await response.json()
+      } catch {
+        okJson = null
+      }
+      // #region agent log
+      debugSend('H_save', 'components/admin/vacation-list.tsx:handleConfirmBalance:ok', 'Save succeeded', {
+        employeeId: selectedEmployee.id,
+        status: response.status,
+        returnedTotalDays: okJson?.totalDays ?? null,
+        returnedUsedDays: okJson?.usedDays ?? null,
+      })
+      // #endregion
 
       setIsBalanceDialogOpen(false)
       setSelectedEmployee(null)
@@ -214,6 +316,11 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
       setCalculatedDays(null)
       window.location.reload()
     } catch (error) {
+      // #region agent log
+      debugSend('H_save', 'components/admin/vacation-list.tsx:handleConfirmBalance:catch', 'Save threw exception', {
+        employeeId: selectedEmployee?.id ?? null,
+      })
+      // #endregion
       setError('Ein Fehler ist aufgetreten')
       setLoading(false)
     }
