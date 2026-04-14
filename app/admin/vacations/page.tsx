@@ -8,6 +8,10 @@ import VacationList from '@/components/admin/vacation-list'
 import CarryoverList from '@/components/admin/carryover-list'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function VacationsPage() {
   const session = await getSession()
 
