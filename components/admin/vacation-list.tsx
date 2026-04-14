@@ -72,6 +72,7 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
   const [balanceMode, setBalanceMode] = useState<'full' | 'partial' | null>(null)
   const [startDate, setStartDate] = useState('')
   const [calculatedDays, setCalculatedDays] = useState<number | null>(null)
+  const [fullTotalDays, setFullTotalDays] = useState<number>(STANDARD_VACATION_DAYS)
   const [carryoverDays, setCarryoverDays] = useState<number>(0)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -114,6 +115,11 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
       setStartDate('')
       setCalculatedDays(null)
     }
+
+    if (mode === 'full') {
+      setFullTotalDays(balance?.totalDays ?? STANDARD_VACATION_DAYS)
+    }
+
     setError('')
     setIsBalanceDialogOpen(true)
   }
@@ -171,6 +177,16 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
         }
         totalDays = calculatedDays
         startDateValue = new Date(startDate).toISOString()
+      }
+
+      if (balanceMode === 'full') {
+        if (!Number.isFinite(fullTotalDays) || fullTotalDays <= 0) {
+          setError('Bitte geben Sie einen gültigen Jahressaldo (> 0) ein')
+          setLoading(false)
+          return
+        }
+        totalDays = Math.round(fullTotalDays * 10) / 10
+        startDateValue = null
       }
 
       const response = await fetch('/api/admin/vacation-balances', {
@@ -364,11 +380,25 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
           {balanceMode === 'full' && (
             <div className="space-y-4">
               <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">
-                  Jahressaldo: {STANDARD_VACATION_DAYS} Tage
-                </p>
-                <p className="text-xs text-blue-700 mt-1">
-                  Standard-Feriensaldo für das gesamte Jahr {currentYear}
+                <p className="text-sm font-medium text-blue-900">Jahressaldo (Tage)</p>
+                <div className="mt-3 flex items-end gap-3">
+                  <div className="flex-1">
+                    <Label htmlFor="fullTotalDays" className="text-xs text-blue-900">
+                      Total Tage für {currentYear}
+                    </Label>
+                    <Input
+                      id="fullTotalDays"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={Number.isFinite(fullTotalDays) ? fullTotalDays : ''}
+                      onChange={(e) => setFullTotalDays(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-blue-700 mt-2">
+                  Standard ist {STANDARD_VACATION_DAYS} Tage. Hier kannst du den Jahressaldo korrigieren (z.B. inkl. Restferien).
+                  Verbrauchte Tage bleiben unverändert.
                 </p>
               </div>
             </div>
