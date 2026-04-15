@@ -41,6 +41,44 @@ export default async function VacationsPage({
     })
   )
 
+  // Geplante Ferien (künftige FE-Einträge im Dienstplan; nur Mo-Fr) pro Mitarbeiter für die Übersicht.
+  const plannedByEmployeeId: Record<string, number> = {}
+  const vacationService = await prisma.service.findFirst({ where: { name: 'FE' }, select: { id: true } })
+  if (vacationService) {
+    const startOfYear = new Date(currentYear, 0, 1)
+    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const futureEntries = await prisma.scheduleEntry.findMany({
+      where: {
+        serviceId: vacationService.id,
+        date: { gt: today, gte: startOfYear, lte: endOfYear },
+      },
+      select: { employeeId: true, date: true },
+      orderBy: { date: 'asc' },
+    })
+
+    const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+    const isWeekendIsoDay = (dayIso: string) => {
+      const dt = new Date(`${dayIso}T00:00:00.000Z`)
+      const wd = dt.getUTCDay() // 0=So ... 6=Sa
+      return wd === 0 || wd === 6
+    }
+
+    const sets = new Map<string, Set<string>>()
+    for (const e of futureEntries) {
+      const d = isoDay(e.date)
+      if (isWeekendIsoDay(d)) continue
+      const s = sets.get(e.employeeId) ?? new Set<string>()
+      s.add(d)
+      sets.set(e.employeeId, s)
+    }
+    for (const [employeeId, s] of sets.entries()) {
+      plannedByEmployeeId[employeeId] = s.size
+    }
+  }
+
   const employeesData = await prisma.employee.findMany({
     include: {
       user: true,
@@ -270,6 +308,7 @@ export default async function VacationsPage({
               employees={employees} 
               vacations={vacations}
               employeesWithCarryover={employeesWithCarryover}
+              plannedByEmployeeId={plannedByEmployeeId}
             />
           </CardContent>
         </Card>

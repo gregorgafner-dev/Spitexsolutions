@@ -80,11 +80,17 @@ interface VacationListProps {
   employees: Employee[]
   vacations: Vacation[]
   employeesWithCarryover?: CarryoverEmployee[]
+  plannedByEmployeeId?: Record<string, number>
 }
 
 const STANDARD_VACATION_DAYS = 25
 
-export default function VacationList({ employees, vacations, employeesWithCarryover = [] }: VacationListProps) {
+export default function VacationList({
+  employees,
+  vacations,
+  employeesWithCarryover = [],
+  plannedByEmployeeId = {},
+}: VacationListProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const debugRequested = searchParams.get('debug') === '1'
@@ -452,6 +458,11 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
                         {remainingDays} Tage
                       </span>
                     </p>
+                    {plannedByEmployeeId[employee.id] ? (
+                      <p className="text-sm text-gray-600">
+                        Geplant: <span className="font-medium">{plannedByEmployeeId[employee.id]} Tage</span>
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 mt-1">
