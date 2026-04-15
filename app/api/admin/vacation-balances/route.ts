@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const employeeId = request.nextUrl.searchParams.get('employeeId') || ''
     const yearParam = request.nextUrl.searchParams.get('year') || ''
     const debug = request.nextUrl.searchParams.get('debug') === '1'
+    const includeUsage = request.nextUrl.searchParams.get('includeUsage') === '1'
     const year = parseInt(yearParam, 10)
 
     if (!employeeId || !Number.isFinite(year)) {
@@ -31,10 +32,45 @@ export async function GET(request: NextRequest) {
       where: { employeeId_year: { employeeId, year } },
     })
 
-    if (!debug) return NextResponse.json(balance)
+    if (!debug && !includeUsage) return NextResponse.json(balance)
+
+    let usage: any = null
+    if (includeUsage) {
+      const vacationService = await prisma.service.findFirst({ where: { name: 'FE' } })
+      if (vacationService) {
+        const startOfYear = new Date(year, 0, 1)
+        const endOfYear = new Date(year, 11, 31, 23, 59, 59)
+        const entries = await prisma.scheduleEntry.findMany({
+          where: {
+            employeeId,
+            serviceId: vacationService.id,
+            date: { gte: startOfYear, lte: endOfYear },
+          },
+          select: { id: true, date: true },
+          orderBy: { date: 'asc' },
+        })
+
+        const toDay = (d: Date) => d.toISOString().slice(0, 10)
+        const days = entries.map((e) => toDay(e.date))
+        const uniqueDays = Array.from(new Set(days))
+        usage = {
+          service: 'FE',
+          entriesCount: entries.length,
+          uniqueDaysCount: uniqueDays.length,
+          firstDay: uniqueDays[0] ?? null,
+          lastDay: uniqueDays[uniqueDays.length - 1] ?? null,
+          sampleDays: uniqueDays.slice(0, 60),
+        }
+      } else {
+        usage = { service: 'FE', error: 'Service FE not found' }
+      }
+    }
+
+    if (!debug) return NextResponse.json({ balance, usage })
 
     return NextResponse.json({
       balance,
+      usage,
       debug: {
         serverNow: new Date().toISOString(),
         commit: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null,

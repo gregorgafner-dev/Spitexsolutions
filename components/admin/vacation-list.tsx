@@ -146,6 +146,32 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
     setIsBalanceDialogOpen(true)
   }
 
+  useEffect(() => {
+    if (!debugEnabled) return
+    if (!isBalanceDialogOpen) return
+    if (!selectedEmployee) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch(
+          `/api/admin/vacation-balances?employeeId=${encodeURIComponent(selectedEmployee.id)}&year=${encodeURIComponent(
+            String(currentYear)
+          )}&debug=1&includeUsage=1`,
+          { cache: 'no-store' as any }
+        )
+        const j = await r.json()
+        if (!cancelled) setDebugInfo({ initial: j })
+      } catch {
+        if (!cancelled) setDebugInfo({ initial: { error: 'fetch_failed' } })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [debugEnabled, isBalanceDialogOpen, selectedEmployee, currentYear])
+
   const calculatePartialVacationDays = (startDateStr: string): number => {
     const start = new Date(startDateStr)
     const yearStart = startOfYear(start)
