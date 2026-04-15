@@ -12,12 +12,20 @@ import { de } from 'date-fns/locale'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function VacationsPage() {
+export default async function VacationsPage({
+  searchParams,
+}: {
+  searchParams?: { debug?: string }
+}) {
   const session = await getSession()
 
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/admin/login')
   }
+
+  const debugEnabled = searchParams?.debug === '1'
+  const buildSha = (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null
+  const serverNow = new Date().toISOString()
 
   const currentYear = new Date().getFullYear()
   const previousYear = currentYear - 1
@@ -229,6 +237,11 @@ export default async function VacationsPage() {
           <p className="text-gray-600 mt-1">
             Verwalten Sie Feriensaldi und Ferienanträge der Mitarbeiter
           </p>
+          {debugEnabled && (
+            <div className="mt-3 text-xs bg-yellow-50 border border-yellow-200 text-yellow-900 rounded p-2">
+              DEBUG aktiv. Build: {buildSha ?? 'unbekannt'} | Serverzeit: {serverNow}
+            </div>
+          )}
         </div>
 
         <Card className="mb-6">
