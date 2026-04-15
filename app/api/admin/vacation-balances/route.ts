@@ -46,19 +46,35 @@ export async function GET(request: NextRequest) {
             serviceId: vacationService.id,
             date: { gte: startOfYear, lte: endOfYear },
           },
-          select: { id: true, date: true },
+          select: { id: true, date: true, startTime: true, endTime: true },
           orderBy: { date: 'asc' },
         })
 
         const toDay = (d: Date) => d.toISOString().slice(0, 10)
         const days = entries.map((e) => toDay(e.date))
-        const uniqueDays = Array.from(new Set(days))
+        const dayCounts = new Map<string, number>()
+        for (const d of days) dayCounts.set(d, (dayCounts.get(d) ?? 0) + 1)
+        const uniqueDays = Array.from(dayCounts.keys()).sort()
+
+        const duplicates = uniqueDays
+          .filter((d) => (dayCounts.get(d) ?? 0) > 1)
+          .slice(0, 25)
+          .map((d) => ({ day: d, count: dayCounts.get(d) ?? 0 }))
+
+        const todayIso = new Date().toISOString().slice(0, 10)
+        const futureDays = uniqueDays.filter((d) => d > todayIso)
+        const futureEntriesCount = entries.filter((e) => toDay(e.date) > todayIso).length
+
         usage = {
           service: 'FE',
           entriesCount: entries.length,
           uniqueDaysCount: uniqueDays.length,
           firstDay: uniqueDays[0] ?? null,
           lastDay: uniqueDays[uniqueDays.length - 1] ?? null,
+          today: todayIso,
+          futureUniqueDaysCount: futureDays.length,
+          futureEntriesCount,
+          duplicates,
           sampleDays: uniqueDays.slice(0, 60),
         }
       } else {
