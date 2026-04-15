@@ -31,8 +31,7 @@ const HEADER_LINE =
 
 const HOTEL_RECIPIENT_LINES = [
   'Zentrum Elisabeth',
-  'Frau Monika',
-  'Leuenberger',
+  'Frau Monika Leuenberger',
   'Hinterbergstrasse 41, 6318 Walchwil',
 ]
 
@@ -66,6 +65,28 @@ export function renderHotelInvoicePdf(opts: {
   params: HotelInvoiceRenderParams
 }) {
   const { doc, logoBase64, params } = opts
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'hotel-invoice',
+      hypothesisId: 'H1_lines_split',
+      location: 'lib/hotel-invoice-pdf.ts:renderHotelInvoicePdf',
+      message: 'Recipient lines shape',
+      data: {
+        recipientLinesCount: HOTEL_RECIPIENT_LINES.length,
+        line2WordCount: (HOTEL_RECIPIENT_LINES[1] ?? '').trim().split(/\s+/).filter(Boolean).length,
+        line3WordCount: (HOTEL_RECIPIENT_LINES[2] ?? '').trim().split(/\s+/).filter(Boolean).length,
+        line2Length: (HOTEL_RECIPIENT_LINES[1] ?? '').length,
+        line3Length: (HOTEL_RECIPIENT_LINES[2] ?? '').length,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
 
   const drawFineSeparator = (yLine: number) => {
     doc.setDrawColor(190, 190, 190)
