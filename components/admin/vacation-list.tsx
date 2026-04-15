@@ -51,6 +51,10 @@ type UsageInfo =
       today: string
       futureUniqueDaysCount: number
       futureEntriesCount: number
+      weekendUniqueDaysCount: number
+      weekdayUniqueDaysCount: number
+      pastWeekdayUniqueDaysCount: number
+      pastWeekdayEntriesCount: number
       duplicates: Array<{ day: string; count: number }>
       sampleDays: string[]
     }
@@ -578,6 +582,15 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
               <div>
                 Heute: <span className="font-medium">{usageInfo.today}</span> | Zukunft (eindeutige Tage):{' '}
                 <span className="font-medium">{usageInfo.futureUniqueDaysCount}</span>
+              </div>
+              <div className="mt-1">
+                Wochenende (eindeutige Tage): <span className="font-medium">{usageInfo.weekendUniqueDaysCount}</span> |{' '}
+                Wochentage (eindeutige Tage): <span className="font-medium">{usageInfo.weekdayUniqueDaysCount}</span>
+              </div>
+              <div className="mt-1">
+                Relevanz‑Check (bis heute, nur Wochentage):{' '}
+                <span className="font-medium">{usageInfo.pastWeekdayUniqueDaysCount}</span> Tage (unique) /{' '}
+                <span className="font-medium">{usageInfo.pastWeekdayEntriesCount}</span> Einträge
               </div>
               {usageInfo.duplicates.length > 0 && (
                 <div className="mt-1">

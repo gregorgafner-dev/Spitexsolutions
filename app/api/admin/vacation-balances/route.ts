@@ -65,6 +65,20 @@ export async function GET(request: NextRequest) {
         const futureDays = uniqueDays.filter((d) => d > todayIso)
         const futureEntriesCount = entries.filter((e) => toDay(e.date) > todayIso).length
 
+        const isWeekendIsoDay = (isoDay: string) => {
+          const dt = new Date(`${isoDay}T00:00:00.000Z`)
+          const wd = dt.getUTCDay() // 0=So ... 6=Sa
+          return wd === 0 || wd === 6
+        }
+
+        const weekendDays = uniqueDays.filter(isWeekendIsoDay)
+        const weekdayDays = uniqueDays.filter((d) => !isWeekendIsoDay(d))
+        const pastWeekdayDays = weekdayDays.filter((d) => d <= todayIso)
+        const pastWeekdayEntriesCount = entries.filter((e) => {
+          const d = toDay(e.date)
+          return d <= todayIso && !isWeekendIsoDay(d)
+        }).length
+
         usage = {
           service: 'FE',
           entriesCount: entries.length,
@@ -74,6 +88,10 @@ export async function GET(request: NextRequest) {
           today: todayIso,
           futureUniqueDaysCount: futureDays.length,
           futureEntriesCount,
+          weekendUniqueDaysCount: weekendDays.length,
+          weekdayUniqueDaysCount: weekdayDays.length,
+          pastWeekdayUniqueDaysCount: pastWeekdayDays.length,
+          pastWeekdayEntriesCount,
           duplicates,
           sampleDays: uniqueDays.slice(0, 60),
         }
