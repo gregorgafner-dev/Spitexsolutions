@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
+import { updateVacationBalanceFromSchedule } from '@/lib/update-vacation-balance'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import Link from 'next/link'
@@ -24,6 +25,9 @@ export default async function EmployeeDashboard() {
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() + 1
+
+  // usedDays "per heute" aktualisieren (ohne Zukunftstage / ohne Wochenenden)
+  await updateVacationBalanceFromSchedule(session.user.employeeId, currentYear)
 
   const employee = await prisma.employee.findUnique({
     where: { id: session.user.employeeId },

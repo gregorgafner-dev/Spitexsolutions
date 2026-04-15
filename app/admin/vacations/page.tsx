@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
+import { updateVacationBalanceFromSchedule } from '@/lib/update-vacation-balance'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +31,15 @@ export default async function VacationsPage({
 
   const currentYear = new Date().getFullYear()
   const previousYear = currentYear - 1
+
+  // Rechne usedDays "per heute" vor dem Rendern neu (damit geplante Zukunftstage nicht als bezogen zählen).
+  const employeeIds = await prisma.employee.findMany({ select: { id: true } })
+  await Promise.all(
+    employeeIds.map(async ({ id }) => {
+      await updateVacationBalanceFromSchedule(id, currentYear)
+      await updateVacationBalanceFromSchedule(id, previousYear)
+    })
+  )
 
   const employeesData = await prisma.employee.findMany({
     include: {

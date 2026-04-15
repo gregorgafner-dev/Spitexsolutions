@@ -2,9 +2,28 @@ import { prisma } from './db'
 
 /**
  * Aktualisiert den Feriensaldo basierend auf Ferien-Einträgen im Dienstplan
- * Zählt alle ScheduleEntry mit Service "FE" (Ferien) für das angegebene Jahr
+ * Zählt Ferien aus ScheduleEntry mit Service "FE" (Ferien) für das angegebene Jahr.
+ *
+ * Business-Regel (Saldo "per heute"):
+ * - Nur eindeutige Kalendertage zählen (Duplikate pro Datum werden 1x gezählt)
+ * - Keine Zukunftstage zählen (nur bis inkl. "heute")
+ * - Wochenenden zählen nicht (Sa/So)
+ *
+ * Hinweis: Diese Funktion wird beim Erstellen/Löschen von FE-Einträgen aufgerufen.
+ * Zusätzlich sollte sie beim Rendern relevanter Pages (Dashboard/Admin) aufgerufen werden,
+ * damit sich der Saldo täglich korrekt aktualisiert.
  */
 export async function updateVacationBalanceFromSchedule(employeeId: string, year: number) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { employmentType: true },
+  })
+
+  // Stundenlöhner werden nicht über Feriensaldi geführt.
+  if (!employee || employee.employmentType !== 'MONTHLY_SALARY') {
+    return
+  }
+
   // Hole den Service "FE" (Ferien)
   const vacationService = await prisma.service.findFirst({
     where: { name: 'FE' },
@@ -28,10 +47,23 @@ export async function updateVacationBalanceFromSchedule(employeeId: string, year
         lte: endOfYear,
       },
     },
+    select: { date: true },
   })
 
-  // Zähle die Anzahl der Ferientage (jeder Eintrag = 1 Tag)
-  const usedDays = vacationEntries.length
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+  const isWeekendIsoDay = (dayIso: string) => {
+    const dt = new Date(`${dayIso}T00:00:00.000Z`)
+    const wd = dt.getUTCDay() // 0=So ... 6=Sa
+    return wd === 0 || wd === 6
+  }
+
+  // Eindeutige Tage, nur bis inkl. heute, ohne Wochenenden
+  const uniqueDays = Array.from(new Set(vacationEntries.map((e) => isoDay(e.date))))
+    .filter((d) => d <= todayIso)
+    .filter((d) => !isWeekendIsoDay(d))
+
+  const usedDays = uniqueDays.length
 
   // Hole oder erstelle VacationBalance für das Jahr
   const vacationBalance = await prisma.vacationBalance.findUnique({
