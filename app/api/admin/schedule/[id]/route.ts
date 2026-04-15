@@ -24,7 +24,7 @@ export async function DELETE(
     }
 
     // Prüfe ob das Datum noch bearbeitbar ist
-    if (!isScheduleDateEditable(entry.date)) {
+    if (!isScheduleDateEditable(entry.date, { adminRetroOverride: true })) {
       return NextResponse.json(
         { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Bearbeitung ist nur bis zum 5. Tag des Folgemonats möglich.' },
         { status: 403 }

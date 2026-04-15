@@ -116,7 +116,7 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
     }
 
     // Prüfe ob das Datum noch bearbeitbar ist
-    if (!isScheduleDateEditable(day)) {
+    if (!isScheduleDateEditable(day, { adminRetroOverride: true })) {
       alert('Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Bearbeitung ist nur bis zum 5. Tag des Folgemonats möglich.')
       return
     }
@@ -378,7 +378,7 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
                   {days.map((day) => {
                     const entries = getEntriesForCell(employee.id, day)
                     const isHoliday = isHolidayOrSundayDay(day)
-                    const isEditable = isScheduleDateEditable(day)
+                    const isEditable = isScheduleDateEditable(day, { adminRetroOverride: true })
                     return (
                       <td
                         key={day.toISOString()}

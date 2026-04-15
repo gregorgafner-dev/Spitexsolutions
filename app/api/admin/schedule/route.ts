@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Prüfe ob das Datum noch bearbeitbar ist
     const dateObj = new Date(date)
-    if (!isScheduleDateEditable(dateObj)) {
+    if (!isScheduleDateEditable(dateObj, { adminRetroOverride: true })) {
       return NextResponse.json(
         { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Bearbeitung ist nur bis zum 5. Tag des Folgemonats möglich.' },
         { status: 403 }
