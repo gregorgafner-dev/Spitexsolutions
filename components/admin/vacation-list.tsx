@@ -67,7 +67,7 @@ const STANDARD_VACATION_DAYS = 25
 
 export default function VacationList({ employees, vacations, employeesWithCarryover = [] }: VacationListProps) {
   const searchParams = useSearchParams()
-  const debugEnabled = searchParams.get('debug') === '1'
+  const [debugEnabled, setDebugEnabled] = useState(false)
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [isCarryoverDialogOpen, setIsCarryoverDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
@@ -82,6 +82,19 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
   const [debugInfo, setDebugInfo] = useState<any>(null)
 
   const currentYear = new Date().getFullYear()
+
+  useEffect(() => {
+    // Persist debug flag so it survives navigation that drops query params.
+    try {
+      const qp = searchParams.get('debug')
+      if (qp === '1') localStorage.setItem('vacation_debug', '1')
+      if (qp === '0') localStorage.removeItem('vacation_debug')
+      const persisted = localStorage.getItem('vacation_debug') === '1'
+      setDebugEnabled(qp === '1' || persisted)
+    } catch {
+      setDebugEnabled(searchParams.get('debug') === '1')
+    }
+  }, [searchParams])
 
   // Event Listener für Carryover-Dialog
   useEffect(() => {
@@ -214,7 +227,7 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
           data = null
         }
         if (debugEnabled) setDebugInfo({ ok: false, status: response.status, body: data })
-        setError(data.error || 'Ein Fehler ist aufgetreten')
+        setError(data?.error || 'Ein Fehler ist aufgetreten')
         setLoading(false)
         return
       }
@@ -326,6 +339,11 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
 
   return (
     <div>
+      {debugEnabled && (
+        <div className="mb-3 text-xs bg-yellow-50 border border-yellow-200 text-yellow-900 rounded p-2">
+          DEBUG aktiv. Speichern zeigt Server-Response + DB-Readback im Dialog.
+        </div>
+      )}
       <div className="space-y-2">
         {employees.map((employee) => {
           const balance = getEmployeeBalance(employee)
