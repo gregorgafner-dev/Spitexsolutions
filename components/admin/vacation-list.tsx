@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { format, differenceInDays, startOfYear, endOfYear } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -41,25 +41,6 @@ interface VacationBalance {
   startDate: string | null
 }
 
-type UsageInfo =
-  | {
-      service: 'FE'
-      entriesCount: number
-      uniqueDaysCount: number
-      firstDay: string | null
-      lastDay: string | null
-      today: string
-      futureUniqueDaysCount: number
-      futureEntriesCount: number
-      weekendUniqueDaysCount: number
-      weekdayUniqueDaysCount: number
-      pastWeekdayUniqueDaysCount: number
-      pastWeekdayEntriesCount: number
-      duplicates: Array<{ day: string; count: number }>
-      sampleDays: string[]
-    }
-  | { service: 'FE'; error: string }
-
 interface Employee {
   id: string
   user: {
@@ -92,12 +73,6 @@ export default function VacationList({
   plannedByEmployeeId = {},
 }: VacationListProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const debugRequested = searchParams.get('debug') === '1'
-  const initialDebug =
-    debugRequested ||
-    (typeof window !== 'undefined' && window.localStorage?.getItem('vacation_debug') === '1')
-  const [debugEnabled, setDebugEnabled] = useState<boolean>(initialDebug)
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [isCarryoverDialogOpen, setIsCarryoverDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
@@ -109,23 +84,8 @@ export default function VacationList({
   const [carryoverDays, setCarryoverDays] = useState<number>(0)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null)
 
   const currentYear = new Date().getFullYear()
-
-  useEffect(() => {
-    // Persist debug flag so it survives navigation that drops query params.
-    try {
-      const qp = searchParams.get('debug')
-      if (qp === '1') localStorage.setItem('vacation_debug', '1')
-      if (qp === '0') localStorage.removeItem('vacation_debug')
-      const persisted = localStorage.getItem('vacation_debug') === '1'
-      setDebugEnabled(qp === '1' || persisted)
-    } catch {
-      setDebugEnabled(searchParams.get('debug') === '1')
-    }
-  }, [searchParams])
 
   // Event Listener für Carryover-Dialog
   useEffect(() => {
@@ -167,64 +127,10 @@ export default function VacationList({
     if (mode === 'full') {
       setFullTotalDays(balance?.totalDays ?? STANDARD_VACATION_DAYS)
     }
-    setDebugInfo(debugEnabled || debugRequested ? { loading: true } : null)
-    setUsageInfo(null)
 
     setError('')
     setIsBalanceDialogOpen(true)
   }
-
-  useEffect(() => {
-    if (!isBalanceDialogOpen) return
-    if (!selectedEmployee) return
-
-    let cancelled = false
-    ;(async () => {
-      try {
-        const r = await fetch(
-          `/api/admin/vacation-balances?employeeId=${encodeURIComponent(selectedEmployee.id)}&year=${encodeURIComponent(
-            String(currentYear)
-          )}&includeUsage=1`,
-          { cache: 'no-store' as RequestCache }
-        )
-        const j = await r.json()
-        if (!cancelled) setUsageInfo(j?.usage ?? null)
-      } catch {
-        if (!cancelled) setUsageInfo({ service: 'FE', error: 'fetch_failed' })
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [isBalanceDialogOpen, selectedEmployee, currentYear])
-
-  useEffect(() => {
-    if (!debugEnabled && !debugRequested) return
-    if (!isBalanceDialogOpen) return
-    if (!selectedEmployee) return
-
-    let cancelled = false
-    ;(async () => {
-      try {
-        setDebugInfo((prev: any) => prev ?? { loading: true })
-        const r = await fetch(
-          `/api/admin/vacation-balances?employeeId=${encodeURIComponent(selectedEmployee.id)}&year=${encodeURIComponent(
-            String(currentYear)
-          )}&debug=1&includeUsage=1`,
-          { cache: 'no-store' as RequestCache }
-        )
-        const j = await r.json()
-        if (!cancelled) setDebugInfo({ initial: j })
-      } catch {
-        if (!cancelled) setDebugInfo({ initial: { error: 'fetch_failed' } })
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [debugEnabled, debugRequested, isBalanceDialogOpen, selectedEmployee, currentYear])
 
   const calculatePartialVacationDays = (startDateStr: string): number => {
     const start = new Date(startDateStr)
@@ -299,7 +205,6 @@ export default function VacationList({
           year: currentYear,
           totalDays,
           startDate: startDateValue,
-          ...(debugEnabled ? { debug: true } : {}),
         }),
       })
 
@@ -310,7 +215,6 @@ export default function VacationList({
         } catch {
           data = null
         }
-        if (debugEnabled) setDebugInfo({ ok: false, status: response.status, body: data })
         setError(data?.error || 'Ein Fehler ist aufgetreten')
         setLoading(false)
         return
@@ -323,23 +227,6 @@ export default function VacationList({
         okJson = null
       }
 
-      if (debugEnabled) {
-        let after: any = null
-        try {
-          const r = await fetch(
-            `/api/admin/vacation-balances?employeeId=${encodeURIComponent(selectedEmployee.id)}&year=${encodeURIComponent(
-              String(currentYear)
-            )}&debug=1`
-          )
-          after = await r.json()
-        } catch {
-          after = null
-        }
-        setDebugInfo({ ok: true, status: response.status, body: okJson, after })
-        setLoading(false)
-        return
-      }
-
       setIsBalanceDialogOpen(false)
       setSelectedEmployee(null)
       setBalanceMode(null)
@@ -347,7 +234,6 @@ export default function VacationList({
       setCalculatedDays(null)
       router.refresh()
     } catch (error) {
-      if (debugEnabled) setDebugInfo({ ok: false, thrown: true })
       setError('Ein Fehler ist aufgetreten')
       setLoading(false)
     }
@@ -423,11 +309,6 @@ export default function VacationList({
 
   return (
     <div>
-      {debugEnabled && (
-        <div className="mb-3 text-xs bg-yellow-50 border border-yellow-200 text-yellow-900 rounded p-2">
-          DEBUG aktiv. Speichern zeigt Server-Response + DB-Readback im Dialog.
-        </div>
-      )}
       <div className="space-y-2">
         {employees.map((employee) => {
           const balance = getEmployeeBalance(employee)
@@ -580,58 +461,6 @@ export default function VacationList({
           {error && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
               {error}
-            </div>
-          )}
-
-          {usageInfo && !('error' in usageInfo) && (
-            <div className="text-xs bg-slate-50 border rounded p-3">
-              <div className="font-medium mb-1">Berechnung „Verbraucht“ (Dienstplan‑Service FE)</div>
-              <div>
-                Einträge: <span className="font-medium">{usageInfo.entriesCount}</span> | Eindeutige Tage:{' '}
-                <span className="font-medium">{usageInfo.uniqueDaysCount}</span>
-              </div>
-              <div>
-                Heute: <span className="font-medium">{usageInfo.today}</span> | Zukunft (eindeutige Tage):{' '}
-                <span className="font-medium">{usageInfo.futureUniqueDaysCount}</span>
-              </div>
-              <div className="mt-1">
-                Wochenende (eindeutige Tage): <span className="font-medium">{usageInfo.weekendUniqueDaysCount}</span> |{' '}
-                Wochentage (eindeutige Tage): <span className="font-medium">{usageInfo.weekdayUniqueDaysCount}</span>
-              </div>
-              <div className="mt-1">
-                Relevanz‑Check (bis heute, nur Wochentage):{' '}
-                <span className="font-medium">{usageInfo.pastWeekdayUniqueDaysCount}</span> Tage (unique) /{' '}
-                <span className="font-medium">{usageInfo.pastWeekdayEntriesCount}</span> Einträge
-              </div>
-              {usageInfo.duplicates.length > 0 && (
-                <div className="mt-1">
-                  Duplikate (max 25):{' '}
-                  <span className="font-medium">
-                    {usageInfo.duplicates.map((d) => `${d.day}×${d.count}`).join(', ')}
-                  </span>
-                </div>
-              )}
-              {usageInfo.firstDay && usageInfo.lastDay && (
-                <div className="mt-1 text-slate-600">
-                  Zeitraum: {usageInfo.firstDay} – {usageInfo.lastDay}
-                </div>
-              )}
-            </div>
-          )}
-          {usageInfo && 'error' in usageInfo && (
-            <div className="text-xs bg-slate-50 border rounded p-3">
-              <div className="font-medium mb-1">Berechnung „Verbraucht“ (Dienstplan‑Service FE)</div>
-              <div className="text-slate-600">Konnte FE‑Daten nicht laden: {usageInfo.error}</div>
-            </div>
-          )}
-
-          {(debugEnabled || debugRequested) && (
-            <div className="text-xs bg-gray-50 border rounded p-3 whitespace-pre-wrap break-words">
-              <div className="font-medium mb-2">Debug</div>
-              <div className="mb-2">
-                Status: {debugEnabled ? 'aktiv' : 'initialisiert…'} (URL debug={searchParams.get('debug') ?? '∅'})
-              </div>
-              {debugInfo ? JSON.stringify(debugInfo, null, 2) : 'Lade Debug-Daten…'}
             </div>
           )}
 

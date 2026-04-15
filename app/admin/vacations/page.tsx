@@ -24,11 +24,6 @@ export default async function VacationsPage({
     redirect('/admin/login')
   }
 
-  const debugEnabled = searchParams?.debug === '1'
-  const buildSha = (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null
-  const serverNow = new Date().toISOString()
-  const uiMarker = '18a71c7'
-
   const currentYear = new Date().getFullYear()
   const previousYear = currentYear - 1
 
@@ -286,14 +281,6 @@ export default async function VacationsPage({
           <p className="text-gray-600 mt-1">
             Verwalten Sie Feriensaldi und Ferienanträge der Mitarbeiter
           </p>
-          <div className="mt-2 text-xs text-gray-500">
-            Build: {buildSha ?? 'unbekannt'} | Marker: {uiMarker}
-          </div>
-          {debugEnabled && (
-            <div className="mt-3 text-xs bg-yellow-50 border border-yellow-200 text-yellow-900 rounded p-2">
-              DEBUG aktiv. Build: {buildSha ?? 'unbekannt'} | Serverzeit: {serverNow}
-            </div>
-          )}
         </div>
 
         <Card className="mb-6">
