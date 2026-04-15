@@ -41,6 +41,21 @@ interface VacationBalance {
   startDate: string | null
 }
 
+type UsageInfo =
+  | {
+      service: 'FE'
+      entriesCount: number
+      uniqueDaysCount: number
+      firstDay: string | null
+      lastDay: string | null
+      today: string
+      futureUniqueDaysCount: number
+      futureEntriesCount: number
+      duplicates: Array<{ day: string; count: number }>
+      sampleDays: string[]
+    }
+  | { service: 'FE'; error: string }
+
 interface Employee {
   id: string
   user: {
@@ -85,6 +100,7 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null)
 
   const currentYear = new Date().getFullYear()
 
@@ -142,10 +158,36 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
       setFullTotalDays(balance?.totalDays ?? STANDARD_VACATION_DAYS)
     }
     setDebugInfo(debugEnabled || debugRequested ? { loading: true } : null)
+    setUsageInfo(null)
 
     setError('')
     setIsBalanceDialogOpen(true)
   }
+
+  useEffect(() => {
+    if (!isBalanceDialogOpen) return
+    if (!selectedEmployee) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch(
+          `/api/admin/vacation-balances?employeeId=${encodeURIComponent(selectedEmployee.id)}&year=${encodeURIComponent(
+            String(currentYear)
+          )}&includeUsage=1`,
+          { cache: 'no-store' as RequestCache }
+        )
+        const j = await r.json()
+        if (!cancelled) setUsageInfo(j?.usage ?? null)
+      } catch {
+        if (!cancelled) setUsageInfo({ service: 'FE', error: 'fetch_failed' })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isBalanceDialogOpen, selectedEmployee, currentYear])
 
   useEffect(() => {
     if (!debugEnabled && !debugRequested) return
@@ -523,6 +565,39 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
           {error && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
               {error}
+            </div>
+          )}
+
+          {usageInfo && !('error' in usageInfo) && (
+            <div className="text-xs bg-slate-50 border rounded p-3">
+              <div className="font-medium mb-1">Berechnung „Verbraucht“ (Dienstplan‑Service FE)</div>
+              <div>
+                Einträge: <span className="font-medium">{usageInfo.entriesCount}</span> | Eindeutige Tage:{' '}
+                <span className="font-medium">{usageInfo.uniqueDaysCount}</span>
+              </div>
+              <div>
+                Heute: <span className="font-medium">{usageInfo.today}</span> | Zukunft (eindeutige Tage):{' '}
+                <span className="font-medium">{usageInfo.futureUniqueDaysCount}</span>
+              </div>
+              {usageInfo.duplicates.length > 0 && (
+                <div className="mt-1">
+                  Duplikate (max 25):{' '}
+                  <span className="font-medium">
+                    {usageInfo.duplicates.map((d) => `${d.day}×${d.count}`).join(', ')}
+                  </span>
+                </div>
+              )}
+              {usageInfo.firstDay && usageInfo.lastDay && (
+                <div className="mt-1 text-slate-600">
+                  Zeitraum: {usageInfo.firstDay} – {usageInfo.lastDay}
+                </div>
+              )}
+            </div>
+          )}
+          {usageInfo && 'error' in usageInfo && (
+            <div className="text-xs bg-slate-50 border rounded p-3">
+              <div className="font-medium mb-1">Berechnung „Verbraucht“ (Dienstplan‑Service FE)</div>
+              <div className="text-slate-600">Konnte FE‑Daten nicht laden: {usageInfo.error}</div>
             </div>
           )}
 
