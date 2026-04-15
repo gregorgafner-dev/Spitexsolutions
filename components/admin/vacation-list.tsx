@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { format, differenceInDays, startOfYear, endOfYear } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
@@ -66,8 +66,12 @@ interface VacationListProps {
 const STANDARD_VACATION_DAYS = 25
 
 export default function VacationList({ employees, vacations, employeesWithCarryover = [] }: VacationListProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const [debugEnabled, setDebugEnabled] = useState(false)
+  const initialDebug =
+    searchParams.get('debug') === '1' ||
+    (typeof window !== 'undefined' && window.localStorage?.getItem('vacation_debug') === '1')
+  const [debugEnabled, setDebugEnabled] = useState<boolean>(initialDebug)
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [isCarryoverDialogOpen, setIsCarryoverDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
@@ -261,7 +265,7 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
       setBalanceMode(null)
       setStartDate('')
       setCalculatedDays(null)
-      window.location.reload()
+      router.refresh()
     } catch (error) {
       if (debugEnabled) setDebugInfo({ ok: false, thrown: true })
       setError('Ein Fehler ist aufgetreten')
@@ -320,7 +324,7 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
       setIsCarryoverDialogOpen(false)
       setSelectedCarryover(null)
       setCarryoverDays(0)
-      window.location.reload()
+      router.refresh()
     } catch (error) {
       setError('Ein Fehler ist aufgetreten')
       setLoading(false)
