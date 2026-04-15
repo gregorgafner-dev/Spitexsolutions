@@ -68,8 +68,9 @@ const STANDARD_VACATION_DAYS = 25
 export default function VacationList({ employees, vacations, employeesWithCarryover = [] }: VacationListProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const debugRequested = searchParams.get('debug') === '1'
   const initialDebug =
-    searchParams.get('debug') === '1' ||
+    debugRequested ||
     (typeof window !== 'undefined' && window.localStorage?.getItem('vacation_debug') === '1')
   const [debugEnabled, setDebugEnabled] = useState<boolean>(initialDebug)
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
@@ -140,25 +141,26 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
     if (mode === 'full') {
       setFullTotalDays(balance?.totalDays ?? STANDARD_VACATION_DAYS)
     }
-    setDebugInfo(null)
+    setDebugInfo(debugEnabled || debugRequested ? { loading: true } : null)
 
     setError('')
     setIsBalanceDialogOpen(true)
   }
 
   useEffect(() => {
-    if (!debugEnabled) return
+    if (!debugEnabled && !debugRequested) return
     if (!isBalanceDialogOpen) return
     if (!selectedEmployee) return
 
     let cancelled = false
     ;(async () => {
       try {
+        setDebugInfo((prev: any) => prev ?? { loading: true })
         const r = await fetch(
           `/api/admin/vacation-balances?employeeId=${encodeURIComponent(selectedEmployee.id)}&year=${encodeURIComponent(
             String(currentYear)
           )}&debug=1&includeUsage=1`,
-          { cache: 'no-store' as any }
+          { cache: 'no-store' as RequestCache }
         )
         const j = await r.json()
         if (!cancelled) setDebugInfo({ initial: j })
@@ -170,7 +172,7 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
     return () => {
       cancelled = true
     }
-  }, [debugEnabled, isBalanceDialogOpen, selectedEmployee, currentYear])
+  }, [debugEnabled, debugRequested, isBalanceDialogOpen, selectedEmployee, currentYear])
 
   const calculatePartialVacationDays = (startDateStr: string): number => {
     const start = new Date(startDateStr)
@@ -524,9 +526,13 @@ export default function VacationList({ employees, vacations, employeesWithCarryo
             </div>
           )}
 
-          {debugEnabled && debugInfo && (
+          {(debugEnabled || debugRequested) && (
             <div className="text-xs bg-gray-50 border rounded p-3 whitespace-pre-wrap break-words">
-              {JSON.stringify(debugInfo, null, 2)}
+              <div className="font-medium mb-2">Debug</div>
+              <div className="mb-2">
+                Status: {debugEnabled ? 'aktiv' : 'initialisiert…'} (URL debug={searchParams.get('debug') ?? '∅'})
+              </div>
+              {debugInfo ? JSON.stringify(debugInfo, null, 2) : 'Lade Debug-Daten…'}
             </div>
           )}
 
