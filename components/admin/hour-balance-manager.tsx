@@ -24,9 +24,9 @@ type AdjustmentRow = {
   createdByUser?: { email?: string } | null
 }
 
-const START_SALDI_NOV_2025: Array<{ matchFirstName: string; matchLastNamePrefix?: string; value: string }> = [
-  { matchFirstName: 'Barbara', matchLastNamePrefix: 'Kost', value: '37:02' },
-  { matchFirstName: 'Anna Joelle', matchLastNamePrefix: 'Furrer', value: '-3:43' },
+const START_SALDI_NOV_2025: Array<{ matchFirstName: string; matchLastNameContains?: string; value: string }> = [
+  { matchFirstName: 'Barbara', matchLastNameContains: 'Kost', value: '37:02' },
+  { matchFirstName: 'Anna Joelle', matchLastNameContains: 'Furrer', value: '-3:43' },
   { matchFirstName: 'Almina', value: '36:04' },
   { matchFirstName: 'Adelina', value: '18:51' },
   { matchFirstName: 'Samantha', value: '28:58' },
@@ -34,6 +34,14 @@ const START_SALDI_NOV_2025: Array<{ matchFirstName: string; matchLastNamePrefix?
 
 function fullName(e: EmployeeLite) {
   return `${e.user.firstName} ${e.user.lastName}`.trim()
+}
+
+function normNamePart(s: string) {
+  return (s ?? '')
+    .toLowerCase()
+    .replace(/[^a-zäöüàéèêìíòóôùúçñ\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export default function HourBalanceManager({ employees }: { employees: EmployeeLite[] }) {
@@ -59,10 +67,15 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
     // Prefill the provided start saldi for Nov 2025.
     const next: Record<string, string> = {}
     for (const e of monthlySalaryEmployees) {
+      const first = normNamePart(e.user.firstName)
+      const last = normNamePart(e.user.lastName)
       const rule = START_SALDI_NOV_2025.find((r) => {
-        if (e.user.firstName !== r.matchFirstName) return false
-        if (!r.matchLastNamePrefix) return true
-        return e.user.lastName.startsWith(r.matchLastNamePrefix)
+        const matchFirst = normNamePart(r.matchFirstName)
+        if (!first || !matchFirst) return false
+        if (!first.startsWith(matchFirst)) return false
+        if (!r.matchLastNameContains) return true
+        const needle = normNamePart(r.matchLastNameContains)
+        return !!needle && last.includes(needle)
       })
       if (rule) next[e.id] = rule.value
     }
