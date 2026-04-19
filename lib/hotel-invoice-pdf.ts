@@ -335,9 +335,31 @@ export function renderHotelInvoicePdf(opts: {
   drawFineSeparator(y2 - 2.5)
 
   y2 += 2
-  line('hiervon Anteil Spitex Domus % 50', (params.leerstundenWork * 0.5).toFixed(2), '')
-  line('hiervon Anteil Zentrum Elisabeth % 50', (params.leerstundenWork * 0.5).toFixed(2), '')
-  line('Anteil Zentrum Elisabeth % 100', '', params.leerstundenSleep.toFixed(2))
+  const percentLabels = {
+    shareSpitex50: 'hiervon Anteil Spitex Domus 50%',
+    shareHotel50: 'hiervon Anteil Zentrum Elisabeth 50%',
+    shareHotel100: 'Anteil Zentrum Elisabeth 100%',
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'post-fix',
+      hypothesisId: 'H4_percent_label_order',
+      location: 'lib/hotel-invoice-pdf.ts:renderHotelInvoicePdf',
+      message: 'Percent label order for share lines',
+      data: percentLabels,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
+  line(percentLabels.shareSpitex50, (params.leerstundenWork * 0.5).toFixed(2), '')
+  line(percentLabels.shareHotel50, (params.leerstundenWork * 0.5).toFixed(2), '')
+  line(percentLabels.shareHotel100, '', params.leerstundenSleep.toFixed(2))
   drawFineSeparator(y2 - 2.5)
 
   y2 += 6
