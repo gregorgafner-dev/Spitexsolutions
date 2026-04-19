@@ -19,6 +19,7 @@ import { isScheduleDateEditable } from '@/lib/schedule-date-validation'
 interface Employee {
   id: string
   pensum: number
+  employmentType: string
   user: {
     firstName: string
     lastName: string
@@ -366,6 +367,7 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
             {employees.map((employee) => {
               const balance = getBalanceForEmployee(employee.id)
               const plannedHours = calculatePlannedHours(employee.id)
+              const isHourlyWage = employee.employmentType === 'HOURLY_WAGE'
 
               return (
                 <tr key={employee.id} className="hover:bg-gray-50">
@@ -426,39 +428,39 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
                     {balance ? balance.targetHours.toFixed(1) : '-'}h
                   </td>
                   <td className={`border p-1 text-center bg-gray-50 font-semibold text-[9px] ${
-                    balance && balance.projectedBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                    !isHourlyWage && balance && balance.projectedBalance >= 0 ? 'text-green-600' : !isHourlyWage && balance ? 'text-red-600' : ''
                   }`}>
-                    {balance ? (
+                    {!isHourlyWage && balance ? (
                       <>
                         {balance.projectedBalance > 0 ? '+' : ''}
                         {balance.projectedBalance.toFixed(1)}h
                       </>
                     ) : (
-                      '-'
+                      ''
                     )}
                   </td>
                   <td className={`border p-1 text-center bg-gray-50 text-[9px] ${
-                    balance && balance.previousBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                    !isHourlyWage && balance && balance.previousBalance >= 0 ? 'text-green-600' : !isHourlyWage && balance ? 'text-red-600' : ''
                   }`}>
-                    {balance ? (
+                    {!isHourlyWage && balance ? (
                       <>
                         {balance.previousBalance > 0 ? '+' : ''}
                         {balance.previousBalance.toFixed(1)}h
                       </>
                     ) : (
-                      '-'
+                      ''
                     )}
                   </td>
                   <td className={`border p-1 text-center bg-gray-50 font-semibold text-[9px] ${
-                    balance && balance.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                    !isHourlyWage && balance && balance.balance >= 0 ? 'text-green-600' : !isHourlyWage && balance ? 'text-red-600' : ''
                   }`}>
-                    {balance ? (
+                    {!isHourlyWage && balance ? (
                       <>
                         {balance.balance > 0 ? '+' : ''}
                         {balance.balance.toFixed(1)}h
                       </>
                     ) : (
-                      '-'
+                      ''
                     )}
                   </td>
                 </tr>
