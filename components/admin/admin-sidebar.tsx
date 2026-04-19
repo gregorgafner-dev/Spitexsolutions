@@ -10,6 +10,7 @@ import {
   Plane, 
   FileText, 
   Clock, 
+  Wallet,
   Calculator, 
   MessageSquare, 
   AlertTriangle
@@ -48,6 +49,11 @@ const adminNavItems = [
     title: 'Zeiterfassung',
     href: '/admin/time-tracking',
     icon: Clock,
+  },
+  {
+    title: 'Stundensaldi',
+    href: '/admin/hour-balances',
+    icon: Wallet,
   },
   {
     title: 'Abrechnungen',

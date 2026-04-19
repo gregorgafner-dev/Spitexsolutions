@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { User } from 'lucide-react'
+import { minutesToHoursFloat } from '@/lib/hour-balance-utils'
 export default async function EmployeeDashboard() {
   const session = await getSession()
 
@@ -56,6 +57,26 @@ export default async function EmployeeDashboard() {
     },
   })
 
+  // Manuelle Stundensaldo-Anpassungen (z.B. Auszahlung von Plusstunden) bis heute
+  let adjustmentMinutes = 0
+  try {
+    adjustmentMinutes = await (prisma as any).hourBalanceAdjustment
+      .findMany({
+        where: {
+          employeeId: employee.id,
+          effectiveDate: { lte: now },
+        },
+        select: { minutes: true },
+      })
+      .then((rows) => rows.reduce((sum, r) => sum + (r.minutes || 0), 0))
+  } catch {
+    // Falls die Tabelle noch nicht gepusht wurde (P2021), ignorieren wir Adjustments.
+    adjustmentMinutes = 0
+  }
+
+  const effectiveBalance =
+    (monthlyBalance?.balance ?? 0) + minutesToHoursFloat(adjustmentMinutes)
+
   // Heutige Zeiteinträge
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -94,9 +115,9 @@ export default async function EmployeeDashboard() {
             <CardContent>
               <div className="text-3xl font-bold">
                 {monthlyBalance ? (
-                  <span className={monthlyBalance.balance >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {monthlyBalance.balance > 0 ? '+' : ''}
-                    {monthlyBalance.balance.toFixed(2)}h
+                  <span className={effectiveBalance >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {effectiveBalance > 0 ? '+' : ''}
+                    {effectiveBalance.toFixed(2)}h
                   </span>
                 ) : (
                   <span className="text-gray-400">0.00h</span>
@@ -108,6 +129,11 @@ export default async function EmployeeDashboard() {
                     Soll: {monthlyBalance.targetHours.toFixed(2)}h | 
                     Ist: {monthlyBalance.actualHours.toFixed(2)}h
                   </p>
+                  {adjustmentMinutes !== 0 && (
+                    <p className="text-sm text-gray-600">
+                      Manuelle Anpassungen: <span className="font-medium">{minutesToHoursFloat(adjustmentMinutes).toFixed(2)}h</span>
+                    </p>
+                  )}
                   {monthlyBalance.surchargeHours > 0 && (
                     <p className="text-sm text-blue-600 font-medium">
                       Zeitzuschlag (Sonn-/Feiertage): +{monthlyBalance.surchargeHours.toFixed(2)}h
