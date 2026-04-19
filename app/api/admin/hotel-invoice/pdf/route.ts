@@ -145,6 +145,35 @@ export async function POST(request: NextRequest) {
     const mwstBetrag = PAUSCHALE_CHF * MWST_SATZ
     const pauschaleTotal = PAUSCHALE_CHF + mwstBetrag
 
+    // #region agent log
+    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+      body: JSON.stringify({
+        sessionId: '42d3e1',
+        runId: 'pre-fix',
+        hypothesisId: 'H3_input_params',
+        location: 'app/api/admin/hotel-invoice/pdf/route.ts:POST',
+        message: 'Hotel invoice request params (non-PII)',
+        data: {
+          year,
+          monthIndex,
+          klvHours,
+          totals: {
+            workMonthlySalary: Number(workMonthlySalary.toFixed(2)),
+            workHourlyWage: Number(workHourlyWage.toFixed(2)),
+            totalSleepHours: Number(totalSleepHours.toFixed(2)),
+            productivity: Number(productivity.toFixed(2)),
+            leerstundenWork: Number(leerstundenWork.toFixed(2)),
+            leerstundenSleep: Number(leerstundenSleep.toFixed(2)),
+          },
+          pauschale: { base: PAUSCHALE_CHF, mwst: Number(mwstBetrag.toFixed(2)), total: Number(pauschaleTotal.toFixed(2)) },
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     const { default: jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
     const hotelLogoBase64 = await loadHotelLogoBase64()

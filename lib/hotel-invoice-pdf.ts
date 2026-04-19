@@ -43,6 +43,31 @@ function formatCHF(amount: number): string {
 }
 
 function drawHeader(doc: any, logoBase64: string | null) {
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'pre-fix',
+      hypothesisId: 'H1_header_logo_alignment',
+      location: 'lib/hotel-invoice-pdf.ts:drawHeader',
+      message: 'Header/logo baseline params',
+      data: {
+        hasLogo: !!logoBase64,
+        logoW: 62,
+        logoH: 62 / 3.46,
+        logoX: 15,
+        logoY: 10,
+        headerLineY: 32,
+        separatorY: 35,
+        headerFontSize: 8.5,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
   if (logoBase64) {
     const w = 62
     const h = w / 3.46
@@ -110,7 +135,59 @@ export function renderHotelInvoicePdf(opts: {
 
   y += 2
   doc.setFontSize(9.5)
-  doc.text('Rechnung Zahlungsfrist: 30 Tage MwSt-Nr. CHE-283.375.390', 15, y)
+  const paymentPrefix = 'Rechnung '
+  const paymentRest = 'Zahlungsfrist: 30 Tage MwSt-Nr. CHE-283.375.390'
+  doc.setFont('helvetica', 'bold')
+  doc.text(paymentPrefix, 15, y)
+  const paymentPrefixWidth = doc.getTextWidth(paymentPrefix)
+  doc.setFont('helvetica', 'normal')
+  doc.text(paymentRest, 15 + paymentPrefixWidth, y)
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'post-fix',
+      hypothesisId: 'H2_payment_term_styling_v2',
+      location: 'lib/hotel-invoice-pdf.ts:renderHotelInvoicePdf',
+      message: 'Payment term split widths',
+      data: {
+        y,
+        xPrefix: 15,
+        prefixLen: paymentPrefix.length,
+        prefixWidth: paymentPrefixWidth,
+        xRest: 15 + paymentPrefixWidth,
+        restLen: paymentRest.length,
+        fontSize: 9.5,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'pre-fix',
+      hypothesisId: 'H2_payment_term_styling',
+      location: 'lib/hotel-invoice-pdf.ts:renderHotelInvoicePdf',
+      message: 'Payment term line position/style',
+      data: {
+        recipientStartY: 60,
+        recipientLineStep: 5,
+        recipientEndY: y - 2,
+        paymentLineY: y,
+        paymentFontSize: 9.5,
+        paymentLineLen: 'Rechnung Zahlungsfrist: 30 Tage MwSt-Nr. CHE-283.375.390'.length,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
   y += 10
 
   doc.setFont('helvetica', 'bold')
