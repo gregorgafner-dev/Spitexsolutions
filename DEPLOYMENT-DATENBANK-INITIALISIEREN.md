@@ -23,7 +23,7 @@ vercel login
 vercel env pull .env.local
 
 # Datenbank initialisieren
-npx prisma db push
+npx prisma db push --schema prisma/schema.postgres.prisma
 npx prisma db seed
 ```
 

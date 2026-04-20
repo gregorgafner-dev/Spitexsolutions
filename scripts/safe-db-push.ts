@@ -10,6 +10,14 @@ import { backupDatabase } from './backup-database'
 const args = process.argv.slice(2)
 const hasForceReset = args.includes('--force-reset')
 
+function pickSchema() {
+  const url = process.env.DATABASE_URL || ''
+  if (url.startsWith('postgresql://') || url.startsWith('postgres://')) {
+    return 'prisma/schema.postgres.prisma'
+  }
+  return 'prisma/schema.prisma'
+}
+
 if (hasForceReset) {
   console.log('⚠️  WARNUNG: --force-reset erkannt!')
   console.log('⚠️  Dies wird ALLE Daten löschen!')
@@ -34,7 +42,9 @@ if (hasForceReset) {
 
 // Führe prisma db push aus
 try {
-  execSync(`npx prisma db push ${args.join(' ')}`, { stdio: 'inherit' })
+  const schema = pickSchema()
+  console.log(`🔧 Using schema: ${schema}`)
+  execSync(`npx prisma db push --schema ${schema} ${args.join(' ')}`.trim(), { stdio: 'inherit' })
   console.log('')
   console.log('✅ Schema erfolgreich aktualisiert')
   if (backupPath) {

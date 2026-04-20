@@ -25,7 +25,7 @@ Führen Sie aus:
 npx prisma generate
 
 # Schema zur Datenbank pushen
-npx prisma db push
+npx prisma db push --schema prisma/schema.postgres.prisma
 
 # Seed-Daten erstellen (Admin-Account)
 npm run db:seed
