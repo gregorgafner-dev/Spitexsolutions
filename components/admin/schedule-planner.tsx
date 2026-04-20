@@ -51,9 +51,14 @@ interface MonthlyBalance {
   month: number
   targetHours: number
   actualHours: number
+  surchargeHours?: number
   plannedHours: number
   balance: number
   previousBalance: number
+  adjustmentMinutesUpToPrevMonthEnd?: number
+  adjustmentMinutesUpToMonthEnd?: number
+  adjustedPreviousBalance?: number
+  adjustedBalance?: number
 }
 
 interface SchedulePlannerProps {
@@ -218,7 +223,14 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
     if (!balance) return null
 
     const plannedHours = calculatePlannedHours(employeeId)
-    const projectedBalance = balance.actualHours + plannedHours - balance.targetHours + balance.previousBalance
+    const adjMonthMin = balance.adjustmentMinutesUpToMonthEnd || 0
+    const projectedBalance =
+      balance.actualHours +
+      (balance.surchargeHours || 0) +
+      plannedHours -
+      balance.targetHours +
+      balance.previousBalance +
+      adjMonthMin / 60
 
     return {
       ...balance,
@@ -444,8 +456,8 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
                   }`}>
                     {!isHourlyWage && balance ? (
                       <>
-                        {balance.previousBalance > 0 ? '+' : ''}
-                        {balance.previousBalance.toFixed(1)}h
+                        {(balance.adjustedPreviousBalance ?? balance.previousBalance) > 0 ? '+' : ''}
+                        {(balance.adjustedPreviousBalance ?? balance.previousBalance).toFixed(1)}h
                       </>
                     ) : (
                       ''
@@ -456,8 +468,8 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
                   }`}>
                     {!isHourlyWage && balance ? (
                       <>
-                        {balance.balance > 0 ? '+' : ''}
-                        {balance.balance.toFixed(1)}h
+                        {(balance.adjustedBalance ?? balance.balance) > 0 ? '+' : ''}
+                        {(balance.adjustedBalance ?? balance.balance).toFixed(1)}h
                       </>
                     ) : (
                       ''
