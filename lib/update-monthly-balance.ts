@@ -13,6 +13,9 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
 
   if (!employee) return
 
+  const monthStart = new Date(year, month - 1, 1)
+  const monthEnd = new Date(year, month, 0, 23, 59, 59)
+
   // Hole WorkTimeConfig für das Jahr
   let workTimeConfig = await prisma.workTimeConfig.findUnique({
     where: { year },
@@ -29,21 +32,18 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
   }
 
   // Berechne tatsächliche Stunden für den Monat
-  const startOfMonth = new Date(year, month - 1, 1)
-  const endOfMonth = new Date(year, month, 0, 23, 59, 59)
-
   const timeEntries = await prisma.timeEntry.findMany({
     where: {
       employeeId,
       date: {
-        gte: startOfMonth,
-        lte: endOfMonth,
+        gte: monthStart,
+        lte: monthEnd,
       },
       endTime: { not: null },
     },
   })
 
-  const actualHours = timeEntries.reduce((sum, entry) => {
+  const actualHoursFromTimeEntries = timeEntries.reduce((sum, entry) => {
     if (entry.endTime && entry.entryType !== 'SLEEP' && entry.entryType !== 'SLEEP_INTERRUPTION') {
       return sum + calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
     }
@@ -57,22 +57,35 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
     return sum + (entry.surchargeHours || 0)
   }, 0)
 
-  // Dienstplan-Absenzen (Ferien/Krankheit) werden aktuell NICHT in actualHours eingerechnet.
-  // Wir instrumentieren das, um zu sehen, ob genau diese Stunden fehlen.
-  const startOfMonth = new Date(year, month - 1, 1)
-  const endOfMonth = new Date(year, month, 0, 23, 59, 59)
+  // Dienstplan-Absenzen (Ferien/Krankheit) sollen in den Stundensaldo einfliessen.
+  // Regel: Zähle FE/K Stunden aus dem Dienstplan als "Ist", aber nur an Tagen OHNE Zeiterfassung,
+  // um Doppelzählungen zu vermeiden.
   const scheduleAbsences = await prisma.scheduleEntry.findMany({
     where: {
       employeeId,
-      date: { gte: startOfMonth, lte: endOfMonth },
+      date: { gte: monthStart, lte: monthEnd },
       service: { name: { in: ['FE', 'K'] } },
     },
     include: { service: true },
   })
-  const scheduleAbsenceHours = scheduleAbsences.reduce((sum, e) => {
+
+  const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+  const daysWithTimeEntries = new Set(timeEntries.map((t) => isoDay(t.date)))
+  const scheduleAbsenceHoursTotal = scheduleAbsences.reduce((sum, e) => {
     const h = (e.endTime.getTime() - e.startTime.getTime()) / (1000 * 60 * 60)
     return sum + h
   }, 0)
+  const scheduleAbsenceHoursCredited = scheduleAbsences.reduce((sum, e) => {
+    const day = isoDay(e.date)
+    if (daysWithTimeEntries.has(day)) return sum
+    const h = (e.endTime.getTime() - e.startTime.getTime()) / (1000 * 60 * 60)
+    return sum + h
+  }, 0)
+
+  const actualHours =
+    employee.employmentType === 'MONTHLY_SALARY'
+      ? actualHoursFromTimeEntries + scheduleAbsenceHoursCredited
+      : actualHoursFromTimeEntries
 
   // Berechne Soll-Stunden für den Monat
   const targetHours = calculateMonthlyTargetHours(
@@ -130,10 +143,12 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
         month,
         pensum: employee.pensum,
         timeEntryCount: timeEntries.length,
-        actualHours: Number(actualHours.toFixed(2)),
+        actualHoursFromTimeEntries: Number(actualHoursFromTimeEntries.toFixed(2)),
         surchargeHours: Number(surchargeHours.toFixed(2)),
         scheduleAbsenceCount: scheduleAbsences.length,
-        scheduleAbsenceHours: Number(scheduleAbsenceHours.toFixed(2)),
+        scheduleAbsenceHoursTotal: Number(scheduleAbsenceHoursTotal.toFixed(2)),
+        scheduleAbsenceHoursCredited: Number(scheduleAbsenceHoursCredited.toFixed(2)),
+        actualHours: Number(actualHours.toFixed(2)),
         targetHours: Number(targetHours.toFixed(2)),
         previousBalance: Number(previousBalance.toFixed(2)),
         balance: Number(balance.toFixed(2)),

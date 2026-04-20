@@ -171,7 +171,7 @@ async function updatePlannedHours(employeeId: string, date: Date) {
     return sum + hours
   }, 0)
 
-  const absenceHoursFromSchedule = entries
+  const absenceHoursFromScheduleTotal = entries
     .filter((e: any) => e?.service?.name === 'FE' || e?.service?.name === 'K')
     .reduce((sum: number, entry: any) => {
       const hours = (entry.endTime.getTime() - entry.startTime.getTime()) / (1000 * 60 * 60)
@@ -200,7 +200,7 @@ async function updatePlannedHours(employeeId: string, date: Date) {
   })
 
   const { calculateWorkHours } = await import('@/lib/calculations')
-  const actualHours = timeEntries.reduce((sum: number, entry: any) => {
+  const actualHoursFromTimeEntries = timeEntries.reduce((sum: number, entry: any) => {
     if (entry.endTime && entry.entryType !== 'SLEEP' && entry.entryType !== 'SLEEP_INTERRUPTION') {
       return sum + calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
     }
@@ -210,6 +210,22 @@ async function updatePlannedHours(employeeId: string, date: Date) {
     }
     return sum
   }, 0)
+
+  const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+  const daysWithTimeEntries = new Set(timeEntries.map((t: any) => isoDay(t.date)))
+  const absenceHoursFromScheduleCredited = entries
+    .filter((e: any) => e?.service?.name === 'FE' || e?.service?.name === 'K')
+    .reduce((sum: number, entry: any) => {
+      const day = isoDay(entry.date)
+      if (daysWithTimeEntries.has(day)) return sum
+      const hours = (entry.endTime.getTime() - entry.startTime.getTime()) / (1000 * 60 * 60)
+      return sum + hours
+    }, 0)
+
+  const actualHours =
+    employee.employmentType === 'MONTHLY_SALARY'
+      ? actualHoursFromTimeEntries + absenceHoursFromScheduleCredited
+      : actualHoursFromTimeEntries
 
   // Summiere Zeitzuschläge
   const surchargeHours = timeEntries.reduce((sum: number, entry: any) => {
@@ -255,8 +271,10 @@ async function updatePlannedHours(employeeId: string, date: Date) {
         pensum: employee.pensum,
         scheduleCount: entries.length,
         plannedHours: Number(plannedHours.toFixed(2)),
-        absenceHoursFromSchedule: Number(absenceHoursFromSchedule.toFixed(2)),
+        absenceHoursFromScheduleTotal: Number(absenceHoursFromScheduleTotal.toFixed(2)),
+        absenceHoursFromScheduleCredited: Number(absenceHoursFromScheduleCredited.toFixed(2)),
         timeEntryCount: timeEntries.length,
+        actualHoursFromTimeEntries: Number(actualHoursFromTimeEntries.toFixed(2)),
         actualHours: Number(actualHours.toFixed(2)),
         surchargeHours: Number(surchargeHours.toFixed(2)),
         targetHours: Number(targetHours.toFixed(2)),
