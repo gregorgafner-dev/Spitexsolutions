@@ -3,7 +3,7 @@ import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
 import { parseSignedHHMMToMinutes } from '@/lib/hour-balance-utils'
 
-const MIN_EFFECTIVE_DATE = new Date('2026-12-01T00:00:00.000Z')
+const MIN_EFFECTIVE_DATE = new Date('2025-12-01T00:00:00.000Z')
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     if (effectiveDate < MIN_EFFECTIVE_DATE) {
       return NextResponse.json(
-        { error: 'Manuelle Anpassungen sind erst ab Dezember 2026 erlaubt.' },
+        { error: 'Manuelle Anpassungen sind erst ab Dezember 2025 erlaubt.' },
         { status: 400 }
       )
     }

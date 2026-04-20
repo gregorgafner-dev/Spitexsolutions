@@ -33,7 +33,7 @@ export default async function HourBalancesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Verwaltung</CardTitle>
-            <CardDescription>Monatslöhner: Startsaldo per Ende November 2025 + manuelle Adjustments ab Dezember 2026</CardDescription>
+            <CardDescription>Monatslöhner: Startsaldo per Ende November 2025 + manuelle Adjustments ab Dezember 2025</CardDescription>
           </CardHeader>
           <CardContent>
             <HourBalanceManager employees={employees} />

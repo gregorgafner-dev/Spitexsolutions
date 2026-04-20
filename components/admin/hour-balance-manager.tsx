@@ -56,7 +56,7 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
   const [initError, setInitError] = useState('')
 
   const [adjEmployeeId, setAdjEmployeeId] = useState<string>('')
-  const [adjEffectiveDate, setAdjEffectiveDate] = useState<string>('2026-12-01')
+  const [adjEffectiveDate, setAdjEffectiveDate] = useState<string>('2025-12-01')
   const [adjAmount, setAdjAmount] = useState<string>('')
   const [adjReason, setAdjReason] = useState<string>('Auszahlung Plusstunden')
   const [adjLoading, setAdjLoading] = useState(false)
@@ -208,7 +208,7 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
 
       <Card>
         <CardHeader>
-          <CardTitle>Manuelle Anpassungen (ab Dezember 2026)</CardTitle>
+          <CardTitle>Manuelle Anpassungen (ab Dezember 2025)</CardTitle>
           <CardDescription>
             Für Fälle wie Auszahlung von Plusstunden. Diese Anpassungen verändern keine Zeiteinträge.
           </CardDescription>
