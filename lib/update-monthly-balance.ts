@@ -57,6 +57,23 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
     return sum + (entry.surchargeHours || 0)
   }, 0)
 
+  // Dienstplan-Absenzen (Ferien/Krankheit) werden aktuell NICHT in actualHours eingerechnet.
+  // Wir instrumentieren das, um zu sehen, ob genau diese Stunden fehlen.
+  const startOfMonth = new Date(year, month - 1, 1)
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59)
+  const scheduleAbsences = await prisma.scheduleEntry.findMany({
+    where: {
+      employeeId,
+      date: { gte: startOfMonth, lte: endOfMonth },
+      service: { name: { in: ['FE', 'K'] } },
+    },
+    include: { service: true },
+  })
+  const scheduleAbsenceHours = scheduleAbsences.reduce((sum, e) => {
+    const h = (e.endTime.getTime() - e.startTime.getTime()) / (1000 * 60 * 60)
+    return sum + h
+  }, 0)
+
   // Berechne Soll-Stunden für den Monat
   const targetHours = calculateMonthlyTargetHours(
     workTimeConfig.weeklyHours,
@@ -96,6 +113,35 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
 
   // Berechne Saldo
   const balance = actualHours + surchargeHours - targetHours + previousBalance
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'absence-saldo',
+      hypothesisId: 'A1_absence_not_counted',
+      location: 'lib/update-monthly-balance.ts:updateMonthlyBalance',
+      message: 'Monthly balance inputs incl. schedule absences (FE/K)',
+      data: {
+        employeeIdSuffix: String(employeeId).slice(-6),
+        year,
+        month,
+        pensum: employee.pensum,
+        timeEntryCount: timeEntries.length,
+        actualHours: Number(actualHours.toFixed(2)),
+        surchargeHours: Number(surchargeHours.toFixed(2)),
+        scheduleAbsenceCount: scheduleAbsences.length,
+        scheduleAbsenceHours: Number(scheduleAbsenceHours.toFixed(2)),
+        targetHours: Number(targetHours.toFixed(2)),
+        previousBalance: Number(previousBalance.toFixed(2)),
+        balance: Number(balance.toFixed(2)),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
 
   // Aktualisiere oder erstelle Monatssaldo
   await prisma.monthlyBalance.upsert({

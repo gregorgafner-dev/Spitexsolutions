@@ -161,12 +161,22 @@ async function updatePlannedHours(employeeId: string, date: Date) {
         lte: endDate,
       },
     },
+    include: {
+      service: true,
+    },
   })
 
   const plannedHours = entries.reduce((sum: number, entry: any) => {
     const hours = (entry.endTime.getTime() - entry.startTime.getTime()) / (1000 * 60 * 60)
     return sum + hours
   }, 0)
+
+  const absenceHoursFromSchedule = entries
+    .filter((e: any) => e?.service?.name === 'FE' || e?.service?.name === 'K')
+    .reduce((sum: number, entry: any) => {
+      const hours = (entry.endTime.getTime() - entry.startTime.getTime()) / (1000 * 60 * 60)
+      return sum + hours
+    }, 0)
 
   // Berechne Soll-Stunden basierend auf Pensum
   const { calculateMonthlyTargetHours } = await import('@/lib/calculations')
@@ -227,6 +237,36 @@ async function updatePlannedHours(employeeId: string, date: Date) {
 
   // Berechne neuen Saldo (inkl. Zeitzuschlag)
   const balance = (actualHours + surchargeHours) - targetHours + previousBalance
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'absence-saldo',
+      hypothesisId: 'A1_absence_not_counted',
+      location: 'app/api/admin/schedule/route.ts:updatePlannedHours',
+      message: 'Planned vs actual hours incl. schedule absences (FE/K)',
+      data: {
+        employeeIdSuffix: String(employeeId).slice(-6),
+        year,
+        month,
+        pensum: employee.pensum,
+        scheduleCount: entries.length,
+        plannedHours: Number(plannedHours.toFixed(2)),
+        absenceHoursFromSchedule: Number(absenceHoursFromSchedule.toFixed(2)),
+        timeEntryCount: timeEntries.length,
+        actualHours: Number(actualHours.toFixed(2)),
+        surchargeHours: Number(surchargeHours.toFixed(2)),
+        targetHours: Number(targetHours.toFixed(2)),
+        previousBalance: Number(previousBalance.toFixed(2)),
+        balance: Number(balance.toFixed(2)),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
 
   await prisma.monthlyBalance.upsert({
     where: {
