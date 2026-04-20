@@ -59,30 +59,6 @@ export async function POST(request: NextRequest) {
     const amountRaw = body?.amount ?? ''
     const reason = (body?.reason ?? '').trim()
 
-    // #region agent log
-    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-      body: JSON.stringify({
-        sessionId: '42d3e1',
-        runId: 'pre-fix',
-        hypothesisId: 'HB1_input_format_or_db',
-        location: 'app/api/admin/hour-balance-adjustments/route.ts:POST',
-        message: 'Adjustment POST received (non-PII)',
-        data: {
-          hasEmployeeId: !!employeeId,
-          employeeIdSuffix: employeeId ? employeeId.slice(-6) : null,
-          effectiveDateRaw,
-          amountRaw,
-          amountLen: amountRaw.length,
-          amountMatchesHHMM: /^([+-])?\s*(\d+)\s*:\s*([0-5]\d)$/.test(amountRaw.trim()),
-          reasonLen: reason.length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-
     if (!employeeId || !effectiveDateRaw || !amountRaw || !reason) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
@@ -138,25 +114,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating hour balance adjustment:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    // #region agent log
-    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-      body: JSON.stringify({
-        sessionId: '42d3e1',
-        runId: 'pre-fix',
-        hypothesisId: 'HB1_input_format_or_db',
-        location: 'app/api/admin/hour-balance-adjustments/route.ts:POST:catch',
-        message: 'Adjustment POST failed',
-        data: {
-          errorType: error && typeof error === 'object' ? (error as any).name : typeof error,
-          errorMessage,
-          prismaCode: error && typeof error === 'object' ? (error as any).code : undefined,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
     const prismaCode = error && typeof error === 'object' ? (error as any).code : undefined
     if (prismaCode === 'P2021') {
       return NextResponse.json(
