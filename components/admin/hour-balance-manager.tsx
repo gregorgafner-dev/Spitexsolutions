@@ -141,7 +141,7 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
-        setAdjError(data?.error || 'Speichern fehlgeschlagen')
+        setAdjError(data?.details ? `${data?.error || 'Speichern fehlgeschlagen'} (${data.details})` : (data?.error || 'Speichern fehlgeschlagen'))
         setAdjLoading(false)
         return
       }

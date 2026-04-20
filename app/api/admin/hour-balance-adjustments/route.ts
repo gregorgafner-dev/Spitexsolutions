@@ -99,7 +99,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const minutes = parseSignedHHMMToMinutes(amountRaw)
+    let minutes: number
+    try {
+      minutes = parseSignedHHMMToMinutes(amountRaw)
+    } catch (e) {
+      return NextResponse.json(
+        {
+          error: 'Ungültiges Stunden-Format. Bitte HH:MM verwenden (z.B. -18:00).',
+          details: e instanceof Error ? e.message : 'Invalid amount format',
+        },
+        { status: 400 }
+      )
+    }
     if (minutes === 0) {
       return NextResponse.json({ error: '0:00 ist keine Anpassung' }, { status: 400 })
     }
@@ -146,7 +157,18 @@ export async function POST(request: NextRequest) {
       }),
     }).catch(() => {})
     // #endregion
-    return NextResponse.json({ error: 'Internal server error', details: errorMessage }, { status: 500 })
+    const prismaCode = error && typeof error === 'object' ? (error as any).code : undefined
+    if (prismaCode === 'P2021') {
+      return NextResponse.json(
+        {
+          error:
+            'Datenbank-Schema ist noch nicht aktualisiert (Tabelle für Stundensaldo-Anpassungen fehlt). Bitte DB-Push ausführen.',
+          details: 'Run: npm run db:push (oder prisma db push) auf der produktiven DB.',
+        },
+        { status: 503 }
+      )
+    }
+    return NextResponse.json({ error: 'Internal server error', details: errorMessage, prismaCode }, { status: 500 })
   }
 }
 
