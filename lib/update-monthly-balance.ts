@@ -127,37 +127,6 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
   // Berechne Saldo
   const balance = actualHours + surchargeHours - targetHours + previousBalance
 
-  // #region agent log
-  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-    body: JSON.stringify({
-      sessionId: '42d3e1',
-      runId: 'absence-saldo',
-      hypothesisId: 'A1_absence_not_counted',
-      location: 'lib/update-monthly-balance.ts:updateMonthlyBalance',
-      message: 'Monthly balance inputs incl. schedule absences (FE/K)',
-      data: {
-        employeeIdSuffix: String(employeeId).slice(-6),
-        year,
-        month,
-        pensum: employee.pensum,
-        timeEntryCount: timeEntries.length,
-        actualHoursFromTimeEntries: Number(actualHoursFromTimeEntries.toFixed(2)),
-        surchargeHours: Number(surchargeHours.toFixed(2)),
-        scheduleAbsenceCount: scheduleAbsences.length,
-        scheduleAbsenceHoursTotal: Number(scheduleAbsenceHoursTotal.toFixed(2)),
-        scheduleAbsenceHoursCredited: Number(scheduleAbsenceHoursCredited.toFixed(2)),
-        actualHours: Number(actualHours.toFixed(2)),
-        targetHours: Number(targetHours.toFixed(2)),
-        previousBalance: Number(previousBalance.toFixed(2)),
-        balance: Number(balance.toFixed(2)),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
-
   // Aktualisiere oder erstelle Monatssaldo
   await prisma.monthlyBalance.upsert({
     where: {

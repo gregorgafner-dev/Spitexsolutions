@@ -70,36 +70,6 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // #region agent log
-    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-      body: JSON.stringify({
-        sessionId: '42d3e1',
-        runId: 'schedule-adjustments',
-        hypothesisId: 'S1_schedule_missing_adjustments',
-        location: 'app/api/admin/monthly-balances/route.ts:GET',
-        message: 'Enriched monthly balances with adjustments',
-        data: {
-          year,
-          month,
-          countBalances: balances.length,
-          countAdjustments: adjustments.length,
-          sample: enriched.slice(0, 5).map((r: any) => ({
-            employeeIdSuffix: String(r.employeeId).slice(-6),
-            prev: Number(r.previousBalance.toFixed(2)),
-            bal: Number(r.balance.toFixed(2)),
-            adjPrevMin: r.adjustmentMinutesUpToPrevMonthEnd,
-            adjMonthMin: r.adjustmentMinutesUpToMonthEnd,
-            adjPrev: Number(r.adjustedPreviousBalance.toFixed(2)),
-            adjBal: Number(r.adjustedBalance.toFixed(2)),
-          })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-
     return NextResponse.json(enriched)
   } catch (error) {
     console.error('Error fetching monthly balances:', error)
