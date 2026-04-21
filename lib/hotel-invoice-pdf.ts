@@ -237,7 +237,8 @@ export function renderHotelInvoicePdf(opts: {
 
   y2 += 2
   line('hiervon: Std KLV-verrechnet', params.klvHours.toFixed(2), '')
-  line('Produktivität in %', `${params.productivity.toFixed(2)}%`, '')
+  const productivityLabel = 'Produktivität'
+  line(productivityLabel, `${params.productivity.toFixed(2)}%`, '')
   line('Leerstunden', params.leerstundenWork.toFixed(2), params.leerstundenSleep.toFixed(2))
   drawFineSeparator(y2 - 2.5)
 
@@ -256,7 +257,8 @@ export function renderHotelInvoicePdf(opts: {
   y2 += 6
 
   doc.setFont('helvetica', 'normal')
-  doc.text('Verrechnung CHF/Std', xLabel, y2)
+  const verrechnungFootnote = '*Ansätze gemäss Vertrag vom 15. Dezember 2024'
+  doc.text('Verrechnung CHF/Std*', xLabel, y2)
   doc.text('Arbeit', xLabel + 55, y2)
   doc.text('52.84', xWork, y2, { align: 'right' })
   doc.text(formatCHF(params.verrechnungArbeitTotal), xAmountRight, y2, { align: 'right' })
@@ -266,7 +268,35 @@ export function renderHotelInvoicePdf(opts: {
   doc.text('Schlaf', xLabel + 55, y2)
   doc.text('28.9', xWork, y2, { align: 'right' })
   doc.text(formatCHF(params.verrechnungSchlafTotal), xAmountRight, y2, { align: 'right' })
-  y2 += 12
+  y2 += 6
+
+  doc.setFontSize(8.5)
+  doc.text(verrechnungFootnote, xLabel, y2)
+  doc.setFontSize(10)
+  y2 += 6
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'hotel-invoice-page2-text',
+      hypothesisId: 'H1_label_and_footnote',
+      location: 'lib/hotel-invoice-pdf.ts:page2',
+      message: 'Page2 labels (productivity + verrechnung footnote)',
+      data: {
+        productivityLabel,
+        verrechnungLabel1: 'Verrechnung CHF/Std*',
+        verrechnungLabel2: 'Verrechnung CHF/Std',
+        verrechnungFootnote,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
+  y2 += 6
 
   drawFineSeparator(y2 - 6.5)
 
