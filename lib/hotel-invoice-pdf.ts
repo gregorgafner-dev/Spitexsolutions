@@ -62,27 +62,6 @@ function drawHeader(doc: any, logoBase64: string | null) {
   doc.setLineWidth(0.3)
   doc.line(15, headerLineY, 195, headerLineY)
   doc.setDrawColor(0, 0, 0)
-
-  // #region agent log
-  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-    body: JSON.stringify({
-      sessionId: '42d3e1',
-      runId: 'hotel-invoice-header-layout',
-      hypothesisId: 'H3_header_spacing_and_address_split',
-      location: 'lib/hotel-invoice-pdf.ts:drawHeader',
-      message: 'Header layout coords and address split',
-      data: {
-        headerTextY,
-        headerLineY,
-        recipientLinesCount: HOTEL_RECIPIENT_LINES.length,
-        hasZipSeparateLine: HOTEL_RECIPIENT_LINES.some((l) => /\b6318\b/.test(l)),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
 }
 
 export function renderHotelInvoicePdf(opts: {
@@ -308,30 +287,6 @@ export function renderHotelInvoicePdf(opts: {
   doc.text('28.9', xWork, y2, { align: 'right' })
   doc.text(formatCHF(params.verrechnungSchlafTotal), xAmountRight, y2, { align: 'right' })
   y2 += 12
-
-  // #region agent log
-  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
-    body: JSON.stringify({
-      sessionId: '42d3e1',
-      runId: 'hotel-invoice-page2-verrechnung',
-      hypothesisId: 'H2_verrechnung_share_line',
-      location: 'lib/hotel-invoice-pdf.ts:page2',
-      message: 'Verrechnung share line inserted between rows',
-      data: {
-        page2YOffset,
-        page1FirstLineY,
-        productivityLabel,
-        verrechnungArbeitTotal: Number(params.verrechnungArbeitTotal.toFixed(2)),
-        hotelShareLabel,
-        hotelShareWorkChf: Number(hotelShareWorkChf.toFixed(2)),
-        verrechnungSchlafTotal: Number(params.verrechnungSchlafTotal.toFixed(2)),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
 
   drawFineSeparator(y2 - 6.5)
 
