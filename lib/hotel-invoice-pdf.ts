@@ -32,7 +32,8 @@ const HEADER_LINE =
 const HOTEL_RECIPIENT_LINES = [
   'Zentrum Elisabeth',
   'Frau Monika Leuenberger',
-  'Hinterbergstrasse 41, 6318 Walchwil',
+  'Hinterbergstrasse 41,',
+  '6318 Walchwil',
 ]
 
 function formatCHF(amount: number): string {
@@ -43,6 +44,9 @@ function formatCHF(amount: number): string {
 }
 
 function drawHeader(doc: any, logoBase64: string | null) {
+  const headerTextY = 42
+  const headerLineY = 45
+
   if (logoBase64) {
     const w = 62
     const h = w / 3.46
@@ -51,12 +55,33 @@ function drawHeader(doc: any, logoBase64: string | null) {
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
-  doc.text(HEADER_LINE, 15, 32, { maxWidth: 180 })
+  doc.text(HEADER_LINE, 15, headerTextY, { maxWidth: 180 })
 
   doc.setDrawColor(200, 200, 200)
   doc.setLineWidth(0.3)
-  doc.line(15, 35, 195, 35)
+  doc.line(15, headerLineY, 195, headerLineY)
   doc.setDrawColor(0, 0, 0)
+
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'hotel-invoice-header-layout',
+      hypothesisId: 'H3_header_spacing_and_address_split',
+      location: 'lib/hotel-invoice-pdf.ts:drawHeader',
+      message: 'Header layout coords and address split',
+      data: {
+        headerTextY,
+        headerLineY,
+        recipientLinesCount: HOTEL_RECIPIENT_LINES.length,
+        hasZipSeparateLine: HOTEL_RECIPIENT_LINES.some((l) => /\b6318\b/.test(l)),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
 }
 
 export function renderHotelInvoicePdf(opts: {

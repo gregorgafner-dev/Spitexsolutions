@@ -11,7 +11,8 @@ import { renderHotelInvoicePdf, type HotelInvoiceRenderParams } from '@/lib/hote
 const HOTEL_RECIPIENT_LINES = [
   'Zentrum Elisabeth',
   'Frau Monika Leuenberger',
-  'Hinterbergstrasse 41, 6318 Walchwil',
+  'Hinterbergstrasse 41,',
+  '6318 Walchwil',
 ]
 
 const HEADER_LINE =
