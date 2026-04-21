@@ -257,23 +257,25 @@ export function renderHotelInvoicePdf(opts: {
   y2 += 6
 
   doc.setFont('helvetica', 'normal')
-  const verrechnungFootnote = '*Ansätze gemäss Vertrag vom 15. Dezember 2024'
-  doc.text('Verrechnung CHF/Std*', xLabel, y2)
+  const hotelShareLabel = 'Hiervon Anteil Zentrum Elisabeth 50%'
+  const hotelShareWorkChf = params.verrechnungArbeitTotal * 0.5
+
+  doc.text('Verrechnung CHF/Std', xLabel, y2)
   doc.text('Arbeit', xLabel + 55, y2)
   doc.text('52.84', xWork, y2, { align: 'right' })
   doc.text(formatCHF(params.verrechnungArbeitTotal), xAmountRight, y2, { align: 'right' })
-  y2 += 7
+  y2 += 6
+
+  // Zeile zwischen den beiden "Verrechnung CHF/Std" Blöcken
+  doc.text(hotelShareLabel, xLabel, y2)
+  doc.text(formatCHF(hotelShareWorkChf), xAmountRight, y2, { align: 'right' })
+  y2 += 6
 
   doc.text('Verrechnung CHF/Std', xLabel, y2)
   doc.text('Schlaf', xLabel + 55, y2)
   doc.text('28.9', xWork, y2, { align: 'right' })
   doc.text(formatCHF(params.verrechnungSchlafTotal), xAmountRight, y2, { align: 'right' })
-  y2 += 6
-
-  doc.setFontSize(8.5)
-  doc.text(verrechnungFootnote, xLabel, y2)
-  doc.setFontSize(10)
-  y2 += 6
+  y2 += 12
 
   // #region agent log
   fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
@@ -281,22 +283,21 @@ export function renderHotelInvoicePdf(opts: {
     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
     body: JSON.stringify({
       sessionId: '42d3e1',
-      runId: 'hotel-invoice-page2-text',
-      hypothesisId: 'H1_label_and_footnote',
+      runId: 'hotel-invoice-page2-verrechnung',
+      hypothesisId: 'H2_verrechnung_share_line',
       location: 'lib/hotel-invoice-pdf.ts:page2',
-      message: 'Page2 labels (productivity + verrechnung footnote)',
+      message: 'Verrechnung share line inserted between rows',
       data: {
         productivityLabel,
-        verrechnungLabel1: 'Verrechnung CHF/Std*',
-        verrechnungLabel2: 'Verrechnung CHF/Std',
-        verrechnungFootnote,
+        verrechnungArbeitTotal: Number(params.verrechnungArbeitTotal.toFixed(2)),
+        hotelShareLabel,
+        hotelShareWorkChf: Number(hotelShareWorkChf.toFixed(2)),
+        verrechnungSchlafTotal: Number(params.verrechnungSchlafTotal.toFixed(2)),
       },
       timestamp: Date.now(),
     }),
   }).catch(() => {})
   // #endregion
-
-  y2 += 6
 
   drawFineSeparator(y2 - 6.5)
 
