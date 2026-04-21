@@ -102,11 +102,17 @@ export function renderHotelInvoicePdf(opts: {
   // ---------------- Page 1 ----------------
   drawHeader(doc, logoBase64)
 
+  // Mehr Abstand zwischen Header (inkl. Linie) und Content
+  // Ziel: Rechnungsdatum ca. 2 cm weiter unten
+  const headerLineY = 40
+  const page1HeaderToFirstLineGapMm = 25 // vorher ~5mm -> +20mm
+  const page1FirstLineY = headerLineY + page1HeaderToFirstLineGapMm
+
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
-  doc.text(`Rechnungsdatum ${format(params.now, 'dd.MM.yy', { locale: de })}`, 15, 45)
+  doc.text(`Rechnungsdatum ${format(params.now, 'dd.MM.yy', { locale: de })}`, 15, page1FirstLineY)
 
-  let y = 56
+  let y = page1FirstLineY + 11
   for (const line of HOTEL_RECIPIENT_LINES) {
     doc.text(line, 15, y)
     y += 5
@@ -213,7 +219,8 @@ export function renderHotelInvoicePdf(opts: {
   drawHeader(doc, logoBase64)
 
   // Mehr Abstand zwischen Header-Linie und erstem Inhalt (ca. 1 cm insgesamt)
-  const page2YOffset = 3
+  // Ziel: Titel ca. 2 cm weiter unten
+  const page2YOffset = 23
 
   doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
@@ -314,6 +321,7 @@ export function renderHotelInvoicePdf(opts: {
       message: 'Verrechnung share line inserted between rows',
       data: {
         page2YOffset,
+        page1FirstLineY,
         productivityLabel,
         verrechnungArbeitTotal: Number(params.verrechnungArbeitTotal.toFixed(2)),
         hotelShareLabel,
