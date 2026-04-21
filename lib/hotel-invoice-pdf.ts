@@ -215,24 +215,27 @@ export function renderHotelInvoicePdf(opts: {
   doc.addPage()
   drawHeader(doc, logoBase64)
 
+  // Mehr Abstand zwischen Header-Linie und erstem Inhalt (ca. 1 cm insgesamt)
+  const page2YOffset = 7
+
   doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
-  doc.text('Produktivität / Leerstunden', 15, 48)
+  doc.text('Produktivität / Leerstunden', 15, 48 + page2YOffset)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
-  doc.text('Kostenanteil Zentrum Elisabeth', 15, 56)
+  doc.text('Kostenanteil Zentrum Elisabeth', 15, 56 + page2YOffset)
 
   doc.setFontSize(10)
-  doc.text(String(params.year), 15, 70)
-  doc.text(`Monat ${format(params.monthDate, 'MMMM', { locale: de })}`, 15, 78)
+  doc.text(String(params.year), 15, 70 + page2YOffset)
+  doc.text(`Monat ${format(params.monthDate, 'MMMM', { locale: de })}`, 15, 78 + page2YOffset)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.text('Arbeits-h', 120, 78, { align: 'right' })
-  doc.text('Schlaf-h', 175, 78, { align: 'right' })
+  doc.text('Arbeits-h', 120, 78 + page2YOffset, { align: 'right' })
+  doc.text('Schlaf-h', 175, 78 + page2YOffset, { align: 'right' })
   doc.setFont('helvetica', 'normal')
 
-  let y2 = 90
+  let y2 = 90 + page2YOffset
   const xLabel = 15
   const xWork = 120
   const xSleep = 175
@@ -241,7 +244,7 @@ export function renderHotelInvoicePdf(opts: {
   // Obere Trennlinie (wird im Fix auf "fein" angepasst)
   doc.setDrawColor(0, 0, 0)
   doc.setLineWidth(0.4)
-  doc.line(15, 82, 195, 82)
+  doc.line(15, 82 + page2YOffset, 195, 82 + page2YOffset)
   doc.setLineWidth(0.2)
   doc.setDrawColor(230, 230, 230)
 
@@ -313,6 +316,7 @@ export function renderHotelInvoicePdf(opts: {
       location: 'lib/hotel-invoice-pdf.ts:page2',
       message: 'Verrechnung share line inserted between rows',
       data: {
+        page2YOffset,
         productivityLabel,
         verrechnungArbeitTotal: Number(params.verrechnungArbeitTotal.toFixed(2)),
         hotelShareLabel,
