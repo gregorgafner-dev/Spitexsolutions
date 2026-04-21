@@ -112,7 +112,8 @@ export function renderHotelInvoicePdf(opts: {
     y += 5
   }
 
-  y += 2
+  // Etwas mehr Abstand zwischen Anschrift und Zahlungsfrist
+  y += 5
   doc.setFontSize(9.5)
   doc.setFont('helvetica', 'normal')
   doc.text('Zahlungsfrist: 30 Tage MwSt-Nr. CHE-283.375.390', 15, y)
