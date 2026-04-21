@@ -45,8 +45,8 @@ function formatCHF(amount: number): string {
 
 function drawHeader(doc: any, logoBase64: string | null) {
   // Etwas näher ans Logo rücken (nur wenig)
-  const headerTextY = 39
-  const headerLineY = 42
+  const headerTextY = 37
+  const headerLineY = 40
 
   if (logoBase64) {
     const w = 62
@@ -104,9 +104,9 @@ export function renderHotelInvoicePdf(opts: {
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
-  doc.text(`Rechnungsdatum ${format(params.now, 'dd.MM.yy', { locale: de })}`, 15, 46)
+  doc.text(`Rechnungsdatum ${format(params.now, 'dd.MM.yy', { locale: de })}`, 15, 45)
 
-  let y = 58
+  let y = 56
   for (const line of HOTEL_RECIPIENT_LINES) {
     doc.text(line, 15, y)
     y += 5
@@ -114,13 +114,8 @@ export function renderHotelInvoicePdf(opts: {
 
   y += 2
   doc.setFontSize(9.5)
-  const paymentPrefix = 'Rechnung '
-  const paymentRest = 'Zahlungsfrist: 30 Tage MwSt-Nr. CHE-283.375.390'
-  doc.setFont('helvetica', 'bold')
-  doc.text(paymentPrefix, 15, y)
-  const paymentPrefixWidth = doc.getTextWidth(paymentPrefix)
   doc.setFont('helvetica', 'normal')
-  doc.text(paymentRest, 15 + paymentPrefixWidth, y)
+  doc.text('Zahlungsfrist: 30 Tage MwSt-Nr. CHE-283.375.390', 15, y)
   y += 10
 
   doc.setFont('helvetica', 'bold')
@@ -217,7 +212,7 @@ export function renderHotelInvoicePdf(opts: {
   drawHeader(doc, logoBase64)
 
   // Mehr Abstand zwischen Header-Linie und erstem Inhalt (ca. 1 cm insgesamt)
-  const page2YOffset = 5
+  const page2YOffset = 3
 
   doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
