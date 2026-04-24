@@ -88,6 +88,20 @@ export default function TimeTrackingPage() {
     // #endregion
   }
 
+  const isNightShiftSecondWorkBlock = (startTime: string | null | undefined) => {
+    if (!startTime) return false
+    return startTime === '06:01' || startTime.startsWith('06:01')
+  }
+
+  const isNightShiftFirstWorkBlock = (startTime: string | null | undefined, endTime: string | null | undefined) => {
+    if (!startTime || !endTime) return false
+    if (!(endTime === '23:00' || endTime.startsWith('23:'))) return false
+    const [hRaw] = startTime.split(':')
+    const h = Number(hRaw)
+    if (!Number.isFinite(h)) return false
+    return h >= 17 && h <= 22
+  }
+
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
   const daysInMonth = getDaysInMonth(currentMonth)
@@ -503,14 +517,8 @@ export default function TimeTrackingPage() {
       // Prüfe ob es ein Nachtdienst ist (19:00-23:00 und 06:01-07:xx vorhanden)
       // Nur wenn beide typischen Nachtdienst-Blöcke vorhanden sind
       // Verwende flexiblere Prüfung für bessere Erkennung
-      const hasBlock1 = allBlocks.some(b => {
-        const startMatch = b.startTime === '19:00' || (b.startTime && b.startTime.startsWith('19:'))
-        const endMatch = b.endTime === '23:00' || (b.endTime && b.endTime.startsWith('23:'))
-        return startMatch && endMatch
-      })
-      const hasBlock2 = allBlocks.some(b => {
-        return b.startTime === '06:01' || (b.startTime && b.startTime.startsWith('06:01'))
-      })
+      const hasBlock1 = allBlocks.some((b) => isNightShiftFirstWorkBlock(b.startTime, b.endTime))
+      const hasBlock2 = allBlocks.some((b) => isNightShiftSecondWorkBlock(b.startTime))
       const hasNightShift = hasBlock1 && hasBlock2
 
       emitDebugLog({
@@ -572,9 +580,9 @@ export default function TimeTrackingPage() {
       } else {
         // WICHTIG: Wenn kein Nachtdienst für diesen Tag erkannt wurde, prüfe ob bereits Nachtdienst-Blöcke im State sind
         // (z.B. vom Initialisieren). Wenn ja, behalte sie, damit sie nicht verloren gehen.
-        const existingNightShiftBlocks = workBlocks.filter(block => {
-          const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                   (block.startTime === '06:01' || block.startTime.startsWith('06:01'))
+        const existingNightShiftBlocks = workBlocks.filter((block) => {
+          const isNightShiftBlock =
+            isNightShiftFirstWorkBlock(block.startTime, block.endTime) || isNightShiftSecondWorkBlock(block.startTime)
           return isNightShiftBlock && !block.id.startsWith('new-') // Nur gespeicherte Blöcke behalten
         })
         
@@ -582,19 +590,15 @@ export default function TimeTrackingPage() {
           // Es gibt bereits gespeicherte Nachtdienst-Blöcke, behalte sie
           console.log('Behalte vorhandene Nachtdienst-Blöcke:', existingNightShiftBlocks)
           // Füge normale Blöcke hinzu (falls vorhanden)
-          const normalBlocks = allBlocks.filter(block => {
-            const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                     (block.startTime === '06:01')
-            return !isNightShiftBlock
-          })
+          const normalBlocks = allBlocks.filter(
+            (block) => !isNightShiftFirstWorkBlock(block.startTime, block.endTime) && !isNightShiftSecondWorkBlock(block.startTime)
+          )
           setWorkBlocks([...existingNightShiftBlocks, ...normalBlocks])
         } else {
           // Wenn kein Nachtdienst erkannt wurde und keine vorhanden sind, filtere Nachtdienst-Blöcke heraus
-          const normalBlocks = allBlocks.filter(block => {
-            const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                     (block.startTime === '06:01')
-            return !isNightShiftBlock
-          })
+          const normalBlocks = allBlocks.filter(
+            (block) => !isNightShiftFirstWorkBlock(block.startTime, block.endTime) && !isNightShiftSecondWorkBlock(block.startTime)
+          )
           setWorkBlocks(normalBlocks)
         }
       }
@@ -805,14 +809,14 @@ export default function TimeTrackingPage() {
     // WICHTIG: Prüfe sowohl in workBlocks als auch in entries
     let isNightShiftBlock = false
     if (blockToDelete) {
-      isNightShiftBlock = (blockToDelete.startTime === '19:00' && blockToDelete.endTime === '23:00') ||
-                         (blockToDelete.startTime === '06:01' || (blockToDelete.startTime && blockToDelete.startTime.startsWith('06:01')))
+      isNightShiftBlock =
+        isNightShiftFirstWorkBlock(blockToDelete.startTime, blockToDelete.endTime) ||
+        isNightShiftSecondWorkBlock(blockToDelete.startTime)
     }
     if (!isNightShiftBlock && entryToDelete) {
       const startTimeStr = format(parseISO(entryToDelete.startTime), 'HH:mm')
       const endTimeStr = entryToDelete.endTime ? format(parseISO(entryToDelete.endTime), 'HH:mm') : ''
-      isNightShiftBlock = (startTimeStr === '19:00' && endTimeStr === '23:00') ||
-                         (startTimeStr === '06:01' || startTimeStr.startsWith('06:01'))
+      isNightShiftBlock = isNightShiftFirstWorkBlock(startTimeStr, endTimeStr) || isNightShiftSecondWorkBlock(startTimeStr)
     }
     
     // Prüfe auch, ob isNightShift aktiv ist
@@ -1004,8 +1008,8 @@ export default function TimeTrackingPage() {
       ? workBlocks 
       : workBlocks.filter(block => {
           // Beim Speichern: Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke
-          const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                   (block.startTime === '06:01')
+          const isNightShiftBlock =
+            isNightShiftFirstWorkBlock(block.startTime, block.endTime) || isNightShiftSecondWorkBlock(block.startTime)
           return !isNightShiftBlock
         })
     
@@ -1260,11 +1264,18 @@ export default function TimeTrackingPage() {
           const currentDayResponse = await fetch(`/api/employee/time-entries?date=${currentDateStr}`)
           if (currentDayResponse.ok) {
             const currentDayEntries = await currentDayResponse.json()
-            hasExistingNightShiftOnCurrentDay = currentDayEntries.some((e: TimeEntry) => {
+            const hasSecondBlockOnCurrentDay = currentDayEntries.some((e: TimeEntry) => {
               if (!e.endTime || e.entryType !== 'WORK') return false
               const startTime = format(parseISO(e.startTime), 'HH:mm')
-              return startTime === '06:01' || startTime.startsWith('06:01')
+              return isNightShiftSecondWorkBlock(startTime)
             })
+            const hasFirstBlockOnCurrentDay = currentDayEntries.some((e: TimeEntry) => {
+              if (!e.endTime || e.entryType !== 'WORK') return false
+              const startTime = format(parseISO(e.startTime), 'HH:mm')
+              const endTime = format(parseISO(e.endTime), 'HH:mm')
+              return isNightShiftFirstWorkBlock(startTime, endTime)
+            })
+            hasExistingNightShiftOnCurrentDay = hasSecondBlockOnCurrentDay && !hasFirstBlockOnCurrentDay
             console.log('Prüfe Nachtdienst am aktuellen Tag (vor Löschen):', {
               currentDate: currentDateStr,
               hasExistingNightShiftOnCurrentDay,
@@ -1278,11 +1289,18 @@ export default function TimeTrackingPage() {
             const entryDate = new Date(e.date)
             return isSameDay(entryDate, selectedDate)
           })
-          hasExistingNightShiftOnCurrentDay = currentDayEntries.some(e => {
+          const hasSecondBlockOnCurrentDay = currentDayEntries.some(e => {
             if (!e.endTime || e.entryType !== 'WORK') return false
             const startTime = format(parseISO(e.startTime), 'HH:mm')
-            return startTime === '06:01' || startTime.startsWith('06:01')
+            return isNightShiftSecondWorkBlock(startTime)
           })
+          const hasFirstBlockOnCurrentDay = currentDayEntries.some(e => {
+            if (!e.endTime || e.entryType !== 'WORK') return false
+            const startTime = format(parseISO(e.startTime), 'HH:mm')
+            const endTime = format(parseISO(e.endTime), 'HH:mm')
+            return isNightShiftFirstWorkBlock(startTime, endTime)
+          })
+          hasExistingNightShiftOnCurrentDay = hasSecondBlockOnCurrentDay && !hasFirstBlockOnCurrentDay
         }
         
         // Lade Einträge vom Folgetag direkt vom Server
@@ -1290,11 +1308,18 @@ export default function TimeTrackingPage() {
           const nextDayResponse = await fetch(`/api/employee/time-entries?date=${nextDateStr}`)
           if (nextDayResponse.ok) {
             const nextDayEntries = await nextDayResponse.json()
-            hasExistingNightShiftOnNextDay = nextDayEntries.some((e: TimeEntry) => {
+            const hasSecondBlockOnNextDay = nextDayEntries.some((e: TimeEntry) => {
               if (!e.endTime || e.entryType !== 'WORK') return false
               const startTime = format(parseISO(e.startTime), 'HH:mm')
-              return startTime === '06:01' || startTime.startsWith('06:01')
+              return isNightShiftSecondWorkBlock(startTime)
             })
+            const hasFirstBlockOnNextDay = nextDayEntries.some((e: TimeEntry) => {
+              if (!e.endTime || e.entryType !== 'WORK') return false
+              const startTime = format(parseISO(e.startTime), 'HH:mm')
+              const endTime = format(parseISO(e.endTime), 'HH:mm')
+              return isNightShiftFirstWorkBlock(startTime, endTime)
+            })
+            hasExistingNightShiftOnNextDay = hasSecondBlockOnNextDay && !hasFirstBlockOnNextDay
             console.log('Prüfe Nachtdienst am Folgetag (vor Löschen):', {
               nextDate: nextDateStr,
               hasExistingNightShiftOnNextDay,
@@ -1308,11 +1333,18 @@ export default function TimeTrackingPage() {
             const entryDate = new Date(e.date)
             return isSameDay(entryDate, nextDay)
           })
-          hasExistingNightShiftOnNextDay = nextDayEntries.some(e => {
+          const hasSecondBlockOnNextDay = nextDayEntries.some(e => {
             if (!e.endTime || e.entryType !== 'WORK') return false
             const startTime = format(parseISO(e.startTime), 'HH:mm')
-            return startTime === '06:01' || startTime.startsWith('06:01')
+            return isNightShiftSecondWorkBlock(startTime)
           })
+          const hasFirstBlockOnNextDay = nextDayEntries.some(e => {
+            if (!e.endTime || e.entryType !== 'WORK') return false
+            const startTime = format(parseISO(e.startTime), 'HH:mm')
+            const endTime = format(parseISO(e.endTime), 'HH:mm')
+            return isNightShiftFirstWorkBlock(startTime, endTime)
+          })
+          hasExistingNightShiftOnNextDay = hasSecondBlockOnNextDay && !hasFirstBlockOnNextDay
         }
       }
       
@@ -1338,7 +1370,7 @@ export default function TimeTrackingPage() {
           // wenn hasExistingNightShiftOnCurrentDay true ist. Diese dürfen NICHT gelöscht werden!
           if (isCurrentDay && e.entryType === 'WORK' && e.endTime) {
             const startTime = format(parseISO(e.startTime), 'HH:mm')
-            if (startTime === '06:01' || startTime.startsWith('06:01')) {
+            if (isNightShiftSecondWorkBlock(startTime)) {
               // Dieser Block gehört zu einem vorherigen Nachtdienst, wenn hasExistingNightShiftOnCurrentDay true ist
               // WICHTIG: Wenn ein vorheriger Nachtdienst existiert, darf dieser Block NICHT gelöscht werden,
               // auch wenn er nicht in blocksToSave ist (weil er zu einem anderen Nachtdienst gehört)
@@ -1357,7 +1389,7 @@ export default function TimeTrackingPage() {
           // wenn hasExistingNightShiftOnNextDay true ist. Diese dürfen NICHT gelöscht werden!
           if (isNextDay && e.entryType === 'WORK' && e.endTime) {
             const startTime = format(parseISO(e.startTime), 'HH:mm')
-            if (startTime === '06:01' || startTime.startsWith('06:01')) {
+            if (isNightShiftSecondWorkBlock(startTime)) {
               // Dieser Block gehört zu einem vorherigen Nachtdienst, wenn hasExistingNightShiftOnNextDay true ist
               // WICHTIG: Wenn ein vorheriger Nachtdienst existiert, darf dieser Block NICHT gelöscht werden,
               // auch wenn er nicht in blocksToSave ist (weil er zu einem anderen Nachtdienst gehört)
@@ -1501,18 +1533,8 @@ export default function TimeTrackingPage() {
       // Bei Nachtdienst: Stelle sicher, dass beide Arbeitszeit-Blöcke vorhanden sind
       // Prüfe ob beide Blöcke vorhanden sind (19:00-23:00 und 06:01-07:xx)
       if (isNightShift) {
-        const hasFirstBlock = blocksToSave.some(b => {
-          const startTime = b.startTime || ''
-          const endTime = b.endTime || ''
-          // Prüfe ob es der erste Block ist (19:00-23:00 oder ähnlich)
-          return (startTime === '19:00' || startTime.startsWith('19:')) && 
-                 (endTime === '23:00' || endTime.startsWith('23:'))
-        })
-        const hasSecondBlock = blocksToSave.some(b => {
-          const startTime = b.startTime || ''
-          // Prüfe ob es der zweite Block ist (06:01 oder ähnlich)
-          return startTime === '06:01' || startTime.startsWith('06:01')
-        })
+        const hasFirstBlock = blocksToSave.some((b) => isNightShiftFirstWorkBlock(b.startTime, b.endTime))
+        const hasSecondBlock = blocksToSave.some((b) => isNightShiftSecondWorkBlock(b.startTime))
         
         console.log('Nachtdienst: Prüfe Blöcke', { hasFirstBlock, hasSecondBlock, blocksToSaveLength: blocksToSave.length, blocksToSave })
         
@@ -1541,12 +1563,12 @@ export default function TimeTrackingPage() {
       // Bei Nachtdienst: Sortiere Blöcke so, dass der erste Block (19:00) zuerst kommt
       const sortedBlocks = isNightShift 
         ? [...blocksToSave].sort((a, b) => {
-            // Erster Block (19:00) kommt zuerst
-            if (a.startTime === '19:00' || (a.startTime && a.startTime.startsWith('19:'))) return -1
-            if (b.startTime === '19:00' || (b.startTime && b.startTime.startsWith('19:'))) return 1
+            // Erster Block (Abendblock mit Ende 23:00) kommt zuerst
+            if (isNightShiftFirstWorkBlock(a.startTime, a.endTime)) return -1
+            if (isNightShiftFirstWorkBlock(b.startTime, b.endTime)) return 1
             // Zweiter Block (06:01) kommt danach
-            if (a.startTime === '06:01' || (a.startTime && a.startTime.startsWith('06:01'))) return 1
-            if (b.startTime === '06:01' || (b.startTime && b.startTime.startsWith('06:01'))) return -1
+            if (isNightShiftSecondWorkBlock(a.startTime)) return 1
+            if (isNightShiftSecondWorkBlock(b.startTime)) return -1
             return 0
           })
         : blocksToSave
@@ -1559,8 +1581,8 @@ export default function TimeTrackingPage() {
         }
 
         // Bei Nachtdienst: Bestimme welcher Block es ist basierend auf Startzeit
-        const isFirstBlock = isNightShift && (block.startTime === '19:00' || (block.startTime && block.startTime.startsWith('19:')))
-        const isSecondBlock = isNightShift && (block.startTime === '06:01' || (block.startTime && block.startTime.startsWith('06:01')))
+        const isFirstBlock = isNightShift && isNightShiftFirstWorkBlock(block.startTime, block.endTime)
+        const isSecondBlock = isNightShift && isNightShiftSecondWorkBlock(block.startTime)
         
         // Bei Nachtdienst: Erster Block endet immer um 23:00, zweiter Block startet immer um 06:01
         const effectiveStartTime = isSecondBlock ? '06:01' : block.startTime
