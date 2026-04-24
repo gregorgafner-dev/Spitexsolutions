@@ -578,29 +578,9 @@ export default function TimeTrackingPage() {
         ]
         setWorkBlocks(nightShiftBlocks)
       } else {
-        // WICHTIG: Wenn kein Nachtdienst für diesen Tag erkannt wurde, prüfe ob bereits Nachtdienst-Blöcke im State sind
-        // (z.B. vom Initialisieren). Wenn ja, behalte sie, damit sie nicht verloren gehen.
-        const existingNightShiftBlocks = workBlocks.filter((block) => {
-          const isNightShiftBlock =
-            isNightShiftFirstWorkBlock(block.startTime, block.endTime) || isNightShiftSecondWorkBlock(block.startTime)
-          return isNightShiftBlock && !block.id.startsWith('new-') // Nur gespeicherte Blöcke behalten
-        })
-        
-        if (existingNightShiftBlocks.length > 0) {
-          // Es gibt bereits gespeicherte Nachtdienst-Blöcke, behalte sie
-          console.log('Behalte vorhandene Nachtdienst-Blöcke:', existingNightShiftBlocks)
-          // Füge normale Blöcke hinzu (falls vorhanden)
-          const normalBlocks = allBlocks.filter(
-            (block) => !isNightShiftFirstWorkBlock(block.startTime, block.endTime) && !isNightShiftSecondWorkBlock(block.startTime)
-          )
-          setWorkBlocks([...existingNightShiftBlocks, ...normalBlocks])
-        } else {
-          // Wenn kein Nachtdienst erkannt wurde und keine vorhanden sind, filtere Nachtdienst-Blöcke heraus
-          const normalBlocks = allBlocks.filter(
-            (block) => !isNightShiftFirstWorkBlock(block.startTime, block.endTime) && !isNightShiftSecondWorkBlock(block.startTime)
-          )
-          setWorkBlocks(normalBlocks)
-        }
+        // Auch wenn kein "vollständiger" Nachtdienst erkannt wird, müssen gespeicherte Blöcke
+        // sichtbar bleiben (z.B. bei Teilzuständen), damit MA sie löschen kann.
+        setWorkBlocks(allBlocks)
       }
       
       // Lade Unterbrechungen während des Schlafens
