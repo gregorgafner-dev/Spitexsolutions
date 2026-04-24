@@ -899,6 +899,14 @@ export default function TimeTrackingPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unbekannter Fehler' }))
+        if (response.status === 404) {
+          // Eintrag wurde serverseitig bereits entfernt (z.B. als Teil eines Nachtdienst-Gruppenlöschens).
+          // Zielzustand ist erreicht -> neu laden und nicht als Fehler behandeln.
+          await loadEntriesForMonth()
+          await loadEntriesForDate(selectedDate)
+          setError('')
+          return
+        }
         console.error('Fehler beim Löschen:', errorData, response.status)
         setError(errorData.error || 'Fehler beim Löschen des Eintrags')
         // Bei Fehler: Lade Daten neu, um State zu korrigieren
@@ -1631,6 +1639,33 @@ export default function TimeTrackingPage() {
           
           if (!updateResponse.ok) {
             const errorData = await updateResponse.json().catch(() => ({ error: 'Unbekannter Fehler' }))
+            if (updateResponse.status === 404) {
+              // Der Eintrag existiert nicht mehr (z.B. nach Gruppendelete eines Nachtdienstes).
+              // Fallback: als neuen Eintrag erneut anlegen, damit der Speichervorgang nicht abbricht.
+              const recreateResponse = await fetch('/api/employee/time-entries', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  date: dateStr,
+                  startTime: startDateTime.toISOString(),
+                  endTime: endDateTime.toISOString(),
+                  breakMinutes: 0,
+                  entryType: block.entryType || 'WORK',
+                }),
+              })
+              if (!recreateResponse.ok) {
+                const recreateError = await recreateResponse.json().catch(() => ({ error: 'Unbekannter Fehler' }))
+                setError(recreateError.error || `Fehler beim Erstellen des Eintrags (Status: ${recreateResponse.status})`)
+                return
+              }
+              const recreatedEntry = await recreateResponse.json()
+              setEntries(prevEntries => {
+                const exists = prevEntries.some(e => e.id === recreatedEntry.id)
+                if (exists) return prevEntries
+                return [...prevEntries, recreatedEntry]
+              })
+              continue
+            }
             console.error('Fehler beim Aktualisieren des Eintrags:', errorData, {
               blockId: block.id,
               blockDate,
