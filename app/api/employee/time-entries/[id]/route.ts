@@ -200,6 +200,33 @@ export async function DELETE(
 
     const isNightShift = isNightShiftFirstBlock || isNightShiftSecondBlock || isNightShiftSleep || isNightShiftInterruption
 
+    // #region agent log
+    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+      body: JSON.stringify({
+        sessionId: '42d3e1',
+        runId: 'employee-nightshift-debug',
+        hypothesisId: 'H2_delete_classification_or_window',
+        location: 'app/api/employee/time-entries/[id]/route.ts:DELETE:classify',
+        message: 'DELETE classification for time entry',
+        data: {
+          employeeIdSuffix: String(entry.employeeId).slice(-6),
+          entryIdSuffix: String(entry.id).slice(-6),
+          entryType: entry.entryType,
+          startTime: startTimeDate.toISOString(),
+          endTime: endTimeDate?.toISOString() || null,
+          isNightShiftFirstBlock,
+          isNightShiftSecondBlock,
+          isNightShiftSleep,
+          isNightShiftInterruption,
+          isNightShift,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     // Kompatibilität: alte Daten waren auf den Folgetag "gebucht" (date == startTime-Kalendertag).
     // Dann muss das Buchungsdatum für 06:01 / 00:00-06:00 um einen Tag zurück verschoben werden.
     const isOldSplitBooking = sameYMDZ(entryDate, startTimeDate)
@@ -211,6 +238,24 @@ export async function DELETE(
 
     // Bearbeitbarkeit immer auf Buchungsdatum prüfen
     if (!isDateEditableForEmployee(bookingDate, false)) {
+      // #region agent log
+      fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+        body: JSON.stringify({
+          sessionId: '42d3e1',
+          runId: 'employee-nightshift-debug',
+          hypothesisId: 'H2_delete_classification_or_window',
+          location: 'app/api/employee/time-entries/[id]/route.ts:DELETE:blocked-window',
+          message: 'DELETE blocked by edit window',
+          data: {
+            entryIdSuffix: String(entry.id).slice(-6),
+            bookingDate: bookingDate.toISOString(),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       return NextResponse.json(
         { error: 'Dieses Datum kann nicht mehr bearbeitet werden. Rückwirkende Zeiterfassung ist nur für die letzten 2 Tage möglich.' },
         { status: 403 }
@@ -291,6 +336,27 @@ export async function DELETE(
       }
 
       const ids = Array.from(idsToDelete)
+      // #region agent log
+      fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+        body: JSON.stringify({
+          sessionId: '42d3e1',
+          runId: 'employee-nightshift-debug',
+          hypothesisId: 'H2_delete_classification_or_window',
+          location: 'app/api/employee/time-entries/[id]/route.ts:DELETE:ids',
+          message: 'DELETE ids collected',
+          data: {
+            entryIdSuffix: String(entry.id).slice(-6),
+            isNightShift,
+            idsToDeleteCount: ids.length,
+            idsToDeleteSuffixes: ids.map((id) => String(id).slice(-6)),
+            deletedNextDay,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       if (ids.length > 0) {
         await tx.timeEntry.deleteMany({
           where: { id: { in: ids } },
@@ -306,6 +372,23 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+      body: JSON.stringify({
+        sessionId: '42d3e1',
+        runId: 'employee-nightshift-debug',
+        hypothesisId: 'H2_delete_classification_or_window',
+        location: 'app/api/employee/time-entries/[id]/route.ts:DELETE:catch',
+        message: 'DELETE failed',
+        data: {
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
     console.error('Error deleting time entry:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

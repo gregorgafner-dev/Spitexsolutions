@@ -82,6 +82,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { date, startTime, endTime, breakMinutes, entryType, sleepInterruptionMinutes } = body
 
+    // #region agent log
+    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+      body: JSON.stringify({
+        sessionId: '42d3e1',
+        runId: 'employee-nightshift-debug',
+        hypothesisId: 'H1_post_payload_or_overlap',
+        location: 'app/api/employee/time-entries/route.ts:POST:entry',
+        message: 'POST time-entry request received',
+        data: {
+          employeeIdSuffix: String(session.user.employeeId).slice(-6),
+          date,
+          startTime,
+          endTime,
+          entryType: entryType || 'WORK',
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     // Bei SLEEP_INTERRUPTION ist startTime nicht erforderlich
     if (entryType !== 'SLEEP_INTERRUPTION' && (!date || !startTime)) {
       return NextResponse.json({ error: 'Date and startTime required' }, { status: 400 })
@@ -165,6 +187,29 @@ export async function POST(request: NextRequest) {
       )
 
       if (overlapCheck.overlaps) {
+        // #region agent log
+        fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+          body: JSON.stringify({
+            sessionId: '42d3e1',
+            runId: 'employee-nightshift-debug',
+            hypothesisId: 'H1_post_payload_or_overlap',
+            location: 'app/api/employee/time-entries/route.ts:POST:overlap',
+            message: 'Overlap rejected in POST',
+            data: {
+              employeeIdSuffix: String(session.user.employeeId).slice(-6),
+              date: dateObj.toISOString(),
+              startTime: startTimeDate.toISOString(),
+              endTime: endTimeDate.toISOString(),
+              overlapEntryIdSuffix: overlapCheck.overlappingEntry?.id?.slice(-6) || null,
+              overlapEntryStart: overlapCheck.overlappingEntry?.startTime?.toISOString?.() || null,
+              overlapEntryEnd: overlapCheck.overlappingEntry?.endTime?.toISOString?.() || null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
         return NextResponse.json(
           { error: 'Dieser Block überschneidet sich mit einem bereits erfassten Block' },
           { status: 400 }
@@ -233,6 +278,23 @@ export async function POST(request: NextRequest) {
     console.log('[API] Zeiteintrag wird zurückgegeben:', { id: entry.id, entryType: entry.entryType })
     return NextResponse.json(entry)
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+      body: JSON.stringify({
+        sessionId: '42d3e1',
+        runId: 'employee-nightshift-debug',
+        hypothesisId: 'H1_post_payload_or_overlap',
+        location: 'app/api/employee/time-entries/route.ts:POST:catch',
+        message: 'POST time-entry failed',
+        data: {
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
     console.error('[API] Fehler beim Erstellen des Zeiteintrags:', error)
     if (error instanceof Error) {
       console.error('[API] Fehlerdetails:', {

@@ -57,6 +57,30 @@ export async function checkOverlappingBlocks(
                                   endTime && endTime.getHours() === 23 && endTime.getMinutes() === 0
   const isNightShiftSecondBlock = startTime.getHours() === 6 && startTime.getMinutes() === 1
 
+  // #region agent log
+  fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+    body: JSON.stringify({
+      sessionId: '42d3e1',
+      runId: 'employee-nightshift-debug',
+      hypothesisId: 'H3_overlap_nightshift_detection',
+      location: 'lib/time-entry-validation.ts:checkOverlappingBlocks:start',
+      message: 'checkOverlappingBlocks classification',
+      data: {
+        employeeIdSuffix: String(employeeId).slice(-6),
+        date: date.toISOString(),
+        startTime: startTime.toISOString(),
+        endTime: endTime?.toISOString() || null,
+        isNightShiftFirstBlock,
+        isNightShiftSecondBlock,
+        excludeEntryIdSuffix: excludeEntryId ? String(excludeEntryId).slice(-6) : null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
   for (const entry of existingEntries) {
     // Prüfe ob der bestehende Eintrag ein Nachtdienst-Block ist
     const existingIsNightShiftFirstBlock = entry.startTime.getHours() === 19 && entry.startTime.getMinutes() === 0 &&
@@ -72,6 +96,27 @@ export async function checkOverlappingBlocks(
     }
 
     if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
+      // #region agent log
+      fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+        body: JSON.stringify({
+          sessionId: '42d3e1',
+          runId: 'employee-nightshift-debug',
+          hypothesisId: 'H3_overlap_nightshift_detection',
+          location: 'lib/time-entry-validation.ts:checkOverlappingBlocks:same-day-overlap',
+          message: 'Overlap detected against same-day WORK entry',
+          data: {
+            newStart: startTime.toISOString(),
+            newEnd: endTime?.toISOString() || null,
+            existingEntryIdSuffix: String(entry.id).slice(-6),
+            existingStart: entry.startTime.toISOString(),
+            existingEnd: entry.endTime?.toISOString() || null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       return { overlaps: true, overlappingEntry: entry }
     }
   }
@@ -110,6 +155,27 @@ export async function checkOverlappingBlocks(
       }
 
       if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
+        // #region agent log
+        fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+          body: JSON.stringify({
+            sessionId: '42d3e1',
+            runId: 'employee-nightshift-debug',
+            hypothesisId: 'H3_overlap_nightshift_detection',
+            location: 'lib/time-entry-validation.ts:checkOverlappingBlocks:prev-day-overlap',
+            message: 'Overlap detected against previous-day WORK entry',
+            data: {
+              newStart: startTime.toISOString(),
+              newEnd: endTime?.toISOString() || null,
+              existingEntryIdSuffix: String(entry.id).slice(-6),
+              existingStart: entry.startTime.toISOString(),
+              existingEnd: entry.endTime?.toISOString() || null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
         return { overlaps: true, overlappingEntry: entry }
       }
     }
@@ -150,6 +216,27 @@ export async function checkOverlappingBlocks(
       }
 
       if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
+        // #region agent log
+        fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+          body: JSON.stringify({
+            sessionId: '42d3e1',
+            runId: 'employee-nightshift-debug',
+            hypothesisId: 'H3_overlap_nightshift_detection',
+            location: 'lib/time-entry-validation.ts:checkOverlappingBlocks:next-day-overlap',
+            message: 'Overlap detected against next-day WORK entry',
+            data: {
+              newStart: startTime.toISOString(),
+              newEnd: endTime?.toISOString() || null,
+              existingEntryIdSuffix: String(entry.id).slice(-6),
+              existingStart: entry.startTime.toISOString(),
+              existingEnd: entry.endTime?.toISOString() || null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
         return { overlaps: true, overlappingEntry: entry }
       }
     }
