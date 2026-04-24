@@ -64,6 +64,30 @@ export default function TimeTrackingPage() {
   const [messageLoading, setMessageLoading] = useState(false)
   const [messageError, setMessageError] = useState('')
 
+  const emitDebugLog = (payload: {
+    runId: string
+    hypothesisId: string
+    location: string
+    message: string
+    data?: Record<string, unknown>
+  }) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7647/ingest/d02b158b-8692-42bb-9636-87edc733d28f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '42d3e1' },
+      body: JSON.stringify({
+        sessionId: '42d3e1',
+        runId: payload.runId,
+        hypothesisId: payload.hypothesisId,
+        location: payload.location,
+        message: payload.message,
+        data: payload.data || {},
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+  }
+
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
   const daysInMonth = getDaysInMonth(currentMonth)
@@ -488,6 +512,22 @@ export default function TimeTrackingPage() {
         return b.startTime === '06:01' || (b.startTime && b.startTime.startsWith('06:01'))
       })
       const hasNightShift = hasBlock1 && hasBlock2
+
+      emitDebugLog({
+        runId: 'employee-nightshift-debug-client',
+        hypothesisId: 'H4_ui_nightshift_detection',
+        location: 'app/employee/time-tracking/page.tsx:loadEntriesForDate:detect',
+        message: 'Nightshift detection on selected date',
+        data: {
+          selectedDate: format(date, 'yyyy-MM-dd'),
+          currentBlocksCount: currentBlocks.length,
+          nextBlocksCount: nextBlocks.length,
+          hasBlock1,
+          hasBlock2,
+          hasNightShift,
+          blockStarts: allBlocks.map((b) => b.startTime),
+        },
+      })
       
       console.log('Nachtdienst-Erkennung in loadEntriesForDate:', { 
         hasBlock1, 
@@ -788,6 +828,21 @@ export default function TimeTrackingPage() {
 
     try {
       console.log('Lösche Eintrag:', { entryId, isNightShiftBlock, isNightShiftMode })
+      emitDebugLog({
+        runId: 'employee-nightshift-debug-client',
+        hypothesisId: 'H5_ui_delete_flow',
+        location: 'app/employee/time-tracking/page.tsx:deleteTimeEntry:before-delete',
+        message: 'Client starts delete flow',
+        data: {
+          entryIdSuffix: String(entryId).slice(-6),
+          selectedDate: format(selectedDate, 'yyyy-MM-dd'),
+          isNightShift,
+          isNightShiftBlock,
+          isNightShiftMode,
+          workBlocksCount: workBlocks.length,
+          entriesCount: entries.length,
+        },
+      })
       
       // WICHTIG: Optimistisches Update - entferne Einträge sofort aus dem State
       // damit sie sofort aus der UI verschwinden
@@ -824,6 +879,18 @@ export default function TimeTrackingPage() {
       // Jetzt lösche auf dem Server
       const response = await fetch(`/api/employee/time-entries/${entryId}`, {
         method: 'DELETE',
+      })
+
+      emitDebugLog({
+        runId: 'employee-nightshift-debug-client',
+        hypothesisId: 'H5_ui_delete_flow',
+        location: 'app/employee/time-tracking/page.tsx:deleteTimeEntry:after-delete',
+        message: 'Client delete response received',
+        data: {
+          entryIdSuffix: String(entryId).slice(-6),
+          status: response.status,
+          ok: response.ok,
+        },
       })
 
       if (!response.ok) {
@@ -943,6 +1010,22 @@ export default function TimeTrackingPage() {
         })
     
     console.log('handleSave called', { isNightShift, workBlocks, blocksToSave, sleepInterruptions })
+    emitDebugLog({
+      runId: 'employee-nightshift-debug-client',
+      hypothesisId: 'H6_ui_save_payload',
+      location: 'app/employee/time-tracking/page.tsx:handleSave:start',
+      message: 'Client save initiated',
+      data: {
+        selectedDate: format(selectedDate, 'yyyy-MM-dd'),
+        isNightShift,
+        blocksToSave: blocksToSave.map((b) => ({
+          idSuffix: String(b.id).slice(-6),
+          startTime: b.startTime,
+          endTime: b.endTime,
+          entryType: b.entryType,
+        })),
+      },
+    })
 
     // Bei Nachtdienst: Speichere Standard-Zeiten wenn keine Abweichungen
     if (isNightShift) {
