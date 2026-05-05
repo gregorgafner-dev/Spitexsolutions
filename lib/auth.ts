@@ -79,7 +79,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: `${user.firstName} ${user.lastName}`,
-            role: user.role as 'EMPLOYEE' | 'ADMIN',
+            role: user.role as 'EMPLOYEE' | 'ADMIN' | 'ADMIN_SZS',
             employeeId: user.employee?.id,
             adminId: user.admin?.id,
           }
@@ -114,7 +114,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub!
-        session.user.role = token.role as 'ADMIN' | 'EMPLOYEE'
+        session.user.role = token.role as 'ADMIN' | 'EMPLOYEE' | 'ADMIN_SZS'
         session.user.employeeId = token.employeeId as string | undefined
         session.user.adminId = token.adminId as string | undefined
         console.log('[NextAuth] session callback role:', session.user.role)
