@@ -48,6 +48,12 @@ const SLOT_WEIGHT_VM = 33.33333333;
 const SLOT_WEIGHT_NM = 33.33333333;
 const SLOT_WEIGHT_AB = 33.33333333;
 
+const fmtSlot = (n: number): string =>
+  new Intl.NumberFormat("de-CH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+
 type DaySlots = {
   vormittag: boolean;
   nachmittag: boolean;
@@ -563,9 +569,9 @@ export default function FahrzeugePage() {
                   </div>
                   <p className="mt-1 text-sm font-medium text-gray-800">
                     Pro Kalendertag markierst du, in welchen Zeitfenstern das Fahrzeug im Einsatz war.
-                    Vormittag zählt {SLOT_WEIGHT_VM} %, Nachmittag {SLOT_WEIGHT_NM} %, Abend{" "}
-                    {SLOT_WEIGHT_AB} % — maximal 100 % pro Tag bei allen drei Fenstern. Beispiel: nur
-                    Vormittag und Abend = {SLOT_WEIGHT_VM + SLOT_WEIGHT_AB} %.
+                    Vormittag zählt {fmtSlot(SLOT_WEIGHT_VM)} %, Nachmittag {fmtSlot(SLOT_WEIGHT_NM)} %, Abend{" "}
+                    {fmtSlot(SLOT_WEIGHT_AB)} % — maximal 100 % pro Tag bei allen drei Fenstern. Beispiel: nur
+                    Vormittag und Abend = {fmtSlot(SLOT_WEIGHT_VM + SLOT_WEIGHT_AB)} %.
                   </p>
 
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between rounded-lg border border-indigo-200 bg-indigo-50/60 p-4">
@@ -623,13 +629,13 @@ export default function FahrzeugePage() {
                           <th className="px-3 py-2 text-left font-bold">Fahrzeug</th>
                           <th className="px-3 py-2 text-left font-bold">Standort</th>
                           <th className="px-3 py-2 text-center font-bold whitespace-nowrap">
-                            VM ({SLOT_WEIGHT_VM}%)
+                            VM ({fmtSlot(SLOT_WEIGHT_VM)}%)
                           </th>
                           <th className="px-3 py-2 text-center font-bold whitespace-nowrap">
-                            NM ({SLOT_WEIGHT_NM}%)
+                            NM ({fmtSlot(SLOT_WEIGHT_NM)}%)
                           </th>
                           <th className="px-3 py-2 text-center font-bold whitespace-nowrap">
-                            Abend ({SLOT_WEIGHT_AB}%)
+                            Abend ({fmtSlot(SLOT_WEIGHT_AB)}%)
                           </th>
                           <th className="px-3 py-2 text-left font-bold">IST Tag</th>
                           <th className="px-3 py-2 text-left font-bold">SOLL (%)</th>
