@@ -222,7 +222,41 @@ export default function FahrzeugePage() {
     if (cached) {
       setData(cached);
       setSourceLabel(cached.sourceFile || "Gespeicherte Flotte");
+      return;
     }
+
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/szs-admin/cockpit/fahrzeuge", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as FleetResponse;
+      })
+      .then((serverData) => {
+        if (cancelled) return;
+        if (!serverData || !Array.isArray(serverData.autos)) return;
+        if (!serverData.totals) {
+          serverData.totals = {
+            autosGesamt: serverData.autos.length,
+            autosAktiv: serverData.autos.filter((a) => a.status === "aktiv").length,
+            autosAusserBetrieb: serverData.autos.filter((a) => a.status === "ausser-betrieb")
+              .length,
+            ebikesGesamt: Array.isArray(serverData.ebikes) ? serverData.ebikes.length : 0,
+          };
+        }
+        if (!Array.isArray(serverData.ebikes)) serverData.ebikes = [];
+        setData(serverData);
+        setSourceLabel(serverData.sourceFile || "Server-Flotte");
+      })
+      .catch(() => {
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -335,11 +369,32 @@ export default function FahrzeugePage() {
     }
   };
 
-  const handleClearFleet = () => {
+  const handleClearFleet = async () => {
     clearFleetStorage();
     setData(null);
     setSourceLabel("noch nicht geladen");
     setError(null);
+    try {
+      setLoading(true);
+      const res = await fetch("/api/szs-admin/cockpit/fahrzeuge", { cache: "no-store" });
+      if (!res.ok) return;
+      const serverData = (await res.json()) as FleetResponse;
+      if (!serverData || !Array.isArray(serverData.autos)) return;
+      if (!serverData.totals) {
+        serverData.totals = {
+          autosGesamt: serverData.autos.length,
+          autosAktiv: serverData.autos.filter((a) => a.status === "aktiv").length,
+          autosAusserBetrieb: serverData.autos.filter((a) => a.status === "ausser-betrieb").length,
+          ebikesGesamt: Array.isArray(serverData.ebikes) ? serverData.ebikes.length : 0,
+        };
+      }
+      if (!Array.isArray(serverData.ebikes)) serverData.ebikes = [];
+      setData(serverData);
+      setSourceLabel(serverData.sourceFile || "Server-Flotte");
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
