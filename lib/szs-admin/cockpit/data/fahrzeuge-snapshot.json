@@ -1,11 +1,292 @@
 {
-  "sourceFile": "n/a",
-  "autos": [],
-  "ebikes": [],
+  "sourceFile": "Übersicht_Autos_SZS.xlsx",
+  "autos": [
+    {
+      "id": "auto-1",
+      "nummer": "1",
+      "kontrollschild": "ZH 724661",
+      "typ": "Renault Twingo BEV",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-2",
+      "nummer": "2",
+      "kontrollschild": "ZH 395 859",
+      "typ": "Renault Twingo BEV",
+      "standort": "Totalschaden",
+      "parkplatz": "",
+      "badge": "Totalschaden",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "",
+      "status": "ausser-betrieb"
+    },
+    {
+      "id": "auto-3",
+      "nummer": "3",
+      "kontrollschild": "ZH 724805",
+      "typ": "Renault Twingo BEV",
+      "standort": "Im Spitzli 1 (Tiefgarage 8703 Erlenbach)",
+      "parkplatz": "",
+      "badge": "Badge Erlenbach",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "Schaden an Arval gemeldet",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-4",
+      "nummer": "4",
+      "kontrollschild": "ZH 724838",
+      "typ": "Renault Twingo BEV",
+      "standort": "Im Spitzli 1 (Tiefgarage 8703 Erlenbach)",
+      "parkplatz": "",
+      "badge": "Badge Erlenbach",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-5",
+      "nummer": "5",
+      "kontrollschild": "ZH 724855",
+      "typ": "Renault Twingo BEV",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-6",
+      "nummer": "6",
+      "kontrollschild": "ZH 724530",
+      "typ": "Renault Twingo BEV",
+      "standort": "Bergstrasse 2 , 8708 Männedorf",
+      "parkplatz": "",
+      "badge": "Badge Spital Männedorf 20564",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-7",
+      "nummer": "7",
+      "kontrollschild": "ZH 409 494",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-8",
+      "nummer": "8",
+      "kontrollschild": "ZH 409 502",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "Schaden durch Gona",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-9",
+      "nummer": "9",
+      "kontrollschild": "ZH 409 667",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "Kratzer hinten durch temp. MA Eliza",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-10",
+      "nummer": "10",
+      "kontrollschild": "ZH 409 385",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Bahnhofstrasse 35 (Dorfgarage Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-11",
+      "nummer": "11",
+      "kontrollschild": "ZH 409 381",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Bahnhofstrasse 35 (Dorfgarage Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-12",
+      "nummer": "12",
+      "kontrollschild": "ZH 409 743",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Im Spitzli 1 (Tiefgarage 8703 Erlenbach)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "Schaden an Arval gemeldet",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-13",
+      "nummer": "13",
+      "kontrollschild": "ZH 409 434",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Bergstrasse 2 , 8708 Männedorf",
+      "parkplatz": "",
+      "badge": "Badge Spital Männedorf 30032",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-14",
+      "nummer": "14",
+      "kontrollschild": "ZH 410 719",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-15",
+      "nummer": "15",
+      "kontrollschild": "ZH 410 621",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Garage Kästli Erlenbach (Schulhausstrasse 39A, 8703 Erlenbach)",
+      "parkplatz": "",
+      "badge": "",
+      "versicherer": "AXA (Kessler)",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-16",
+      "nummer": "16",
+      "kontrollschild": "ZH 410 874",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Im Spitzli 1 (Tiefgarage 8703 Erlenbach)",
+      "parkplatz": "",
+      "badge": "Badge Erlenbach",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-17",
+      "nummer": "17",
+      "kontrollschild": "ZH 409 720",
+      "typ": "Hyundai (i30'20)",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "parkplatz": "",
+      "badge": "Psychiatrie Auo",
+      "versicherer": "Arval",
+      "schadenInfo": "",
+      "status": "aktiv"
+    },
+    {
+      "id": "auto-Toyota",
+      "nummer": "Toyota",
+      "kontrollschild": "ZH 608 048",
+      "typ": "Toyota Jaris",
+      "standort": "Garage Kästli Erlenbach (Schulhausstrasse 39A, 8703 Erlenbach)",
+      "parkplatz": "",
+      "badge": "Tankkarte Agrola",
+      "versicherer": "",
+      "schadenInfo": "",
+      "status": "aktiv"
+    }
+  ],
+  "ebikes": [
+    {
+      "id": "ebike-1",
+      "nummer": "1",
+      "bezeichnung": "Miloo Classy Beast",
+      "typ": "Miloo Classy Beast",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "Arval",
+      "vertragsnummer": "2025.239.020"
+    },
+    {
+      "id": "ebike-2",
+      "nummer": "2",
+      "bezeichnung": "Miloo Classy Beast",
+      "typ": "Miloo Classy Beast",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "Arval",
+      "vertragsnummer": "2025.239.023"
+    },
+    {
+      "id": "ebike-3",
+      "nummer": "3",
+      "bezeichnung": "Miloo Classy Beast",
+      "typ": "Miloo Classy Beast",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "Arval",
+      "vertragsnummer": "2025.239.027"
+    },
+    {
+      "id": "ebike-4",
+      "nummer": "4",
+      "bezeichnung": "(violette)",
+      "typ": "(violette)",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "unser Velo",
+      "vertragsnummer": ""
+    },
+    {
+      "id": "ebike-5",
+      "nummer": "5",
+      "bezeichnung": "zur Entsorgung",
+      "typ": "zur Entsorgung",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "unser Velo",
+      "vertragsnummer": ""
+    },
+    {
+      "id": "ebike-6",
+      "nummer": "6",
+      "bezeichnung": "zur Entsorgung",
+      "typ": "zur Entsorgung",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "unser Velo",
+      "vertragsnummer": ""
+    },
+    {
+      "id": "ebike-9",
+      "nummer": "9",
+      "bezeichnung": "Miloo Classy Beast",
+      "typ": "Miloo Classy Beast",
+      "standort": "Stelzenstrasse 41 (8706 Meilen)",
+      "versicherer": "unser Velo",
+      "vertragsnummer": "kommt noch von Arval"
+    }
+  ],
   "totals": {
-    "autosGesamt": 0,
-    "autosAktiv": 0,
-    "autosAusserBetrieb": 0,
-    "ebikesGesamt": 0
+    "autosGesamt": 18,
+    "autosAktiv": 17,
+    "autosAusserBetrieb": 1,
+    "ebikesGesamt": 7
   }
 }
