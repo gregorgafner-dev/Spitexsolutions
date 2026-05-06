@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 
@@ -19,8 +20,16 @@ export default async function SzsAdminDashboard() {
           <p className="text-gray-600 mt-2">Willkommen, {session.user.name}</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          Inhalte folgen.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Link
+            href="/szs-admin/cockpit"
+            className="block bg-white rounded-lg shadow p-8 hover:shadow-lg transition border border-gray-200"
+          >
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Cockpit Reporting Tool</h2>
+            <p className="text-gray-600">
+              Produktivität, Overhead-Verhältnisse, Personalmix, Stellenplan, Lohnrechner und mehr.
+            </p>
+          </Link>
         </div>
       </div>
     </div>

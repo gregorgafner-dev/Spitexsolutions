@@ -16,8 +16,12 @@ export default function SzsAdminLayout({
     setMounted(true)
   }, [])
 
-  // Während des ersten Renders oder auf Login-Seite: kein Layout
-  if (!mounted || pathname === '/szs-admin/login') {
+  // Während des ersten Renders, auf Login-Seite oder im Cockpit-Bereich (eigene Navigation): kein Standard-Layout
+  if (
+    !mounted ||
+    pathname === '/szs-admin/login' ||
+    pathname?.startsWith('/szs-admin/cockpit')
+  ) {
     return <>{children}</>
   }
 

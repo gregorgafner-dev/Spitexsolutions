@@ -1,0 +1,11 @@
+{
+  "sourceFile": "n/a",
+  "autos": [],
+  "ebikes": [],
+  "totals": {
+    "autosGesamt": 0,
+    "autosAktiv": 0,
+    "autosAusserBetrieb": 0,
+    "ebikesGesamt": 0
+  }
+}

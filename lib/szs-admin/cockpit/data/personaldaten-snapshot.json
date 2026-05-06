@@ -1,0 +1,1180 @@
+{
+  "meta": {
+    "source": "abacus-xlsx",
+    "sheetName": "Worksheet_-1028174601",
+    "count": 117,
+    "asOf": "28.01.2026"
+  },
+  "people": [
+    {
+      "pNr": "117",
+      "name": "Margrit Fankhauser",
+      "vorname": "Margrit",
+      "nachname": "Fankhauser",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "FaGe",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "130",
+      "name": "Giuseppina Rita Cimino",
+      "vorname": "Giuseppina Rita",
+      "nachname": "Cimino",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "31",
+      "abteilung": "Stab Pflege"
+    },
+    {
+      "pNr": "138",
+      "name": "Raija Junes",
+      "vorname": "Raija",
+      "nachname": "Junes",
+      "beschaeftigungsgrad": "90%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "163",
+      "name": "Eija Louis",
+      "vorname": "Eija",
+      "nachname": "Louis",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "206",
+      "name": "Jasmin Solve",
+      "vorname": "Jasmin",
+      "nachname": "Solve",
+      "beschaeftigungsgrad": "90%",
+      "funktion": "FaGe",
+      "abtNr": "15",
+      "abteilung": "Planung"
+    },
+    {
+      "pNr": "207",
+      "name": "Irina Mohn",
+      "vorname": "Irina",
+      "nachname": "Mohn",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "227",
+      "name": "Julia Goldberg",
+      "vorname": "Julia",
+      "nachname": "Goldberg",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Teamleitung",
+      "abtNr": "34",
+      "abteilung": "Teamleitung"
+    },
+    {
+      "pNr": "230",
+      "name": "Eliane Rusch",
+      "vorname": "Eliane",
+      "nachname": "Rusch",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "231",
+      "name": "Christina Serravalle",
+      "vorname": "Christina",
+      "nachname": "Serravalle",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "242",
+      "name": "Cathrin Christensen",
+      "vorname": "Cathrin",
+      "nachname": "Christensen",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "271",
+      "name": "Alexandra Kunz",
+      "vorname": "Alexandra",
+      "nachname": "Kunz",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "309",
+      "name": "Sandra Troendle",
+      "vorname": "Sandra",
+      "nachname": "Troendle",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "AGS",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "317",
+      "name": "Silvia Wunderli",
+      "vorname": "Silvia",
+      "nachname": "Wunderli",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "AGS",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "347",
+      "name": "Rahel Thoma",
+      "vorname": "Rahel",
+      "nachname": "Thoma",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "352",
+      "name": "Joy Meier",
+      "vorname": "Joy",
+      "nachname": "Meier",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "590",
+      "name": "Mohamad Zin",
+      "vorname": "Mohamad",
+      "nachname": "Zin",
+      "beschaeftigungsgrad": "10%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "622",
+      "name": "Maria Magdalena van der Merwe",
+      "vorname": "Maria Magdalena",
+      "nachname": "van der Merwe",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "11",
+      "abteilung": "Team Psychiatrie"
+    },
+    {
+      "pNr": "638",
+      "name": "Renate Schweyer",
+      "vorname": "Renate",
+      "nachname": "Schweyer",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Pflegehelferin SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "663",
+      "name": "Sultan Beklevic Alvert",
+      "vorname": "Sultan",
+      "nachname": "Beklevic Alvert",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "680",
+      "name": "Silke Röhrig",
+      "vorname": "Silke",
+      "nachname": "Röhrig",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "Telefon&Empfang",
+      "abtNr": "35",
+      "abteilung": "Telefon & Empfang"
+    },
+    {
+      "pNr": "682",
+      "name": "Doruntina Arnadottir",
+      "vorname": "Doruntina",
+      "nachname": "Arnadottir",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "683",
+      "name": "Lucia Käser",
+      "vorname": "Lucia",
+      "nachname": "Käser",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "FaGe",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "699",
+      "name": "Franciscus Hermanus Johannes Rikkerink",
+      "vorname": "Franciscus Hermanus Johannes",
+      "nachname": "Rikkerink",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "701",
+      "name": "Cornelia Bolliger",
+      "vorname": "Cornelia",
+      "nachname": "Bolliger",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "717",
+      "name": "Ramona Harthan",
+      "vorname": "Ramona",
+      "nachname": "Harthan",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Pflegehelferin SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "719",
+      "name": "Werner Kleinhans",
+      "vorname": "Werner",
+      "nachname": "Kleinhans",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Teamleitung",
+      "abtNr": "11",
+      "abteilung": "Team Psychiatrie"
+    },
+    {
+      "pNr": "729",
+      "name": "Yvonne Abegg",
+      "vorname": "Yvonne",
+      "nachname": "Abegg",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Finanzen&controlling",
+      "abtNr": "16",
+      "abteilung": "Finanzen & Dienste"
+    },
+    {
+      "pNr": "730",
+      "name": "Tabea Jung",
+      "vorname": "Tabea",
+      "nachname": "Jung",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "734",
+      "name": "Daniela Lopes Rodrigues",
+      "vorname": "Daniela",
+      "nachname": "Lopes Rodrigues",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "735",
+      "name": "Linda Karina Fierz",
+      "vorname": "Linda Karina",
+      "nachname": "Fierz",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "753",
+      "name": "Rebeca Vargas",
+      "vorname": "Rebeca",
+      "nachname": "Vargas",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "756",
+      "name": "Manuja Ramona Schoderer",
+      "vorname": "Manuja Ramona",
+      "nachname": "Schoderer",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "761",
+      "name": "Laurin Lüchinger",
+      "vorname": "Laurin",
+      "nachname": "Lüchinger",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Lernender",
+      "abtNr": "20",
+      "abteilung": "Lernende"
+    },
+    {
+      "pNr": "766",
+      "name": "Riona Qazimi",
+      "vorname": "Riona",
+      "nachname": "Qazimi",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "AGS",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "767",
+      "name": "Besart Abduli",
+      "vorname": "Besart",
+      "nachname": "Abduli",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "AGS",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "769",
+      "name": "Dzenita Malicevic",
+      "vorname": "Dzenita",
+      "nachname": "Malicevic",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "773",
+      "name": "Andrea Hefti",
+      "vorname": "Andrea",
+      "nachname": "Hefti",
+      "beschaeftigungsgrad": "10%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "774",
+      "name": "Cécile Rose Lienhard",
+      "vorname": "Cécile Rose",
+      "nachname": "Lienhard",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "11",
+      "abteilung": "Team Psychiatrie"
+    },
+    {
+      "pNr": "775",
+      "name": "Miriam Patrizia Koch",
+      "vorname": "Miriam Patrizia",
+      "nachname": "Koch",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "777",
+      "name": "Marie-Luise Gantner-Gruber",
+      "vorname": "Marie-Luise",
+      "nachname": "Gantner-Gruber",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "778",
+      "name": "Prisca Cicero Santalena",
+      "vorname": "Prisca",
+      "nachname": "Cicero Santalena",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Telefon&Empfang",
+      "abtNr": "35",
+      "abteilung": "Telefon & Empfang"
+    },
+    {
+      "pNr": "779",
+      "name": "Adelina Tanner",
+      "vorname": "Adelina",
+      "nachname": "Tanner",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "780",
+      "name": "Fabienne Steinegger",
+      "vorname": "Fabienne",
+      "nachname": "Steinegger",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "791",
+      "name": "Jasmina Katja Stacher",
+      "vorname": "Jasmina Katja",
+      "nachname": "Stacher",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "793",
+      "name": "Stefan Djurdjevic",
+      "vorname": "Stefan",
+      "nachname": "Djurdjevic",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "FaGe",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "798",
+      "name": "Diana Eric",
+      "vorname": "Diana",
+      "nachname": "Eric",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "11",
+      "abteilung": "Team Psychiatrie"
+    },
+    {
+      "pNr": "799",
+      "name": "Anna Liliana Elisabeth Dahlström Niederer",
+      "vorname": "Anna Liliana Elisabeth",
+      "nachname": "Dahlström Niederer",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "800",
+      "name": "Gabriele Gertrud Nagel",
+      "vorname": "Gabriele Gertrud",
+      "nachname": "Nagel",
+      "beschaeftigungsgrad": "90%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "802",
+      "name": "Carmen Schönmann",
+      "vorname": "Carmen",
+      "nachname": "Schönmann",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "805",
+      "name": "Anne Barbara Frederike Traub",
+      "vorname": "Anne Barbara Frederike",
+      "nachname": "Traub",
+      "beschaeftigungsgrad": "30%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "806",
+      "name": "Isabelle Wydler",
+      "vorname": "Isabelle",
+      "nachname": "Wydler",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "813",
+      "name": "Senka Poljak",
+      "vorname": "Senka",
+      "nachname": "Poljak",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "814",
+      "name": "Hala Morellini",
+      "vorname": "Hala",
+      "nachname": "Morellini",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "824",
+      "name": "Beata Antalova",
+      "vorname": "Beata",
+      "nachname": "Antalova",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Geschäftsleitung",
+      "abtNr": "17",
+      "abteilung": "GL"
+    },
+    {
+      "pNr": "830",
+      "name": "Luka Djurdjevic",
+      "vorname": "Luka",
+      "nachname": "Djurdjevic",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "831",
+      "name": "Elisabeth Roseline Djo Ndjana",
+      "vorname": "Elisabeth Roseline",
+      "nachname": "Djo Ndjana",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "835",
+      "name": "Raoul Raineri",
+      "vorname": "Raoul",
+      "nachname": "Raineri",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Lernender",
+      "abtNr": "20",
+      "abteilung": "Lernende"
+    },
+    {
+      "pNr": "846",
+      "name": "Ridwan Sagaaro",
+      "vorname": "Ridwan",
+      "nachname": "Sagaaro",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Lernender",
+      "abtNr": "20",
+      "abteilung": "Lernende"
+    },
+    {
+      "pNr": "851",
+      "name": "Hanna Thum",
+      "vorname": "Hanna",
+      "nachname": "Thum",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Lernender",
+      "abtNr": "20",
+      "abteilung": "Lernende"
+    },
+    {
+      "pNr": "852",
+      "name": "Stephanie Scheffler",
+      "vorname": "Stephanie",
+      "nachname": "Scheffler",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Teamleitung",
+      "abtNr": "34",
+      "abteilung": "Teamleitung"
+    },
+    {
+      "pNr": "853",
+      "name": "Célina Anna Sonderegger",
+      "vorname": "Célina Anna",
+      "nachname": "Sonderegger",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "Teamleitung",
+      "abtNr": "34",
+      "abteilung": "Teamleitung"
+    },
+    {
+      "pNr": "856",
+      "name": "Fatou Sanyang",
+      "vorname": "Fatou",
+      "nachname": "Sanyang",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "861",
+      "name": "Karin Brigitte Schäfer",
+      "vorname": "Karin Brigitte",
+      "nachname": "Schäfer",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Projektleitung, Prozesse & Compliance",
+      "abtNr": "32",
+      "abteilung": "Stab Verwaltung"
+    },
+    {
+      "pNr": "863",
+      "name": "Olga Schnider-Deykun",
+      "vorname": "Olga",
+      "nachname": "Schnider-Deykun",
+      "beschaeftigungsgrad": "30%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "864",
+      "name": "Karin Frei",
+      "vorname": "Karin",
+      "nachname": "Frei",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Teamleitung",
+      "abtNr": "34",
+      "abteilung": "Teamleitung"
+    },
+    {
+      "pNr": "872",
+      "name": "Petya Prapopoulos",
+      "vorname": "Petya",
+      "nachname": "Prapopoulos",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "874",
+      "name": "Petra Unfried",
+      "vorname": "Petra",
+      "nachname": "Unfried",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "875",
+      "name": "Nathalie Brunner",
+      "vorname": "Nathalie",
+      "nachname": "Brunner",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "889",
+      "name": "Inga Budryte",
+      "vorname": "Inga",
+      "nachname": "Budryte",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "890",
+      "name": "Monika Ghenzi",
+      "vorname": "Monika",
+      "nachname": "Ghenzi",
+      "beschaeftigungsgrad": "30%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "892",
+      "name": "Cansu Akinci",
+      "vorname": "Cansu",
+      "nachname": "Akinci",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "897",
+      "name": "Elvira Ruppel",
+      "vorname": "Elvira",
+      "nachname": "Ruppel",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "34",
+      "abteilung": "Teamleitung"
+    },
+    {
+      "pNr": "899",
+      "name": "Tanja Maffi",
+      "vorname": "Tanja",
+      "nachname": "Maffi",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "900",
+      "name": "Yorka Catrionna Retamal Tapia",
+      "vorname": "Yorka Catrionna",
+      "nachname": "Retamal Tapia",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "901",
+      "name": "Kristina Gojakovic",
+      "vorname": "Kristina",
+      "nachname": "Gojakovic",
+      "beschaeftigungsgrad": "10%",
+      "funktion": "FaGe",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "902",
+      "name": "Carole Nora Wohlhauser",
+      "vorname": "Carole Nora",
+      "nachname": "Wohlhauser",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "Pflegeexpertin APN",
+      "abtNr": "31",
+      "abteilung": "Stab Pflege"
+    },
+    {
+      "pNr": "903",
+      "name": "Mentore Abdyli",
+      "vorname": "Mentore",
+      "nachname": "Abdyli",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "905",
+      "name": "Anna Votta Fortunato",
+      "vorname": "Anna",
+      "nachname": "Votta Fortunato",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Pflegende Angehörige",
+      "abtNr": "22",
+      "abteilung": "Pflegende Angehörige"
+    },
+    {
+      "pNr": "906",
+      "name": "Angelina Nicoleta Lazar",
+      "vorname": "Angelina Nicoleta",
+      "nachname": "Lazar",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "909",
+      "name": "Nancy Mabiala Mpia",
+      "vorname": "Nancy",
+      "nachname": "Mabiala Mpia",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "910",
+      "name": "Sujeeba Akilan",
+      "vorname": "Sujeeba",
+      "nachname": "Akilan",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Pflegehelfer:in SRK",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "913",
+      "name": "Donzilia Manuela Silva Bairinhas Chilrito",
+      "vorname": "Donzilia Manuela",
+      "nachname": "Silva Bairinhas Chilrito",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "915",
+      "name": "Dieter Gerken Goldenstein",
+      "vorname": "Dieter Gerken",
+      "nachname": "Goldenstein",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "11",
+      "abteilung": "Team Psychiatrie"
+    },
+    {
+      "pNr": "919",
+      "name": "Petra Sabine Abegglen",
+      "vorname": "Petra Sabine",
+      "nachname": "Abegglen",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Telefon&Empfang",
+      "abtNr": "35",
+      "abteilung": "Telefon & Empfang"
+    },
+    {
+      "pNr": "922",
+      "name": "Andrea Tuende Rieder",
+      "vorname": "Andrea Tuende",
+      "nachname": "Rieder",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "925",
+      "name": "Satu Johanna Heinänen",
+      "vorname": "Satu Johanna",
+      "nachname": "Heinänen",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "926",
+      "name": "Pedro Mor",
+      "vorname": "Pedro",
+      "nachname": "Mor",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Marketing&Kommunikation",
+      "abtNr": "32",
+      "abteilung": "Stab Verwaltung"
+    },
+    {
+      "pNr": "927",
+      "name": "Sasha Milena Villarroel Schär",
+      "vorname": "Sasha Milena",
+      "nachname": "Villarroel Schär",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "AGS",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "928",
+      "name": "Katarzyna Vosseler",
+      "vorname": "Katarzyna",
+      "nachname": "Vosseler",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Telefon&Empfang",
+      "abtNr": "35",
+      "abteilung": "Telefon & Empfang"
+    },
+    {
+      "pNr": "931",
+      "name": "Ruth Shaanon",
+      "vorname": "Ruth",
+      "nachname": "Shaanon",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "933",
+      "name": "Nurije Aliu",
+      "vorname": "Nurije",
+      "nachname": "Aliu",
+      "beschaeftigungsgrad": "30%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "934",
+      "name": "Matthias Lehmann",
+      "vorname": "Matthias",
+      "nachname": "Lehmann",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Pflegende Angehörige",
+      "abtNr": "22",
+      "abteilung": "Pflegende Angehörige"
+    },
+    {
+      "pNr": "935",
+      "name": "Sandra Weber",
+      "vorname": "Sandra",
+      "nachname": "Weber",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Human Resources",
+      "abtNr": "16",
+      "abteilung": "Finanzen & Dienste"
+    },
+    {
+      "pNr": "936",
+      "name": "Tatjana Kuhnert",
+      "vorname": "Tatjana",
+      "nachname": "Kuhnert",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "941",
+      "name": "Halime Kupina-Omura",
+      "vorname": "Halime",
+      "nachname": "Kupina-Omura",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "Dipl. HF",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "942",
+      "name": "Marketa Gagro",
+      "vorname": "Marketa",
+      "nachname": "Gagro",
+      "beschaeftigungsgrad": "40%",
+      "funktion": "Dipl. HF",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "943",
+      "name": "Benedikt Ambühl",
+      "vorname": "Benedikt",
+      "nachname": "Ambühl",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "946",
+      "name": "Géraldine Künzler",
+      "vorname": "Géraldine",
+      "nachname": "Künzler",
+      "beschaeftigungsgrad": "90%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "947",
+      "name": "Lea Sarah Schmucki",
+      "vorname": "Lea Sarah",
+      "nachname": "Schmucki",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "948",
+      "name": "Velia Peaches Miami Gatti Balisarri",
+      "vorname": "Velia Peaches Miami",
+      "nachname": "Gatti Balisarri",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Lernender",
+      "abtNr": "20",
+      "abteilung": "Lernende"
+    },
+    {
+      "pNr": "950",
+      "name": "Irina Scherrer",
+      "vorname": "Irina",
+      "nachname": "Scherrer",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "FaGe",
+      "abtNr": "18",
+      "abteilung": "Poolteam"
+    },
+    {
+      "pNr": "951",
+      "name": "Lily-Anna Settelen",
+      "vorname": "Lily-Anna",
+      "nachname": "Settelen",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Lernender",
+      "abtNr": "20",
+      "abteilung": "Lernende"
+    },
+    {
+      "pNr": "954",
+      "name": "Kevin Kreuzinger",
+      "vorname": "Kevin",
+      "nachname": "Kreuzinger",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "ICT",
+      "abtNr": "16",
+      "abteilung": "Finanzen & Dienste"
+    },
+    {
+      "pNr": "957",
+      "name": "Daniela Maria Olga Ellerbrock",
+      "vorname": "Daniela Maria Olga",
+      "nachname": "Ellerbrock",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "11",
+      "abteilung": "Team Psychiatrie"
+    },
+    {
+      "pNr": "958",
+      "name": "Isabelle Claudia D'Oronzio",
+      "vorname": "Isabelle Claudia",
+      "nachname": "D'Oronzio",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Pflegeexpertin APN",
+      "abtNr": "31",
+      "abteilung": "Stab Pflege"
+    },
+    {
+      "pNr": "959",
+      "name": "Judith Zimmermann",
+      "vorname": "Judith",
+      "nachname": "Zimmermann",
+      "beschaeftigungsgrad": "50%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "966",
+      "name": "Valeria Da Cruz Pereira",
+      "vorname": "Valeria",
+      "nachname": "Da Cruz Pereira",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "968",
+      "name": "Lirije Fetoska",
+      "vorname": "Lirije",
+      "nachname": "Fetoska",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "970",
+      "name": "Siena Michel",
+      "vorname": "Siena",
+      "nachname": "Michel",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Telefon&Empfang",
+      "abtNr": "35",
+      "abteilung": "Telefon & Empfang"
+    },
+    {
+      "pNr": "974",
+      "name": "Berivan Caglar",
+      "vorname": "Berivan",
+      "nachname": "Caglar",
+      "beschaeftigungsgrad": "90%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "980",
+      "name": "Marina Anna Hess",
+      "vorname": "Marina Anna",
+      "nachname": "Hess",
+      "beschaeftigungsgrad": "60%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "985",
+      "name": "Simge Bektas",
+      "vorname": "Simge",
+      "nachname": "Bektas",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Mitarbeiterin HW",
+      "abtNr": "12",
+      "abteilung": "Team Hauswirtschaft"
+    },
+    {
+      "pNr": "988",
+      "name": "Marina Möller",
+      "vorname": "Marina",
+      "nachname": "Möller",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "Dipl. HF",
+      "abtNr": "13",
+      "abteilung": "Team BKM"
+    },
+    {
+      "pNr": "989",
+      "name": "Jennifer Früh",
+      "vorname": "Jennifer",
+      "nachname": "Früh",
+      "beschaeftigungsgrad": "20%",
+      "funktion": "Spitex++",
+      "abtNr": "33",
+      "abteilung": "Spitex ++"
+    },
+    {
+      "pNr": "990",
+      "name": "Besarta Mustafai",
+      "vorname": "Besarta",
+      "nachname": "Mustafai",
+      "beschaeftigungsgrad": "80%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "992",
+      "name": "Mariana Klara Karl",
+      "vorname": "Mariana Klara",
+      "nachname": "Karl",
+      "beschaeftigungsgrad": "70%",
+      "funktion": "FaGe",
+      "abtNr": "14",
+      "abteilung": "Team Leistungserbringung"
+    },
+    {
+      "pNr": "994",
+      "name": "Gregor Gafner",
+      "vorname": "Gregor",
+      "nachname": "Gafner",
+      "beschaeftigungsgrad": "100%",
+      "funktion": "Geschäftsleitung",
+      "abtNr": "17",
+      "abteilung": "GL"
+    }
+  ]
+}
