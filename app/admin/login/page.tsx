@@ -85,14 +85,15 @@ export default function AdminLoginPage() {
         if (canIngest) fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:handleSubmit:afterGetSession',message:'getSession after login',data:{sessionPresent:!!session,role:session?.user?.role??null},timestamp:Date.now(),sessionId:'debug-session',runId:'vercel-debug',hypothesisId:'H4'})}).catch(()=>{});
         // #endregion
         
+        const targetPath =
+          session?.user?.role === 'ADMIN_SZS' ? '/szs-admin/dashboard' : '/admin/dashboard'
+
         if (session) {
-          // Verwende router.push für client-side navigation
-          router.push('/admin/dashboard')
-          router.refresh() // Aktualisiere die Route
+          router.push(targetPath)
+          router.refresh()
         } else {
-          // Fallback: Falls Session nicht gesetzt, verwende window.location
           console.warn('[Admin Login] Session nicht gesetzt, verwende window.location')
-          window.location.href = '/admin/dashboard'
+          window.location.href = targetPath
         }
       } else {
         console.log('[Admin Login] Login fehlgeschlagen, kein ok-Status')
