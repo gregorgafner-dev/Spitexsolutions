@@ -76,6 +76,19 @@ const dayUtilizationPct = (slots: DaySlots): number => {
 
 const TRACKING_STORAGE_KEY = "cockpit-fahrzeug-tagesauslastung";
 const FLEET_STORAGE_KEY = "cockpit-fahrzeug-flotte-v1";
+const MOBILITY_STORAGE_KEY = "cockpit-fahrzeug-mobility-v1";
+
+const MOBILITY_SLOT_IDS = ["mobility-1", "mobility-2"] as const;
+type MobilitySlotId = (typeof MOBILITY_SLOT_IDS)[number];
+
+type MobilityEntry = {
+  kennzeichen: string;
+  bemerkung: string;
+};
+
+type MobilityByDate = Record<string, Partial<Record<MobilitySlotId, MobilityEntry>>>;
+
+const emptyMobilityEntry = (): MobilityEntry => ({ kennzeichen: "", bemerkung: "" });
 
 const asText = (value: unknown): string => String(value ?? "").trim();
 const hasSwissPlateLikeValue = (value: unknown): boolean =>
@@ -213,6 +226,27 @@ function clearFleetStorage() {
   }
 }
 
+function loadMobilityFromStorage(): MobilityByDate {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(MOBILITY_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as MobilityByDate;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistMobility(data: MobilityByDate) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(MOBILITY_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 export default function FahrzeugePage() {
   const [data, setData] = useState<FleetResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -221,9 +255,11 @@ export default function FahrzeugePage() {
   const [utilization, setUtilization] = useState<Record<string, UtilizationValue>>({});
   const [trackingDate, setTrackingDate] = useState<string>(() => toDateInputValue(new Date()));
   const [daySlots, setDaySlots] = useState<Record<string, Record<string, DaySlots>>>({});
+  const [mobilityByDate, setMobilityByDate] = useState<MobilityByDate>({});
 
   useEffect(() => {
     setDaySlots(loadDaySlotsFromStorage());
+    setMobilityByDate(loadMobilityFromStorage());
     const cached = loadFleetFromStorage();
     if (cached) {
       setData(cached);
@@ -311,6 +347,32 @@ export default function FahrzeugePage() {
       byDate[vehicleId] = current;
       const next = { ...prev, [dateKey]: byDate };
       persistDaySlots(next);
+      return next;
+    });
+  };
+
+  const getMobilityForDate = (dateKey: string, slotId: MobilitySlotId): MobilityEntry => {
+    const entry = mobilityByDate[dateKey]?.[slotId];
+    if (!entry) return emptyMobilityEntry();
+    return {
+      kennzeichen: String(entry.kennzeichen ?? ""),
+      bemerkung: String(entry.bemerkung ?? ""),
+    };
+  };
+
+  const setMobilityForDate = (
+    dateKey: string,
+    slotId: MobilitySlotId,
+    field: keyof MobilityEntry,
+    value: string
+  ) => {
+    setMobilityByDate((prev) => {
+      const byDate = { ...(prev[dateKey] ?? {}) };
+      const current = { ...emptyMobilityEntry(), ...(byDate[slotId] ?? {}) };
+      current[field] = value;
+      byDate[slotId] = current;
+      const next: MobilityByDate = { ...prev, [dateKey]: byDate };
+      persistMobility(next);
       return next;
     });
   };
@@ -696,9 +758,95 @@ export default function FahrzeugePage() {
                               </tr>
                             );
                           })}
+
+                        <tr className="border-t-2 border-orange-200 bg-orange-50/50">
+                          <td
+                            colSpan={8}
+                            className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-orange-900"
+                          >
+                            Externe Mobility-Fahrzeuge (nur an diesem Tag gemietet)
+                          </td>
+                        </tr>
+                        {MOBILITY_SLOT_IDS.map((slotId, idx) => {
+                          const entry = getMobilityForDate(trackingDate, slotId);
+                          const slots = getSlotsForDate(trackingDate, slotId);
+                          const istDay = dayUtilizationPct(slots);
+                          return (
+                            <tr
+                              key={slotId}
+                              className="border-t border-orange-100 bg-orange-50/30 text-gray-900"
+                            >
+                              <td className="px-3 py-2">
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-xs font-bold uppercase tracking-wide text-orange-800">
+                                    Mobility {idx + 1}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={entry.kennzeichen}
+                                    onChange={(e) =>
+                                      setMobilityForDate(
+                                        trackingDate,
+                                        slotId,
+                                        "kennzeichen",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Kennzeichen"
+                                    className="w-32 rounded-md border border-orange-300 bg-white px-2 py-1 text-sm font-semibold text-gray-900 placeholder:text-gray-400"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={entry.bemerkung}
+                                  onChange={(e) =>
+                                    setMobilityForDate(
+                                      trackingDate,
+                                      slotId,
+                                      "bemerkung",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Bemerkung / Standort"
+                                  className="w-48 rounded-md border border-orange-300 bg-white px-2 py-1 text-sm font-medium text-gray-900 placeholder:text-gray-400"
+                                />
+                              </td>
+                              {(["vormittag", "nachmittag", "abend"] as const).map((slot) => (
+                                <td key={slot} className="px-3 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={slots[slot]}
+                                    onChange={(e) =>
+                                      setSlotForDate(trackingDate, slotId, slot, e.target.checked)
+                                    }
+                                    className="h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                                    aria-label={
+                                      slot === "vormittag"
+                                        ? "Vormittag"
+                                        : slot === "nachmittag"
+                                          ? "Nachmittag"
+                                          : "Abend"
+                                    }
+                                  />
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 font-bold tabular-nums">
+                                {fmtPct(istDay)}
+                              </td>
+                              <td className="px-3 py-2 text-xs italic text-gray-600">extern</td>
+                              <td className="px-3 py-2 text-xs italic text-gray-600">–</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
+                  <p className="mt-2 text-xs font-medium text-orange-900">
+                    Hinweis: Externe Mobility-Fahrzeuge fliessen nicht in die Flotten-Auslastung (Ø IST / Delta zu SOLL) ein.
+                    Sie werden pro Tag separat erfasst und dienen der Vollständigkeit.
+                  </p>
                 </div>
               </>
             )}
