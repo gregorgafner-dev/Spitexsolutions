@@ -98,26 +98,32 @@ export async function POST(request: NextRequest) {
 
     let workMonthlySalary = 0
     let workHourlyWage = 0
-    let sleepHourlyWage = 0
+    let sleepHourlyWageGross = 0
+    let sleepInterruptionHoursHourlyWage = 0
 
     for (const entry of timeEntries) {
       const employmentType = employmentTypeByEmployeeId.get(entry.employeeId) ?? 'UNKNOWN'
 
-      // Schlaf: zählt nur mit Endzeit
+      // Schlaf: zählt nur mit Endzeit (Brutto, Unterbrechungen werden weiter unten abgezogen)
       if (entry.entryType === 'SLEEP') {
         if (!entry.endTime) continue
         if (employmentType === 'HOURLY_WAGE') {
           const sleepMinutes = (entry.endTime.getTime() - entry.startTime.getTime()) / (1000 * 60)
-          sleepHourlyWage += sleepMinutes / 60
+          sleepHourlyWageGross += sleepMinutes / 60
         }
         continue
       }
 
-      // Schlafunterbrechung: Minuten-Feld zählt zur Arbeitszeit (auch ohne Endzeit)
+      // Schlafunterbrechung: Minuten-Feld zählt zur Arbeitszeit (auch ohne Endzeit).
+      // Zusätzlich wird die Unterbrechung weiter unten von der Brutto-Schlafzeit abgezogen,
+      // damit das gleiche Zeitfenster nicht doppelt verrechnet wird (Arbeit + Schlaf).
       if (entry.entryType === 'SLEEP_INTERRUPTION') {
         const hours = (entry.sleepInterruptionMinutes || 0) / 60
         if (employmentType === 'MONTHLY_SALARY') workMonthlySalary += hours
-        else if (employmentType === 'HOURLY_WAGE') workHourlyWage += hours
+        else if (employmentType === 'HOURLY_WAGE') {
+          workHourlyWage += hours
+          sleepInterruptionHoursHourlyWage += hours
+        }
         continue
       }
 
@@ -127,6 +133,9 @@ export async function POST(request: NextRequest) {
       if (employmentType === 'MONTHLY_SALARY') workMonthlySalary += hours
       else if (employmentType === 'HOURLY_WAGE') workHourlyWage += hours
     }
+
+    // Effektive Schlafzeit (Stundenlöhner): Brutto-Schlaf abzüglich Unterbrechungen.
+    const sleepHourlyWage = Math.max(0, sleepHourlyWageGross - sleepInterruptionHoursHourlyWage)
 
     const totalWorkHours = workMonthlySalary + workHourlyWage
     const totalSleepHours = sleepHourlyWage

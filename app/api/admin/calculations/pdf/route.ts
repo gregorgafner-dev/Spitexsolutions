@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
       let hours = 0
       let surchargeHours = 0
-      let sleepHours = 0
+      let sleepHoursGross = 0
       let sleepInterruptionHours = 0
 
       for (const entry of timeEntries) {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
           const sleepStart = new Date(entry.startTime).getTime()
           const sleepEnd = new Date(entry.endTime).getTime()
           const sleepMinutes = (sleepEnd - sleepStart) / (1000 * 60)
-          sleepHours += sleepMinutes / 60
+          sleepHoursGross += sleepMinutes / 60
         } else if (entry.endTime && entry.entryType !== 'SLEEP' && entry.entryType !== 'SLEEP_INTERRUPTION') {
           hours += calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
         }
@@ -84,6 +84,12 @@ export async function POST(request: NextRequest) {
         }
         surchargeHours += entry.surchargeHours || 0
       }
+
+      // Effektive Schlafstunden = Brutto-Schlaf MINUS Unterbrechungen.
+      // Die Unterbrechung markiert ein Zeitfenster INNERHALB des Schlafblocks und
+      // zählt bereits zur Arbeitszeit – ohne Abzug würden diese Minuten doppelt
+      // erscheinen (Schlaf + Arbeit).
+      const sleepHours = Math.max(0, sleepHoursGross - sleepInterruptionHours)
 
       results.push({
         employeeId: employee.id,

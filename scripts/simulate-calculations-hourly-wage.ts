@@ -13,13 +13,13 @@ async function simulateCalc(employeeId: string, start: Date, end: Date) {
 
   let hours = 0
   let surchargeHours = 0
-  let sleepHours = 0
+  let sleepHoursGross = 0
   let sleepInterruptionHours = 0
 
   for (const entry of entries) {
     if (entry.endTime && entry.entryType === 'SLEEP') {
       const sleepMin = (new Date(entry.endTime).getTime() - new Date(entry.startTime).getTime()) / 60000
-      sleepHours += sleepMin / 60
+      sleepHoursGross += sleepMin / 60
     } else if (entry.endTime && entry.entryType !== 'SLEEP' && entry.entryType !== 'SLEEP_INTERRUPTION') {
       const diffMin = (new Date(entry.endTime).getTime() - new Date(entry.startTime).getTime()) / 60000
       hours += Math.round(((diffMin - (entry.breakMinutes || 0)) / 60) * 100) / 100
@@ -31,9 +31,12 @@ async function simulateCalc(employeeId: string, start: Date, end: Date) {
     surchargeHours += entry.surchargeHours || 0
   }
 
+  const sleepHours = Math.max(0, sleepHoursGross - sleepInterruptionHours)
+
   return {
     hours: Math.round(hours * 100) / 100,
     surchargeHours: Math.round(surchargeHours * 100) / 100,
+    sleepHoursGross: Math.round(sleepHoursGross * 100) / 100,
     sleepHours: Math.round(sleepHours * 100) / 100,
     sleepInterruptionHours: Math.round(sleepInterruptionHours * 100) / 100,
     totalHours: Math.round((hours + surchargeHours) * 100) / 100,
@@ -59,11 +62,11 @@ async function main() {
 
   for (const e of employees.sort((a, b) => a.user.lastName.localeCompare(b.user.lastName))) {
     console.log(`\n=== ${e.user.lastName}, ${e.user.firstName} (Pensum ${e.pensum}%) ===`)
-    console.log(`  Periode             | Einträge | Arbeit  | Zuschl. | Schlaf  | Unterbr.| Total`)
+    console.log(`  Periode             | Einträge | Arbeit  | Zuschl. | SchlafBr| Unterbr.| SchlafEff| Total`)
     for (const p of periods) {
       const r = await simulateCalc(e.id, p.start, p.end)
       console.log(
-        `  ${p.label}    | ${String(r.count).padStart(7)} | ${r.hours.toFixed(2).padStart(6)} | ${r.surchargeHours.toFixed(2).padStart(6)} | ${r.sleepHours.toFixed(2).padStart(6)} | ${r.sleepInterruptionHours.toFixed(2).padStart(6)} | ${r.totalHours.toFixed(2)}`
+        `  ${p.label}    | ${String(r.count).padStart(7)} | ${r.hours.toFixed(2).padStart(6)} | ${r.surchargeHours.toFixed(2).padStart(6)} | ${r.sleepHoursGross.toFixed(2).padStart(6)} | ${r.sleepInterruptionHours.toFixed(2).padStart(6)} | ${r.sleepHours.toFixed(2).padStart(7)} | ${r.totalHours.toFixed(2)}`
       )
     }
   }

@@ -62,31 +62,38 @@ export async function POST(request: NextRequest) {
       })
 
       // Berechne Arbeitsstunden
+      // WICHTIG: Brutto-Schlafzeit und Unterbrechungen werden zuerst separat aufsummiert.
+      // Erst am Ende wird die Unterbrechungszeit von den Schlafstunden abgezogen, weil
+      // die SLEEP_INTERRUPTION ein Zeitfenster INNERHALB des SLEEP-Blocks markiert.
+      // Andernfalls würde dieses Zeitfenster doppelt gezählt: einmal als Schlaf, einmal
+      // als Arbeit (Unterbrechung zählt zur Arbeitszeit).
       let hours = 0
       let surchargeHours = 0
-      let sleepHours = 0
+      let sleepHoursGross = 0
       let sleepInterruptionHours = 0
 
       for (const entry of timeEntries) {
         if (entry.endTime && entry.entryType === 'SLEEP') {
-          // Berechne Schlafstunden
+          // Brutto-Schlafstunden (vor Abzug der Unterbrechungen)
           const sleepStart = new Date(entry.startTime).getTime()
           const sleepEnd = new Date(entry.endTime).getTime()
           const sleepMinutes = (sleepEnd - sleepStart) / (1000 * 60)
-          sleepHours += sleepMinutes / 60
+          sleepHoursGross += sleepMinutes / 60
         } else if (entry.endTime && entry.entryType !== 'SLEEP' && entry.entryType !== 'SLEEP_INTERRUPTION') {
           // Normale Arbeitsstunden
           hours += calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
         }
-        // Addiere Unterbrechungen während des Schlafens zur Arbeitszeit
+        // Unterbrechungen während des Schlafens zählen zur Arbeitszeit
         if (entry.entryType === 'SLEEP_INTERRUPTION') {
           sleepInterruptionHours += (entry.sleepInterruptionMinutes || 0) / 60
-          // Unterbrechungen zählen auch als Arbeitszeit
           hours += (entry.sleepInterruptionMinutes || 0) / 60
         }
         // Summiere Zeitzuschläge
         surchargeHours += entry.surchargeHours || 0
       }
+
+      // Effektive Schlafstunden = Brutto-Schlaf MINUS Unterbrechungen
+      const sleepHours = Math.max(0, sleepHoursGross - sleepInterruptionHours)
 
       results.push({
         employeeId: employee.id,
