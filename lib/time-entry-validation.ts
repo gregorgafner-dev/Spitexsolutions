@@ -20,16 +20,59 @@ function timeRangesOverlap(
   return start1 < end2 && start2 < end1
 }
 
+export type OverlapCheckResult = {
+  overlaps: boolean
+  overlappingEntry?: TimeEntry
+  reason?: 'duplicate' | 'overlap'
+}
+
 /**
  * Prüft ob ein neuer/aktualisierter Eintrag mit bestehenden Einträgen überlappt
+ * oder identisch ist (Duplikat).
+ *
+ * - `entryType`: Typ des zu prüfenden Eintrags (Default: 'WORK' für Rückwärtskompatibilität).
+ *
+ * Zwei Stufen:
+ *   1. Strikte Duplikat-Prüfung über `(employeeId, entryType, startTime, endTime)` —
+ *      unabhängig vom `date`-Feld. Verhindert "Phantom-Duplikate", die durch das
+ *      alte/neue Nachtdienst-Buchungsmodell entstehen können (gleiche Zeit, aber
+ *      einmal am Start- und einmal am Folgetag verbucht).
+ *   2. Bestehende Überlappungs-Prüfung gegen WORK-Einträge auf dem gleichen Tag
+ *      (inkl. Nachtdienst-Spezialfälle für Vor-/Folgetag).
  */
 export async function checkOverlappingBlocks(
   employeeId: string,
   date: Date,
   startTime: Date,
   endTime: Date | null,
-  excludeEntryId?: string // ID des Eintrags, der aktualisiert wird (wird bei Prüfung ausgeschlossen)
-): Promise<{ overlaps: boolean; overlappingEntry?: TimeEntry }> {
+  excludeEntryId?: string, // ID des Eintrags, der aktualisiert wird (wird bei Prüfung ausgeschlossen)
+  entryType: string = 'WORK'
+): Promise<OverlapCheckResult> {
+  // Stufe 1: Strikte Duplikat-Prüfung (unabhängig vom date-Feld).
+  // Findet Einträge mit exakt gleicher startTime/endTime — egal, auf welchem
+  // Buchungsdatum (`date`) sie liegen. Schützt vor Duplikaten zwischen
+  // altem (date = Folgetag) und neuem (date = Starttag) Nachtdienst-Modell.
+  if (endTime) {
+    const duplicate = await prisma.timeEntry.findFirst({
+      where: {
+        employeeId,
+        entryType,
+        startTime,
+        endTime,
+        ...(excludeEntryId ? { id: { not: excludeEntryId } } : {}),
+      },
+    })
+    if (duplicate) {
+      return { overlaps: true, overlappingEntry: duplicate, reason: 'duplicate' }
+    }
+  }
+
+  // Stufe 2: Bestehende Überlappungs-Logik nur für WORK-Einträge
+  // (SLEEP/SLEEP_INTERRUPTION dürfen sich legitim überlappen).
+  if (entryType !== 'WORK') {
+    return { overlaps: false }
+  }
+
   // Hole alle Einträge für diesen Tag
   const dayStart = new Date(date)
   dayStart.setHours(0, 0, 0, 0)
@@ -72,7 +115,7 @@ export async function checkOverlappingBlocks(
     }
 
     if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
-      return { overlaps: true, overlappingEntry: entry }
+      return { overlaps: true, overlappingEntry: entry, reason: 'overlap' }
     }
   }
 
@@ -110,7 +153,7 @@ export async function checkOverlappingBlocks(
       }
 
       if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
-        return { overlaps: true, overlappingEntry: entry }
+        return { overlaps: true, overlappingEntry: entry, reason: 'overlap' }
       }
     }
   }
@@ -150,7 +193,7 @@ export async function checkOverlappingBlocks(
       }
 
       if (timeRangesOverlap(startTime, endTime, entry.startTime, entry.endTime)) {
-        return { overlaps: true, overlappingEntry: entry }
+        return { overlaps: true, overlappingEntry: entry, reason: 'overlap' }
       }
     }
   }

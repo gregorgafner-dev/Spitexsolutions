@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validierung 3: Prüfe überlappende Blöcke (nur für WORK-Einträge, nicht für SLEEP oder SLEEP_INTERRUPTION)
+    // Validierung 3: Prüfe überlappende/duplizierte Blöcke
     if (endTime && entryType === 'WORK') {
       const startTimeDate = new Date(startTime)
       const endTimeDate = new Date(endTime)
@@ -161,14 +161,16 @@ export async function POST(request: NextRequest) {
         session.user.employeeId,
         dateObj,
         startTimeDate,
-        endTimeDate
+        endTimeDate,
+        undefined,
+        'WORK'
       )
 
       if (overlapCheck.overlaps) {
-        return NextResponse.json(
-          { error: 'Dieser Block überschneidet sich mit einem bereits erfassten Block' },
-          { status: 400 }
-        )
+        const message = overlapCheck.reason === 'duplicate'
+          ? 'Ein identischer Eintrag existiert bereits (gleiche Start- und Endzeit)'
+          : 'Dieser Block überschneidet sich mit einem bereits erfassten Block'
+        return NextResponse.json({ error: message }, { status: 400 })
       }
     }
 

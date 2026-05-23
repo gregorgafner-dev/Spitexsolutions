@@ -52,21 +52,22 @@ export async function PATCH(
       )
     }
 
-    // Validierung 3: Prüfe überlappende Blöcke (nur für WORK-Einträge mit endTime)
+    // Validierung 3: Prüfe überlappende/duplizierte Blöcke
     if (entry.entryType !== 'SLEEP_INTERRUPTION' && endTimeDate) {
       const overlapCheck = await checkOverlappingBlocks(
         entry.employeeId,
         entry.date,
         startTimeDate,
         endTimeDate,
-        entry.id // Schließe den aktuellen Eintrag aus
+        entry.id, // Schließe den aktuellen Eintrag aus
+        entry.entryType
       )
 
       if (overlapCheck.overlaps) {
-        return NextResponse.json(
-          { error: 'Dieser Block überschneidet sich mit einem bereits erfassten Block' },
-          { status: 400 }
-        )
+        const message = overlapCheck.reason === 'duplicate'
+          ? 'Ein identischer Eintrag existiert bereits (gleiche Start- und Endzeit)'
+          : 'Dieser Block überschneidet sich mit einem bereits erfassten Block'
+        return NextResponse.json({ error: message }, { status: 400 })
       }
     }
 
