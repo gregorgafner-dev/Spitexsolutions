@@ -207,4 +207,113 @@ model Message {
   @@index([read, createdAt])
 }
 
+// ============================================================================
+// POOL — Spitex Zürichsee Pool (eigener Bereich, eigene Auth)
+// ============================================================================
+// Vollständig getrennt vom Spitex-Domus-System (eigene Tabellen, eigener Login).
+// Eine Pool-Person ist entweder PLANNER (verwaltet Mitarbeitende, Anfragen,
+// Buchungen) oder MEMBER (trägt Verfügbarkeit ein, nimmt Dienstanfragen an).
+// SZS-Admins können ebenfalls planerische Aktionen ausführen; in Audit-Feldern
+// (createdByType/createdById) wird die Herkunft markiert, ohne FK über
+// Systemgrenzen zu erzwingen.
+
+model PoolUser {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String   // bcrypt hash
+  firstName   String
+  lastName    String
+  role        String   // "PLANNER" or "MEMBER"
+  active      Boolean  @default(true)
+  phone       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  availabilities       PoolAvailability[]
+  bookings             PoolBooking[]      @relation("PoolBookingMember")
+  shiftRequestsFilled  PoolShiftRequest[] @relation("PoolRequestFilled")
+  messagesReceived     PoolMessage[]      @relation("PoolMessageRecipient")
+
+  @@map("pool_users")
+  @@index([role, active])
+}
+
+model PoolAvailability {
+  id         String   @id @default(cuid())
+  poolUserId String
+  date       DateTime
+  shift      String   // "EARLY" or "LATE"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  poolUser   PoolUser @relation(fields: [poolUserId], references: [id], onDelete: Cascade)
+
+  @@unique([poolUserId, date, shift])
+  @@map("pool_availabilities")
+  @@index([date, shift])
+}
+
+model PoolBooking {
+  id              String   @id @default(cuid())
+  poolUserId      String   // wer den Dienst übernimmt
+  date            DateTime
+  shift           String   // "EARLY" or "LATE"
+  shiftRequestId  String?  // optional: Buchung entstand aus einer Anfrage
+  notes           String?
+  // Audit: wer hat gebucht (über Systemgrenze hinweg, daher kein FK)
+  createdByType   String   // "POOL_PLANNER" | "SZS_ADMIN" | "POOL_MEMBER" (FCFS)
+  createdById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  poolUser     PoolUser          @relation("PoolBookingMember", fields: [poolUserId], references: [id], onDelete: Cascade)
+  shiftRequest PoolShiftRequest? @relation(fields: [shiftRequestId], references: [id], onDelete: SetNull)
+
+  @@unique([date, shift]) // ein Slot ist genau einmal vergeben
+  @@map("pool_bookings")
+  @@index([poolUserId, date])
+}
+
+model PoolShiftRequest {
+  id              String    @id @default(cuid())
+  date            DateTime
+  shift           String    // "EARLY" or "LATE"
+  status          String    @default("OPEN") // OPEN | FILLED | CANCELLED
+  message         String?   // optionale Info an Mitarbeitende
+  // Audit: wer hat die Anfrage erstellt
+  createdByType   String    // "POOL_PLANNER" | "SZS_ADMIN"
+  createdById     String
+  filledAt        DateTime?
+  filledByPoolUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  filledByPoolUser PoolUser?     @relation("PoolRequestFilled", fields: [filledByPoolUserId], references: [id], onDelete: SetNull)
+  bookings         PoolBooking[]
+  messages         PoolMessage[]
+
+  @@map("pool_shift_requests")
+  @@index([status, date])
+}
+
+model PoolMessage {
+  id                  String    @id @default(cuid())
+  recipientPoolUserId String
+  type                String    // "SHIFT_REQUEST" | "INFO" | "BOOKING_CONFIRMED" | "BOOKING_CANCELLED"
+  subject             String
+  content             String
+  isRead              Boolean   @default(false)
+  relatedRequestId    String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  recipientPoolUser PoolUser          @relation("PoolMessageRecipient", fields: [recipientPoolUserId], references: [id], onDelete: Cascade)
+  relatedRequest    PoolShiftRequest? @relation(fields: [relatedRequestId], references: [id], onDelete: SetNull)
+
+  @@map("pool_messages")
+  @@index([recipientPoolUserId, isRead])
+  @@index([recipientPoolUserId, createdAt])
+}
+
 

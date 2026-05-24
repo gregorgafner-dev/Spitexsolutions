@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
-import { BarChart3, ArrowRight } from 'lucide-react'
+import { BarChart3, ArrowRight, Waves } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -36,6 +36,27 @@ export default async function SzsAdminDashboard() {
             <p className="relative z-10 text-base text-blue-50 mb-6">
               Produktivität, Overhead-Verhältnisse, Personalmix, Stellenplan,
               Lohnrechner und mehr.
+            </p>
+            <span className="relative z-10 inline-flex items-center gap-2 rounded-lg bg-white/20 px-5 py-2.5 text-sm font-semibold backdrop-blur-sm transition-all duration-200 group-hover:bg-white/30">
+              Öffnen
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </span>
+          </Link>
+
+          <Link
+            href="/szs-admin/pool"
+            className="group relative flex flex-col items-start justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 p-8 text-white shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-emerald-300 cursor-pointer"
+          >
+            <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-2xl transition-transform duration-300 group-hover:scale-110"></div>
+            <div className="relative z-10 flex items-center gap-3 mb-4">
+              <div className="rounded-xl bg-white/15 p-3 backdrop-blur-sm">
+                <Waves className="h-7 w-7 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold">Spitex Zürichsee Pool</h2>
+            </div>
+            <p className="relative z-10 text-base text-emerald-50 mb-6">
+              Pool-Mitarbeitende und gemeinsame Einsatzplanung der Spitex
+              Zürichsee.
             </p>
             <span className="relative z-10 inline-flex items-center gap-2 rounded-lg bg-white/20 px-5 py-2.5 text-sm font-semibold backdrop-blur-sm transition-all duration-200 group-hover:bg-white/30">
               Öffnen

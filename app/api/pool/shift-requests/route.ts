@@ -1,0 +1,164 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
+import { getPoolSession } from '@/lib/pool/auth'
+import { fromIsoDay, isValidShift, toIsoDay } from '@/lib/pool/dates'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+/**
+ * GET /api/pool/shift-requests
+ * Query-Params:
+ *   - status: "OPEN" | "FILLED" | "CANCELLED" | "all" (default "all")
+ *   - dateFrom, dateTo (yyyy-mm-dd, inkl.)
+ *
+ * Sichtbar für Planer/Admin UND für eingeloggte Member (die sehen alle OPEN
+ * Anfragen über das Postfach, hier ist es zusätzlich zugänglich).
+ */
+export async function GET(request: NextRequest) {
+  // Wir akzeptieren entweder Planer-Actor oder Member-Session
+  const actor = await getPoolActor()
+  const session = actor ? null : await getPoolSession()
+  if (!actor && !session) {
+    return NextResponse.json({ error: 'Nicht autorisiert.' }, { status: 401 })
+  }
+
+  const url = new URL(request.url)
+  const status = url.searchParams.get('status') ?? 'all'
+  const dateFromStr = url.searchParams.get('dateFrom') || ''
+  const dateToStr = url.searchParams.get('dateTo') || ''
+
+  const where: Record<string, unknown> = {}
+  if (status !== 'all') where.status = status
+
+  const dateRange: Record<string, Date> = {}
+  if (dateFromStr) {
+    try {
+      dateRange.gte = fromIsoDay(dateFromStr)
+    } catch {
+      return NextResponse.json({ error: 'Ungültiges dateFrom' }, { status: 400 })
+    }
+  }
+  if (dateToStr) {
+    try {
+      const d = fromIsoDay(dateToStr)
+      const next = new Date(d)
+      next.setUTCDate(next.getUTCDate() + 1)
+      dateRange.lt = next
+    } catch {
+      return NextResponse.json({ error: 'Ungültiges dateTo' }, { status: 400 })
+    }
+  }
+  if (Object.keys(dateRange).length > 0) where.date = dateRange
+
+  const items = await prisma.poolShiftRequest.findMany({
+    where,
+    orderBy: [{ status: 'asc' }, { date: 'asc' }, { shift: 'asc' }],
+    include: {
+      filledByPoolUser: { select: { id: true, firstName: true, lastName: true } },
+    },
+  })
+
+  return NextResponse.json({
+    items: items.map((i) => ({
+      id: i.id,
+      date: toIsoDay(i.date),
+      shift: i.shift,
+      status: i.status,
+      message: i.message,
+      filledAt: i.filledAt ? i.filledAt.toISOString() : null,
+      filledByPoolUser: i.filledByPoolUser,
+      createdAt: i.createdAt.toISOString(),
+    })),
+  })
+}
+
+/**
+ * POST /api/pool/shift-requests
+ * Body: { date, shift, message? }
+ *
+ * Erzeugt eine neue Dienstanfrage UND in der gleichen Transaktion eine
+ * Postfach-Nachricht für jedes aktive Pool-MEMBER mit Type=SHIFT_REQUEST.
+ *
+ * Nur Planer/Admin.
+ */
+export async function POST(request: NextRequest) {
+  const actor = await getPoolActor()
+  if (!actor) return unauthorizedPoolActor()
+
+  const body = await request.json().catch(() => null)
+  const dateStr = String(body?.date ?? '')
+  const shiftStr = String(body?.shift ?? '')
+  const message = body?.message ? String(body.message).trim() : null
+
+  if (!isValidShift(shiftStr)) {
+    return NextResponse.json({ error: 'Ungültige Schicht.' }, { status: 400 })
+  }
+  let date: Date
+  try {
+    date = fromIsoDay(dateStr)
+  } catch {
+    return NextResponse.json({ error: 'Ungültiges Datum.' }, { status: 400 })
+  }
+
+  // Sanity: schon gebucht? Dann macht eine offene Anfrage keinen Sinn.
+  const existingBooking = await prisma.poolBooking.findUnique({
+    where: { date_shift: { date, shift: shiftStr } },
+  })
+  if (existingBooking) {
+    return NextResponse.json(
+      { error: 'Für diesen Slot existiert bereits eine verbindliche Buchung.' },
+      { status: 409 }
+    )
+  }
+
+  // Aktive MEMBER ermitteln
+  const members = await prisma.poolUser.findMany({
+    where: { role: 'MEMBER', active: true },
+    select: { id: true },
+  })
+
+  const shiftLabel = shiftStr === 'EARLY' ? 'Frühdienst' : 'Spätdienst'
+  const subject = `Dienstanfrage: ${shiftLabel} am ${toIsoDay(date)}`
+  const content = message ?? 'Bitte schau im Postfach, ob du diesen Dienst übernehmen kannst.'
+
+  const created = await prisma.$transaction(async (tx) => {
+    const req = await tx.poolShiftRequest.create({
+      data: {
+        date,
+        shift: shiftStr,
+        status: 'OPEN',
+        message,
+        createdByType: actor.type,
+        createdById: actor.id,
+      },
+    })
+    if (members.length > 0) {
+      await tx.poolMessage.createMany({
+        data: members.map((m) => ({
+          recipientPoolUserId: m.id,
+          type: 'SHIFT_REQUEST',
+          subject,
+          content,
+          relatedRequestId: req.id,
+        })),
+      })
+    }
+    return req
+  })
+
+  return NextResponse.json(
+    {
+      request: {
+        id: created.id,
+        date: toIsoDay(created.date),
+        shift: created.shift,
+        status: created.status,
+        message: created.message,
+        notified: members.length,
+      },
+    },
+    { status: 201 }
+  )
+}

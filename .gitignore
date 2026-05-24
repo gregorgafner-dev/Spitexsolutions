@@ -40,9 +40,11 @@ next-env.d.ts
 
 # prisma
 /dev.db
-/prisma/dev.db
 /dev.db-journal
+/prisma/dev.db
 /prisma/dev.db-journal
+*.sqlite
+*.sqlite3
 
 # backups (optional - können auch versioniert werden)
 /backups/*.db
