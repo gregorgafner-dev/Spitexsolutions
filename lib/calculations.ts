@@ -22,38 +22,66 @@ function getEasterDate(year: number): Date {
 }
 
 /**
- * Gibt alle Feiertage des Kantons Zug für ein gegebenes Jahr zurück
+ * Gibt alle Feiertage des Kantons Zug für ein gegebenes Jahr zurück.
+ *
+ * Quelle: offizielle Feiertagsliste Kanton Zug
+ * (https://www.zg.ch / Feiertage_2024-2027_Kt-ZG_Daten.pdf)
+ *
+ * Feste Feiertage:
+ *   - 01.01. Neujahr
+ *   - 02.01. Berchtoldstag
+ *   - 19.03. Josefstag
+ *   - 01.08. Bundesfeier
+ *   - 15.08. Mariä Himmelfahrt
+ *   - 01.11. Allerheiligen
+ *   - 08.12. Mariä Empfängnis
+ *   - 25.12. Weihnachten
+ *   - 26.12. Stephanstag
+ *
+ * Bewegliche Feiertage (Osterzyklus):
+ *   - Karfreitag        (Ostern -2)
+ *   - Ostermontag       (Ostern +1)
+ *   - Auffahrt          (Ostern +39)
+ *   - Pfingstmontag     (Ostern +50)
+ *   - Fronleichnam      (Ostern +60)
  */
 export function getHolidaysForYear(year: number): Date[] {
   const holidays: Date[] = []
-  
+
   // Feste Feiertage
   holidays.push(new Date(year, 0, 1))   // Neujahrstag
-  holidays.push(new Date(year, 2, 19))   // Josefstag
-  holidays.push(new Date(year, 7, 1))    // Bundesfeier (1. August)
-  holidays.push(new Date(year, 7, 15))   // Mariä Himmelfahrt
-  holidays.push(new Date(year, 10, 1))   // Allerheiligen
+  holidays.push(new Date(year, 0, 2))   // Berchtoldstag
+  holidays.push(new Date(year, 2, 19))  // Josefstag
+  holidays.push(new Date(year, 7, 1))   // Bundesfeier (1. August)
+  holidays.push(new Date(year, 7, 15))  // Mariä Himmelfahrt
+  holidays.push(new Date(year, 10, 1))  // Allerheiligen
   holidays.push(new Date(year, 11, 8))  // Mariä Empfängnis
-  holidays.push(new Date(year, 11, 25)) // Weihnachtstag
-  
+  holidays.push(new Date(year, 11, 25)) // Weihnachten
+  holidays.push(new Date(year, 11, 26)) // Stephanstag
+
   // Bewegliche Feiertage (basierend auf Ostern)
   const easter = getEasterDate(year)
+
   const goodFriday = new Date(easter)
-  goodFriday.setDate(easter.getDate() - 2) // Karfreitag (2 Tage vor Ostern)
+  goodFriday.setDate(easter.getDate() - 2) // Karfreitag
   holidays.push(goodFriday)
-  
+
   const easterMonday = new Date(easter)
   easterMonday.setDate(easter.getDate() + 1) // Ostermontag
   holidays.push(easterMonday)
-  
+
   const ascension = new Date(easter)
-  ascension.setDate(easter.getDate() + 39) // Auffahrt (39 Tage nach Ostern)
+  ascension.setDate(easter.getDate() + 39) // Auffahrt
   holidays.push(ascension)
-  
+
+  const pentecostMonday = new Date(easter)
+  pentecostMonday.setDate(easter.getDate() + 50) // Pfingstmontag
+  holidays.push(pentecostMonday)
+
   const corpusChristi = new Date(easter)
-  corpusChristi.setDate(easter.getDate() + 60) // Fronleichnam (60 Tage nach Ostern)
+  corpusChristi.setDate(easter.getDate() + 60) // Fronleichnam
   holidays.push(corpusChristi)
-  
+
   return holidays
 }
 
