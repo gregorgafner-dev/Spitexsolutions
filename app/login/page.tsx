@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Logo } from '@/components/logo'
 import { Eye, EyeOff } from 'lucide-react'
+import { tryPoolLoginFallback } from '@/lib/pool/client-fallback'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -76,6 +77,12 @@ export default function LoginPage() {
       // #endregion
 
       if (result?.error) {
+        // Fallback: ggf. handelt es sich um einen Pool-User. Versuche dort.
+        const poolFallback = await tryPoolLoginFallback(email, password)
+        if (poolFallback.ok) {
+          window.location.href = poolFallback.redirectTo
+          return
+        }
         console.error('Login-Fehler:', result.error)
         setError(`Ungültige Anmeldedaten: ${result.error}`)
         return
