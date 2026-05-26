@@ -3,6 +3,11 @@ import { prisma } from '@/lib/db'
 import { getPoolSession } from '@/lib/pool/auth'
 import { startOfMonthUTC, startOfNextMonthUTC, toIsoDay } from '@/lib/pool/dates'
 import { getTeamLabel } from '@/lib/pool/teams'
+import {
+  getQualificationLabel,
+  isMemberQualifiedForRequest,
+  parseAllowedQualifications,
+} from '@/lib/pool/qualifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,7 +37,11 @@ export async function GET(request: NextRequest) {
   const start = startOfMonthUTC(year, monthIndex)
   const end = startOfNextMonthUTC(year, monthIndex)
 
-  const [availabilities, bookings] = await Promise.all([
+  const [me, availabilities, bookings, openRequests] = await Promise.all([
+    prisma.poolUser.findUnique({
+      where: { id: session.poolUserId },
+      select: { qualification: true },
+    }),
     prisma.poolAvailability.findMany({
       where: {
         poolUserId: session.poolUserId,
@@ -47,7 +56,24 @@ export async function GET(request: NextRequest) {
       },
       select: { id: true, date: true, shift: true, team: true },
     }),
+    prisma.poolShiftRequest.findMany({
+      where: {
+        status: 'OPEN',
+        date: { gte: start, lt: end },
+      },
+      orderBy: [{ date: 'asc' }, { shift: 'asc' }],
+      select: {
+        id: true,
+        date: true,
+        shift: true,
+        team: true,
+        message: true,
+        allowedQualifications: true,
+      },
+    }),
   ])
+
+  const myQualification = me?.qualification ?? null
 
   const availabilityMap: Record<string, string[]> = {}
   for (const a of availabilities) {
@@ -66,9 +92,45 @@ export async function GET(request: NextRequest) {
     bookingDetails[key].push({ shift: b.shift, team: b.team, teamLabel: getTeamLabel(b.team) })
   }
 
+  // Offene Anfragen für diesen Member sichtbar machen:
+  //  - allowedQualifications-Filter erfüllt (siehe lib/pool/qualifications)
+  //  - Anfragen, für die der Member in dieser (date, shift) bereits eine
+  //    eigene Buchung hat, werden ausgeblendet (er kann sie ohnehin nicht
+  //    annehmen, Unique-Constraint poolUserId+date+shift).
+  const openRequestsByDay: Record<
+    string,
+    Array<{
+      id: string
+      shift: string
+      team: string
+      teamLabel: string
+      message: string | null
+      allowedQualifications: string[]
+      allowedQualificationLabels: string[]
+    }>
+  > = {}
+  for (const r of openRequests) {
+    const allowed = parseAllowedQualifications(r.allowedQualifications)
+    if (!isMemberQualifiedForRequest(myQualification, allowed)) continue
+    const key = toIsoDay(r.date)
+    const alreadyBookedSameShift = (bookingMap[key] ?? []).includes(r.shift)
+    if (alreadyBookedSameShift) continue
+    if (!openRequestsByDay[key]) openRequestsByDay[key] = []
+    openRequestsByDay[key].push({
+      id: r.id,
+      shift: r.shift,
+      team: r.team,
+      teamLabel: getTeamLabel(r.team),
+      message: r.message,
+      allowedQualifications: allowed,
+      allowedQualificationLabels: allowed.map((q) => getQualificationLabel(q) ?? q),
+    })
+  }
+
   return NextResponse.json({
     availability: availabilityMap,
     bookings: bookingMap,
     bookingDetails,
+    openRequests: openRequestsByDay,
   })
 }
