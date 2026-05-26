@@ -42,6 +42,32 @@ type ShiftRequestApi = {
   createdAt: string
 }
 
+type PoolUserMini = {
+  id: string
+  firstName: string
+  lastName: string
+  qualification: string | null
+  qualificationShort: string | null
+}
+
+type BookingApi = {
+  id: string
+  date: string
+  shift: 'EARLY' | 'LATE'
+  team: PoolTeamId
+  teamLabel: string
+  shiftRequestId: string | null
+  poolUser: PoolUserMini
+}
+
+type AvailabilityApi = {
+  id: string
+  date: string
+  shift: 'EARLY' | 'LATE'
+  poolUser: PoolUserMini
+  lockedByBooking: boolean
+}
+
 function pad2(n: number) { return String(n).padStart(2, '0') }
 function iso(y: number, m: number, d: number) { return `${y}-${pad2(m + 1)}-${pad2(d)}` }
 
@@ -79,6 +105,8 @@ export default function PoolPlannerCalendar() {
   const [year, setYear] = useState<number>(today.getFullYear())
   const [monthIndex, setMonthIndex] = useState<number>(today.getMonth())
   const [requests, setRequests] = useState<ShiftRequestApi[]>([])
+  const [bookings, setBookings] = useState<BookingApi[]>([])
+  const [availabilities, setAvailabilities] = useState<AvailabilityApi[]>([])
   const [loading, setLoading] = useState(true)
   const [openDay, setOpenDay] = useState<string | null>(null)
 
@@ -91,36 +119,61 @@ export default function PoolPlannerCalendar() {
     return iso(last.getFullYear(), last.getMonth(), last.getDate())
   }, [year, monthIndex])
 
-  const fetchRequests = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({ dateFrom: monthStart, dateTo: monthEnd })
-      const res = await fetch(`/api/pool/shift-requests?${params.toString()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/pool/planner/calendar?${params.toString()}`, { cache: 'no-store' })
       if (res.ok) {
         const d = await res.json()
-        setRequests((d.items ?? []) as ShiftRequestApi[])
+        setRequests((d.requests ?? []) as ShiftRequestApi[])
+        setBookings((d.bookings ?? []) as BookingApi[])
+        setAvailabilities((d.availabilities ?? []) as AvailabilityApi[])
       } else {
-        setRequests([])
+        setRequests([]); setBookings([]); setAvailabilities([])
       }
     } finally {
       setLoading(false)
     }
   }, [monthStart, monthEnd])
 
-  useEffect(() => { fetchRequests() }, [fetchRequests])
+  useEffect(() => { fetchData() }, [fetchData])
 
-  // Map iso -> { open: ShiftRequestApi[], filled: ShiftRequestApi[], cancelled: ShiftRequestApi[] }
+  // Aggregierte Sicht pro Tag:
+  //  - open: offene Anfragen
+  //  - filled: gefüllte Anfragen (vom Member übernommen) -> als Buchung sichtbar
+  //  - directBookings: Buchungen ohne zugehörige Anfrage (Direkt vom Planer)
+  //  - availabilities: Verfügbarkeiten, gruppiert nach Schicht
   const byDay = useMemo(() => {
-    const map = new Map<string, { open: ShiftRequestApi[]; filled: ShiftRequestApi[] }>()
+    type DayBucket = {
+      open: ShiftRequestApi[]
+      bookings: BookingApi[] // ALLE Buchungen (auch aus FILLED-Requests)
+      availEarly: AvailabilityApi[]
+      availLate: AvailabilityApi[]
+    }
+    const map = new Map<string, DayBucket>()
+    function entry(iso: string): DayBucket {
+      let e = map.get(iso)
+      if (!e) {
+        e = { open: [], bookings: [], availEarly: [], availLate: [] }
+        map.set(iso, e)
+      }
+      return e
+    }
     for (const r of requests) {
-      if (r.status === 'CANCELLED') continue
-      const entry = map.get(r.date) ?? { open: [], filled: [] }
-      if (r.status === 'OPEN') entry.open.push(r)
-      else if (r.status === 'FILLED') entry.filled.push(r)
-      map.set(r.date, entry)
+      if (r.status !== 'OPEN') continue
+      entry(r.date).open.push(r)
+    }
+    for (const b of bookings) {
+      entry(b.date).bookings.push(b)
+    }
+    for (const a of availabilities) {
+      const bucket = entry(a.date)
+      if (a.shift === 'EARLY') bucket.availEarly.push(a)
+      else bucket.availLate.push(a)
     }
     return map
-  }, [requests])
+  }, [requests, bookings, availabilities])
 
   function prevMonth() {
     if (monthIndex === 0) {
@@ -139,7 +192,9 @@ export default function PoolPlannerCalendar() {
 
   const todayIso = iso(today.getFullYear(), today.getMonth(), today.getDate())
 
-  const dayDetails = openDay ? byDay.get(openDay) ?? { open: [], filled: [] } : null
+  const dayDetails = openDay
+    ? byDay.get(openDay) ?? { open: [], bookings: [], availEarly: [], availLate: [] }
+    : null
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -204,32 +259,50 @@ export default function PoolPlannerCalendar() {
                 )}
               </div>
 
-              {cell.inMonth && dayInfo && (dayInfo.open.length > 0 || dayInfo.filled.length > 0) && (
+              {cell.inMonth && dayInfo && (dayInfo.open.length > 0 || dayInfo.bookings.length > 0) && (
                 <div className="mt-1 flex flex-col gap-1">
                   {dayInfo.open.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {dayInfo.open.slice(0, 3).map((r) => (
-                        <TeamPill key={r.id} req={r} status="OPEN" />
+                        <RequestPill key={r.id} shift={r.shift} team={r.team} status="OPEN" />
                       ))}
                       {dayInfo.open.length > 3 && (
                         <span className="text-[10px] font-medium text-gray-500">+{dayInfo.open.length - 3}</span>
                       )}
                     </div>
                   )}
-                  {dayInfo.filled.length > 0 && (
+                  {dayInfo.bookings.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {dayInfo.filled.slice(0, 3).map((r) => (
-                        <TeamPill key={r.id} req={r} status="FILLED" />
+                      {dayInfo.bookings.slice(0, 3).map((b) => (
+                        <RequestPill key={b.id} shift={b.shift} team={b.team} status="FILLED" />
                       ))}
-                      {dayInfo.filled.length > 3 && (
-                        <span className="text-[10px] font-medium text-gray-500">+{dayInfo.filled.length - 3}</span>
+                      {dayInfo.bookings.length > 3 && (
+                        <span className="text-[10px] font-medium text-gray-500">+{dayInfo.bookings.length - 3}</span>
                       )}
                     </div>
                   )}
                 </div>
               )}
 
-              {cell.inMonth && (!dayInfo || (dayInfo.open.length === 0 && dayInfo.filled.length === 0)) && (
+              {/* Verfügbarkeits-Indikatoren als kleine Pills unten in der Zelle */}
+              {cell.inMonth && dayInfo && (dayInfo.availEarly.length > 0 || dayInfo.availLate.length > 0) && (
+                <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
+                  {dayInfo.availEarly.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                      <Sun className="h-2.5 w-2.5 text-amber-500" />
+                      F:{dayInfo.availEarly.length}
+                    </span>
+                  )}
+                  {dayInfo.availLate.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                      <Moon className="h-2.5 w-2.5 text-indigo-500" />
+                      S:{dayInfo.availLate.length}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {cell.inMonth && (!dayInfo || (dayInfo.open.length === 0 && dayInfo.bookings.length === 0 && dayInfo.availEarly.length === 0 && dayInfo.availLate.length === 0)) && (
                 <div className="mt-auto flex items-end justify-end opacity-0 transition-opacity group-hover:opacity-100">
                   <Plus className="h-4 w-4 text-gray-400" />
                 </div>
@@ -260,24 +333,32 @@ export default function PoolPlannerCalendar() {
         isoDay={openDay}
         details={dayDetails}
         onClose={() => setOpenDay(null)}
-        onChanged={fetchRequests}
+        onChanged={fetchData}
       />
     </div>
   )
 }
 
-function TeamPill({ req, status }: { req: ShiftRequestApi; status: 'OPEN' | 'FILLED' }) {
-  const team = POOL_TEAMS[req.team]
-  const ShiftIcon = req.shift === 'EARLY' ? Sun : Moon
-  const shiftColor = req.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'
+function RequestPill({
+  shift,
+  team,
+  status,
+}: {
+  shift: 'EARLY' | 'LATE'
+  team: PoolTeamId
+  status: 'OPEN' | 'FILLED'
+}) {
+  const teamDef = POOL_TEAMS[team]
+  const ShiftIcon = shift === 'EARLY' ? Sun : Moon
+  const shiftColor = shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'
   const ring = status === 'OPEN' ? 'ring-1 ring-emerald-300' : 'ring-1 ring-blue-400'
   return (
     <div
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${team?.color ?? 'bg-gray-100 text-gray-700'} ${ring}`}
-      title={`${team?.label ?? req.team} · ${req.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} · ${status === 'OPEN' ? 'offen' : 'übernommen'}`}
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${teamDef?.color ?? 'bg-gray-100 text-gray-700'} ${ring}`}
+      title={`${teamDef?.label ?? team} · ${shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} · ${status === 'OPEN' ? 'offen' : 'gebucht'}`}
     >
       <ShiftIcon className={`h-3 w-3 ${shiftColor}`} />
-      {team?.short ?? req.team}
+      {teamDef?.short ?? team}
     </div>
   )
 }
@@ -289,7 +370,12 @@ function DayDialog({
   onChanged,
 }: {
   isoDay: string | null
-  details: { open: ShiftRequestApi[]; filled: ShiftRequestApi[] } | null
+  details: {
+    open: ShiftRequestApi[]
+    bookings: BookingApi[]
+    availEarly: AvailabilityApi[]
+    availLate: AvailabilityApi[]
+  } | null
   onClose: () => void
   onChanged: () => void
 }) {
@@ -379,22 +465,61 @@ function DayDialog({
         </DialogHeader>
 
         {details && (
-          <div className="space-y-3">
-            {/* Existierende Anfragen */}
-            {details.open.length === 0 && details.filled.length === 0 ? (
-              <p className="rounded border border-dashed border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
-                Noch keine Anfragen für diesen Tag.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {details.open.map((r) => (
-                  <RequestRow key={r.id} req={r} onCancel={() => handleCancel(r.id)} />
-                ))}
-                {details.filled.map((r) => (
-                  <RequestRow key={r.id} req={r} onCancel={() => handleCancel(r.id)} />
-                ))}
+          <div className="space-y-4">
+            {/* Sektion: Offene Anfragen */}
+            <section className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Offene Anfragen
               </div>
-            )}
+              {details.open.length === 0 ? (
+                <p className="rounded border border-dashed border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
+                  Keine offenen Anfragen.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {details.open.map((r) => (
+                    <OpenRequestRow key={r.id} req={r} onCancel={() => handleCancel(r.id)} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Sektion: Belegte Schichten (alle Buchungen) */}
+            <section className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Belegte Schichten
+              </div>
+              {details.bookings.length === 0 ? (
+                <p className="rounded border border-dashed border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
+                  Noch keine Buchung.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {details.bookings.map((b) => (
+                    <BookingRow key={b.id} booking={b} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Sektion: Verfügbarkeiten – Konflikt-Filter (gebuchte Personen ausgeblendet) */}
+            <section className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Verfügbar an diesem Tag
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <AvailabilityList
+                  title="Frühdienst"
+                  icon={<Sun className="h-3.5 w-3.5 text-amber-500" />}
+                  items={details.availEarly}
+                />
+                <AvailabilityList
+                  title="Spätdienst"
+                  icon={<Moon className="h-3.5 w-3.5 text-indigo-500" />}
+                  items={details.availLate}
+                />
+              </div>
+            </section>
 
             {/* Erstell-Block */}
             {!creating ? (
@@ -501,14 +626,12 @@ function DayDialog({
   )
 }
 
-function RequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () => void }) {
+function OpenRequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () => void }) {
   const team = POOL_TEAMS[req.team]
   const ShiftIcon = req.shift === 'EARLY' ? Sun : Moon
-  const isOpen = req.status === 'OPEN'
-
   return (
-    <div className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 ${isOpen ? 'border-emerald-200 bg-emerald-50/40' : 'border-blue-200 bg-blue-50/40'}`}>
-      <div className="flex flex-1 items-center gap-2.5 text-sm">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/40 p-2">
+      <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
         <ShiftIcon className={`h-4 w-4 shrink-0 ${req.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
         <span className="font-medium text-gray-900">
           {req.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}
@@ -528,16 +651,92 @@ function RequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () => v
         {req.message && (
           <span className="ml-1 truncate text-xs text-gray-600" title={req.message}>· {req.message}</span>
         )}
-        {!isOpen && req.filledByPoolUser && (
-          <span className="ml-1 inline-flex items-center gap-1 text-xs text-blue-700">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {req.filledByPoolUser.firstName} {req.filledByPoolUser.lastName}
+      </div>
+      <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={onCancel} title="Anfrage stornieren">
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
+function BookingRow({ booking }: { booking: BookingApi }) {
+  const team = POOL_TEAMS[booking.team]
+  const ShiftIcon = booking.shift === 'EARLY' ? Sun : Moon
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/40 p-2">
+      <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" />
+        <ShiftIcon className={`h-4 w-4 shrink-0 ${booking.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
+        <span className="font-medium text-gray-900">
+          {booking.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}
+        </span>
+        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${team?.color ?? 'bg-gray-100'}`}>
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${team?.dotColor ?? 'bg-gray-500'}`} />
+          {team?.label ?? booking.team}
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-sm text-gray-900">
+          {booking.poolUser.firstName} {booking.poolUser.lastName}
+          {booking.poolUser.qualificationShort && (
+            <span
+              className="rounded border border-sky-200 bg-sky-50 px-1 text-[10px] font-semibold uppercase tracking-wide text-sky-800"
+              title={booking.poolUser.qualification ?? ''}
+            >
+              {booking.poolUser.qualificationShort}
+            </span>
+          )}
+        </span>
+        {!booking.shiftRequestId && (
+          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600" title="Direkt vom Planer gebucht (ohne Anfrage)">
+            direkt
           </span>
         )}
       </div>
-      <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={onCancel}>
-        <X className="h-4 w-4" />
-      </Button>
+    </div>
+  )
+}
+
+function AvailabilityList({
+  title,
+  icon,
+  items,
+}: {
+  title: string
+  icon: React.ReactNode
+  items: AvailabilityApi[]
+}) {
+  // Personen ausblenden, die für dieselbe (Tag, Schicht) bereits gebucht sind.
+  const visible = items.filter((a) => !a.lockedByBooking)
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-2">
+      <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+        {icon}
+        {title}
+        <span className="ml-auto rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+          {visible.length}
+        </span>
+      </div>
+      {visible.length === 0 ? (
+        <p className="text-xs text-gray-400">niemand verfügbar</p>
+      ) : (
+        <ul className="space-y-0.5 text-xs">
+          {visible.map((a) => (
+            <li key={a.id} className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="text-gray-900">
+                {a.poolUser.firstName} {a.poolUser.lastName}
+              </span>
+              {a.poolUser.qualificationShort && (
+                <span
+                  className="rounded border border-sky-200 bg-sky-50 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-800"
+                  title={a.poolUser.qualification ?? ''}
+                >
+                  {a.poolUser.qualificationShort}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
