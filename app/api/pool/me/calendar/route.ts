@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getPoolSession } from '@/lib/pool/auth'
 import { startOfMonthUTC, startOfNextMonthUTC, toIsoDay } from '@/lib/pool/dates'
+import { getTeamLabel } from '@/lib/pool/teams'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
         poolUserId: session.poolUserId,
         date: { gte: start, lt: end },
       },
-      select: { id: true, date: true, shift: true },
+      select: { id: true, date: true, shift: true, team: true },
     }),
   ])
 
@@ -56,14 +57,18 @@ export async function GET(request: NextRequest) {
   }
 
   const bookingMap: Record<string, string[]> = {}
+  const bookingDetails: Record<string, Array<{ shift: string; team: string; teamLabel: string }>> = {}
   for (const b of bookings) {
     const key = toIsoDay(b.date)
     if (!bookingMap[key]) bookingMap[key] = []
     bookingMap[key].push(b.shift)
+    if (!bookingDetails[key]) bookingDetails[key] = []
+    bookingDetails[key].push({ shift: b.shift, team: b.team, teamLabel: getTeamLabel(b.team) })
   }
 
   return NextResponse.json({
     availability: availabilityMap,
     bookings: bookingMap,
+    bookingDetails,
   })
 }

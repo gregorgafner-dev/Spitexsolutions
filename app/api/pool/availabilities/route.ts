@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
 import { fromIsoDay, toIsoDay, isValidShift } from '@/lib/pool/dates'
+import { getTeamLabel } from '@/lib/pool/teams'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -65,41 +66,35 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  // Buchungen für (date, shift) im gleichen Range holen, um schnell zu wissen,
-  // welche Slots besetzt sind.
+  // Buchungen für (poolUserId, date, shift) holen: eine Verfügbarkeit gilt
+  // genau dann als für das jeweilige Member "gesperrt", wenn dieses Member
+  // selbst für (date, shift) bereits eine Buchung hat – egal in welchem Team
+  // (eine Person kann nicht zwei Schichten parallel arbeiten).
   const bookings = await prisma.poolBooking.findMany({
     where: {
       ...(Object.keys(dateRange).length > 0 ? { date: dateRange } : {}),
       ...(shiftParam !== 'all' && isValidShift(shiftParam) ? { shift: shiftParam } : {}),
     },
-    select: {
-      id: true,
-      date: true,
-      shift: true,
-      poolUserId: true,
-      poolUser: { select: { id: true, firstName: true, lastName: true } },
-    },
+    select: { id: true, date: true, shift: true, team: true, poolUserId: true },
   })
-  const bookingKey = (d: Date, shift: string) => `${toIsoDay(d)}|${shift}`
-  const bookingMap = new Map<string, (typeof bookings)[number]>()
-  for (const b of bookings) bookingMap.set(bookingKey(b.date, b.shift), b)
+  const memberBookingKey = (poolUserId: string, d: Date, shift: string) =>
+    `${poolUserId}|${toIsoDay(d)}|${shift}`
+  const memberBookingMap = new Map<string, (typeof bookings)[number]>()
+  for (const b of bookings) {
+    memberBookingMap.set(memberBookingKey(b.poolUserId, b.date, b.shift), b)
+  }
 
   const items = availabilities.map((a) => {
-    const key = bookingKey(a.date, a.shift)
-    const booking = bookingMap.get(key) ?? null
+    const key = memberBookingKey(a.poolUserId, a.date, a.shift)
+    const booking = memberBookingMap.get(key) ?? null
     return {
       id: a.id,
       date: toIsoDay(a.date),
       shift: a.shift,
       poolUser: a.poolUser,
       isBooked: Boolean(booking),
-      bookedBy: booking
-        ? {
-            poolUserId: booking.poolUserId,
-            firstName: booking.poolUser?.firstName ?? '',
-            lastName: booking.poolUser?.lastName ?? '',
-          }
-        : null,
+      bookedTeam: booking?.team ?? null,
+      bookedTeamLabel: booking ? getTeamLabel(booking.team) : null,
       bookingId: booking?.id ?? null,
     }
   })

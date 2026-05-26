@@ -110,18 +110,37 @@ echo "  member1 id=$MEMBER1_ID"
 
 resp=$(curl -s -b "$PLANNER_JAR" \
   -H "Content-Type: application/json" \
-  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_3\",\"shift\":\"EARLY\",\"notes\":\"E2E-Test\"}" \
+  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_3\",\"shift\":\"EARLY\",\"team\":\"MEILEN\",\"notes\":\"E2E-Test\"}" \
   "$BASE/api/pool/bookings")
 echo "  → $resp"
-echo "$resp" | grep -q '"booking"' && pass "Buchung erfolgreich" || fail "Buchung fehlgeschlagen"
+echo "$resp" | grep -q '"booking"' && pass "Buchung erfolgreich (Team MEILEN)" || fail "Buchung fehlgeschlagen"
 BOOKING_ID=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["booking"]["id"])')
 
-# Doppelbuchung muss 409 geben
+# Doppelbuchung im SELBEN Team muss 409 geben
 code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" \
   -H "Content-Type: application/json" \
-  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_3\",\"shift\":\"EARLY\"}" \
+  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_3\",\"shift\":\"EARLY\",\"team\":\"MEILEN\"}" \
   "$BASE/api/pool/bookings")
-[ "$code" = "409" ] && pass "Doppelbuchung wird abgewiesen (409)" || fail "Doppelbuchung nicht geschützt ($code)"
+[ "$code" = "409" ] && pass "Doppelbuchung im selben Team wird abgewiesen (409)" || fail "Doppelbuchung im selben Team nicht geschützt ($code)"
+
+# Member darf nicht zweimal gleichzeitig arbeiten (anderes Team gleicher Slot)
+code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" \
+  -H "Content-Type: application/json" \
+  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_3\",\"shift\":\"EARLY\",\"team\":\"HERRLIBERG_ERLENBACH\"}" \
+  "$BASE/api/pool/bookings")
+[ "$code" = "409" ] && pass "Member-Doppelbuchung anderes Team wird abgewiesen (409)" || fail "Member-Schutz fehlt ($code)"
+
+# Anderes Member im anderen Team gleicher Slot DARF gebucht werden
+MEMBER2_ID=$(curl -s -b "$PLANNER_JAR" "$BASE/api/pool/members" | python3 -c '
+import sys,json
+d=json.load(sys.stdin)
+print(next(m["id"] for m in d["members"] if m["email"]=="member2@local.test"))')
+resp=$(curl -s -b "$PLANNER_JAR" \
+  -H "Content-Type: application/json" \
+  -d "{\"poolUserId\":\"$MEMBER2_ID\",\"date\":\"$DATE_PLUS_3\",\"shift\":\"EARLY\",\"team\":\"HERRLIBERG_ERLENBACH\"}" \
+  "$BASE/api/pool/bookings")
+echo "$resp" | grep -q '"booking"' && pass "Paralleles Team gleicher Slot mit anderem Member geht" || fail "Paralleles Team-Booking fehlgeschlagen"
+BOOKING2_ID=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["booking"]["id"])')
 
 # Lock: Member kann gebuchte Schicht nicht mehr aushebeln
 resp=$(curl -s -b "$M1_JAR" \
@@ -134,21 +153,37 @@ echo "$resp" | grep -q '"locked":true' && pass "Member-Lock: Buchungs-Schicht bl
 # Storno-Workflow
 code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" -X DELETE "$BASE/api/pool/bookings/$BOOKING_ID")
 [ "$code" = "200" ] && pass "Buchung storniert" || fail "Storno fehlgeschlagen ($code)"
+code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" -X DELETE "$BASE/api/pool/bookings/$BOOKING2_ID")
+[ "$code" = "200" ] && pass "Parallele Team-Buchung storniert" || fail "Storno 2 fehlgeschlagen ($code)"
 
 # ===========================================================================
 step "Phase 8: ShiftRequest + FCFS"
 # ===========================================================================
 
-# Planer erstellt Anfrage
+# Anfrage ohne Team muss 400 geben
+code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" \
+  -H "Content-Type: application/json" \
+  -d "{\"date\":\"$DATE_PLUS_5\",\"shift\":\"EARLY\",\"message\":\"ohne Team\"}" \
+  "$BASE/api/pool/shift-requests")
+[ "$code" = "400" ] && pass "Anfrage ohne Team wird abgewiesen (400)" || fail "Team-Pflicht greift nicht ($code)"
+
+# Planer erstellt zwei Anfragen auf den GLEICHEN Tag/Schicht in unterschiedlichen Teams
 resp=$(curl -s -b "$PLANNER_JAR" \
   -H "Content-Type: application/json" \
-  -d "{\"date\":\"$DATE_PLUS_5\",\"shift\":\"EARLY\",\"message\":\"E2E\"}" \
+  -d "{\"date\":\"$DATE_PLUS_5\",\"shift\":\"EARLY\",\"team\":\"MEILEN\",\"message\":\"E2E\"}" \
   "$BASE/api/pool/shift-requests")
 echo "  → $resp"
-echo "$resp" | grep -q '"request"' && pass "Anfrage erstellt" || fail "Anfrage fehlgeschlagen"
+echo "$resp" | grep -q '"request"' && pass "Anfrage erstellt (MEILEN)" || fail "Anfrage MEILEN fehlgeschlagen"
 REQUEST_ID=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["request"]["id"])')
 NOTIFIED=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["request"]["notified"])')
 [ "$NOTIFIED" -ge 2 ] && pass "An $NOTIFIED Member benachrichtigt" || fail "Zu wenig benachrichtigt ($NOTIFIED)"
+
+resp=$(curl -s -b "$PLANNER_JAR" \
+  -H "Content-Type: application/json" \
+  -d "{\"date\":\"$DATE_PLUS_5\",\"shift\":\"EARLY\",\"team\":\"MAENNEDORF_UETIKON\",\"message\":\"E2E 2\"}" \
+  "$BASE/api/pool/shift-requests")
+echo "$resp" | grep -q '"request"' && pass "Zweite Anfrage gleicher Slot, anderes Team möglich" || fail "Mehrfach-Anfrage pro Tag/Schicht nicht erlaubt"
+REQUEST2_ID=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["request"]["id"])')
 
 # Member sieht Anfrage im Postfach
 resp=$(curl -s -b "$M1_JAR" "$BASE/api/pool/me/messages")
@@ -193,16 +228,18 @@ print(next(i["id"] for i in d["items"] if i["type"]=="BOOKING_CONFIRMED"))')
 code=$(curl -s -o /dev/null -w "%{http_code}" -b "$M2_JAR" -X POST "$BASE/api/pool/me/messages/$MSG_ID/read")
 [ "$code" = "200" ] && pass "Mark-as-read erfolgreich" || fail "Mark-as-read fehlgeschlagen ($code)"
 
-# Planer storniert die Anfrage (inkl. Booking)
+# Planer storniert beide Anfragen (REQUEST_ID war von Member 2 übernommen, REQUEST2_ID ist offen)
 code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" -X DELETE "$BASE/api/pool/shift-requests/$REQUEST_ID")
-[ "$code" = "200" ] && pass "Anfrage storniert" || fail "Storno-Anfrage fehlgeschlagen ($code)"
+[ "$code" = "200" ] && pass "Anfrage storniert (inkl. Buchung)" || fail "Storno-Anfrage fehlgeschlagen ($code)"
+code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" -X DELETE "$BASE/api/pool/shift-requests/$REQUEST2_ID")
+[ "$code" = "200" ] && pass "Zweite Anfrage storniert" || fail "Storno-Anfrage 2 fehlgeschlagen ($code)"
 
-# Slot wieder frei
+# Slot wieder frei (Team MEILEN nach beiden Stornos)
 code=$(curl -s -o /dev/null -w "%{http_code}" -b "$PLANNER_JAR" \
   -H "Content-Type: application/json" \
-  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_5\",\"shift\":\"EARLY\"}" \
+  -d "{\"poolUserId\":\"$MEMBER1_ID\",\"date\":\"$DATE_PLUS_5\",\"shift\":\"EARLY\",\"team\":\"MEILEN\"}" \
   "$BASE/api/pool/bookings")
-[ "$code" = "201" ] && pass "Slot ist nach Storno wieder buchbar" || fail "Slot nicht freigegeben ($code)"
+[ "$code" = "201" ] && pass "Slot ist nach Storno wieder buchbar (MEILEN)" || fail "Slot nicht freigegeben ($code)"
 
 echo
 echo "===================================="

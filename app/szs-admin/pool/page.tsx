@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/get-session'
-import PoolMonthCalendar from '@/components/pool/PoolMonthCalendar'
+import PoolPlannerCalendar from '@/components/pool/admin/PoolPlannerCalendar'
 import { ArrowLeft, Users, Calendar, MessageSquare, ArrowRight } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -55,8 +55,8 @@ export default async function SzsAdminPoolPage() {
           />
         </div>
 
-        {/* Kalender (Übersicht, klick auf Tag führt in die Verfügbarkeits-Übersicht) */}
-        <PoolMonthCalendar />
+        {/* Planungs-Kalender: Klick auf Tag öffnet Dialog zum Anlegen von Anfragen */}
+        <PoolPlannerCalendar />
       </div>
     </div>
   )

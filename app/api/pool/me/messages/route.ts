@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getPoolSession } from '@/lib/pool/auth'
 import { toIsoDay } from '@/lib/pool/dates'
+import { getTeamLabel } from '@/lib/pool/teams'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,7 @@ export async function GET(_request: NextRequest) {
           id: true,
           date: true,
           shift: true,
+          team: true,
           status: true,
           filledByPoolUserId: true,
         },
@@ -49,6 +51,8 @@ export async function GET(_request: NextRequest) {
           id: m.relatedRequest.id,
           date: toIsoDay(m.relatedRequest.date),
           shift: m.relatedRequest.shift,
+          team: m.relatedRequest.team,
+          teamLabel: getTeamLabel(m.relatedRequest.team),
           status: m.relatedRequest.status,
           takenByMe: m.relatedRequest.filledByPoolUserId === session.poolUserId,
         }

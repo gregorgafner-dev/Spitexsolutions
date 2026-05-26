@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getPoolSession } from '@/lib/pool/auth'
 import { toIsoDay } from '@/lib/pool/dates'
+import { getTeamLabel } from '@/lib/pool/teams'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -46,6 +47,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
           poolUserId: session.poolUserId,
           date: req.date,
           shift: req.shift,
+          team: req.team,
           shiftRequestId: req.id,
           createdByType: 'POOL_MEMBER',
           createdById: session.poolUserId,
@@ -76,7 +78,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
         data: {
           recipientPoolUserId: session.poolUserId,
           type: 'BOOKING_CONFIRMED',
-          subject: `Dienst übernommen: ${req.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} am ${toIsoDay(req.date)}`,
+          subject: `Dienst übernommen: ${req.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} am ${toIsoDay(req.date)} · ${getTeamLabel(req.team)}`,
           content: 'Du hast diesen Dienst verbindlich übernommen.',
           relatedRequestId: req.id,
         },
@@ -90,6 +92,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
         id: result.id,
         date: toIsoDay(result.date),
         shift: result.shift,
+        team: result.team,
       },
     })
   } catch (e) {
@@ -97,8 +100,15 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
       return NextResponse.json({ error: e.message }, { status: e.status })
     }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      const target = (e.meta?.target as string[] | string | undefined) ?? ''
+      const targetStr = Array.isArray(target) ? target.join(',') : target
+      const isMemberConflict = targetStr.includes('poolUserId')
       return NextResponse.json(
-        { error: 'Dieser Dienst wurde soeben von jemand anderem übernommen.' },
+        {
+          error: isMemberConflict
+            ? 'Du arbeitest in dieser Schicht bereits in einem anderen Team.'
+            : 'Dieser Dienst wurde soeben von jemand anderem übernommen.',
+        },
         { status: 409 }
       )
     }

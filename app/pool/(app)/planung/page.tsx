@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getPoolSession } from '@/lib/pool/auth'
-import PoolMonthCalendar from '@/components/pool/PoolMonthCalendar'
+import PoolPlannerCalendar from '@/components/pool/admin/PoolPlannerCalendar'
 import { Users, MessageSquare, Calendar, Inbox } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +51,7 @@ export default async function PoolPlannerPage() {
         />
       </div>
 
-      <PoolMonthCalendar />
+      <PoolPlannerCalendar />
     </div>
   )
 }

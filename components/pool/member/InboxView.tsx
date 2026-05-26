@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sun, Moon, Loader2, CheckCircle2, AlertCircle, Mail, MailOpen, RefreshCw } from 'lucide-react'
 
+import { POOL_TEAMS, type PoolTeamId } from '@/lib/pool/teams'
+
 type Message = {
   id: string
   type: 'SHIFT_REQUEST' | 'INFO' | 'BOOKING_CONFIRMED' | 'BOOKING_CANCELLED'
@@ -15,6 +17,8 @@ type Message = {
     id: string
     date: string
     shift: 'EARLY' | 'LATE'
+    team: PoolTeamId
+    teamLabel: string
     status: 'OPEN' | 'FILLED' | 'CANCELLED'
     takenByMe: boolean
   } | null
@@ -193,6 +197,15 @@ function MessageCard({
                   <Moon className="h-3.5 w-3.5" /> Spätdienst
                 </span>
               )}
+              {(() => {
+                const teamDef = POOL_TEAMS[message.relatedRequest.team]
+                return (
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${teamDef?.color ?? 'bg-gray-100 text-gray-700'}`}>
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${teamDef?.dotColor ?? 'bg-gray-500'}`} />
+                    {teamDef?.label ?? message.relatedRequest.teamLabel}
+                  </span>
+                )
+              })()}
               {wasTakenByMe && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                   <CheckCircle2 className="h-3.5 w-3.5" /> von dir übernommen

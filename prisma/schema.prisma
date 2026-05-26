@@ -259,6 +259,7 @@ model PoolBooking {
   poolUserId      String   // wer den Dienst übernimmt
   date            DateTime
   shift           String   // "EARLY" or "LATE"
+  team            String   // siehe lib/pool/teams.ts (MAENNEDORF_UETIKON | MEILEN | HERRLIBERG_ERLENBACH)
   shiftRequestId  String?  // optional: Buchung entstand aus einer Anfrage
   notes           String?
   // Audit: wer hat gebucht (über Systemgrenze hinweg, daher kein FK)
@@ -270,15 +271,20 @@ model PoolBooking {
   poolUser     PoolUser          @relation("PoolBookingMember", fields: [poolUserId], references: [id], onDelete: Cascade)
   shiftRequest PoolShiftRequest? @relation(fields: [shiftRequestId], references: [id], onDelete: SetNull)
 
-  @@unique([date, shift]) // ein Slot ist genau einmal vergeben
+  // Pro Team kann derselbe (date, shift) nur einmal besetzt sein.
+  @@unique([date, shift, team])
+  // Eine Person kann denselben (date, shift) nicht zweimal arbeiten.
+  @@unique([poolUserId, date, shift])
   @@map("pool_bookings")
   @@index([poolUserId, date])
+  @@index([team, date])
 }
 
 model PoolShiftRequest {
   id              String    @id @default(cuid())
   date            DateTime
   shift           String    // "EARLY" or "LATE"
+  team            String    // siehe lib/pool/teams.ts (MAENNEDORF_UETIKON | MEILEN | HERRLIBERG_ERLENBACH)
   status          String    @default("OPEN") // OPEN | FILLED | CANCELLED
   message         String?   // optionale Info an Mitarbeitende
   // Audit: wer hat die Anfrage erstellt
@@ -295,6 +301,7 @@ model PoolShiftRequest {
 
   @@map("pool_shift_requests")
   @@index([status, date])
+  @@index([team, date])
 }
 
 model PoolMessage {

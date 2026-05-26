@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
 import { fromIsoDay, isValidShift } from '@/lib/pool/dates'
+import { isValidTeam } from '@/lib/pool/teams'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
   const poolUserId = String(body?.poolUserId ?? '').trim()
   const dateStr = String(body?.date ?? '')
   const shiftStr = String(body?.shift ?? '')
+  const teamStr = String(body?.team ?? '')
   const notes = body?.notes ? String(body.notes).trim() : null
   const shiftRequestId = body?.shiftRequestId ? String(body.shiftRequestId).trim() : null
 
@@ -36,6 +38,9 @@ export async function POST(request: NextRequest) {
   }
   if (!isValidShift(shiftStr)) {
     return NextResponse.json({ error: 'Ungültige Schicht.' }, { status: 400 })
+  }
+  if (!isValidTeam(teamStr)) {
+    return NextResponse.json({ error: 'Ungültiges oder fehlendes Team.' }, { status: 400 })
   }
 
   let date: Date
@@ -63,18 +68,37 @@ export async function POST(request: NextRequest) {
         poolUserId,
         date,
         shift: shiftStr,
+        team: teamStr,
         notes,
         shiftRequestId,
         createdByType: actor.type,
         createdById: actor.id,
       },
-      select: { id: true, date: true, shift: true, poolUserId: true, notes: true, createdAt: true },
+      select: {
+        id: true,
+        date: true,
+        shift: true,
+        team: true,
+        poolUserId: true,
+        notes: true,
+        createdAt: true,
+      },
     })
     return NextResponse.json({ booking }, { status: 201 })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      // P2002 kann zwei Constraints betreffen:
+      //  1) (date, shift, team) → Team-Slot schon belegt
+      //  2) (poolUserId, date, shift) → Member arbeitet bereits in dieser Schicht
+      const target = (e.meta?.target as string[] | string | undefined) ?? ''
+      const targetStr = Array.isArray(target) ? target.join(',') : target
+      const isMemberConflict = targetStr.includes('poolUserId')
       return NextResponse.json(
-        { error: 'Dieser Slot (Datum + Schicht) ist bereits gebucht.' },
+        {
+          error: isMemberConflict
+            ? 'Diese:r Mitarbeitende:r ist am gewählten Datum/Schicht bereits gebucht.'
+            : 'Für dieses Team ist der Slot (Datum + Schicht) bereits gebucht.',
+        },
         { status: 409 }
       )
     }

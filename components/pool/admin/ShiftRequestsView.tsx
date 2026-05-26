@@ -14,11 +14,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Sun, Moon, Loader2, Plus, X, CheckCircle2, AlertCircle, Send } from 'lucide-react'
+import { POOL_TEAMS, POOL_TEAM_IDS, type PoolTeamId } from '@/lib/pool/teams'
 
 type ShiftRequest = {
   id: string
   date: string
   shift: 'EARLY' | 'LATE'
+  team: PoolTeamId
+  teamLabel: string
   status: 'OPEN' | 'FILLED' | 'CANCELLED'
   message: string | null
   filledAt: string | null
@@ -41,6 +44,7 @@ export default function ShiftRequestsView() {
   const [items, setItems] = useState<ShiftRequest[]>([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [teamFilter, setTeamFilter] = useState<string>('all')
   const [createOpen, setCreateOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<ShiftRequest | null>(null)
 
@@ -49,6 +53,7 @@ export default function ShiftRequestsView() {
     try {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (teamFilter !== 'all') params.set('team', teamFilter)
       const res = await fetch(`/api/pool/shift-requests?${params.toString()}`, { cache: 'no-store' })
       if (res.ok) {
         const d = await res.json()
@@ -57,7 +62,7 @@ export default function ShiftRequestsView() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, teamFilter])
 
   useEffect(() => {
     fetchItems()
@@ -66,19 +71,35 @@ export default function ShiftRequestsView() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <Label htmlFor="r-status" className="text-xs">Status</Label>
-          <select
-            id="r-status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="flex h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
-          >
-            <option value="all">Alle</option>
-            <option value="OPEN">Offen</option>
-            <option value="FILLED">Übernommen</option>
-            <option value="CANCELLED">Storniert</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="r-status" className="text-xs">Status</Label>
+            <select
+              id="r-status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="flex h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
+            >
+              <option value="all">Alle</option>
+              <option value="OPEN">Offen</option>
+              <option value="FILLED">Übernommen</option>
+              <option value="CANCELLED">Storniert</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="r-team" className="text-xs">Team</Label>
+            <select
+              id="r-team"
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="flex h-9 rounded-md border border-gray-300 bg-white px-3 text-sm"
+            >
+              <option value="all">Alle</option>
+              {POOL_TEAM_IDS.map((id) => (
+                <option key={id} value={id}>{POOL_TEAMS[id].label}</option>
+              ))}
+            </select>
+          </div>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
         </div>
         <Button onClick={() => setCreateOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
@@ -94,6 +115,7 @@ export default function ShiftRequestsView() {
               <tr>
                 <th className="px-4 py-2">Datum</th>
                 <th className="px-4 py-2">Schicht</th>
+                <th className="px-4 py-2">Team</th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Notiz</th>
                 <th className="px-4 py-2">Erstellt</th>
@@ -103,12 +125,14 @@ export default function ShiftRequestsView() {
             <tbody className="divide-y divide-gray-100">
               {items.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">
                     Keine Anfragen vorhanden.
                   </td>
                 </tr>
               )}
-              {items.map((it) => (
+              {items.map((it) => {
+                const teamDef = POOL_TEAMS[it.team]
+                return (
                 <tr key={it.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">{formatDe(it.date)}</td>
                   <td className="px-4 py-2">
@@ -121,6 +145,12 @@ export default function ShiftRequestsView() {
                         <Moon className="h-3.5 w-3.5" /> Spät
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${teamDef?.color ?? 'bg-gray-100 text-gray-700'}`}>
+                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${teamDef?.dotColor ?? 'bg-gray-500'}`} />
+                      {teamDef?.label ?? it.team}
+                    </span>
                   </td>
                   <td className="px-4 py-2">
                     <StatusBadge status={it.status} filledBy={it.filledByPoolUser} />
@@ -148,7 +178,8 @@ export default function ShiftRequestsView() {
                     )}
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -216,6 +247,7 @@ function CreateDialog({
 }) {
   const [date, setDate] = useState<string>(isoToday())
   const [shift, setShift] = useState<'EARLY' | 'LATE'>('EARLY')
+  const [team, setTeam] = useState<PoolTeamId>('MAENNEDORF_UETIKON')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -225,6 +257,7 @@ function CreateDialog({
     if (open) {
       setDate(isoToday())
       setShift('EARLY')
+      setTeam('MAENNEDORF_UETIKON')
       setMessage('')
       setError(null)
       setOkInfo(null)
@@ -240,7 +273,7 @@ function CreateDialog({
       const res = await fetch('/api/pool/shift-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, shift, message: message.trim() || undefined }),
+        body: JSON.stringify({ date, shift, team, message: message.trim() || undefined }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -280,6 +313,19 @@ function CreateDialog({
             >
               <option value="EARLY">Frühdienst</option>
               <option value="LATE">Spätdienst</option>
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="c-team">Team</Label>
+            <select
+              id="c-team"
+              value={team}
+              onChange={(e) => setTeam(e.target.value as PoolTeamId)}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              {POOL_TEAM_IDS.map((id) => (
+                <option key={id} value={id}>{POOL_TEAMS[id].label}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -347,7 +393,8 @@ function CancelDialog({
           <DialogDescription>
             {target && (
               <>
-                {formatDe(target.date)} – {target.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}.
+                {formatDe(target.date)} – {target.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} ·{' '}
+                {target.teamLabel}.
                 {target.status === 'FILLED' && (
                   <> Die zugehörige Buchung wird ebenfalls aufgehoben.</>
                 )}

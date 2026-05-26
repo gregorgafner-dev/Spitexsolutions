@@ -48,6 +48,13 @@ npx prisma db push --schema prisma/schema.postgres.prisma
 `pool_shift_requests`, `pool_messages`. Bestehende Tabellen werden nicht
 verändert.
 
+> Hinweis Team-Modell: `pool_bookings` und `pool_shift_requests` enthalten
+> jeweils ein `team`-Feld (zulässig: `MAENNEDORF_UETIKON`, `MEILEN`,
+> `HERRLIBERG_ERLENBACH`, siehe `lib/pool/teams.ts`). Der Unique-Constraint
+> auf `pool_bookings` ist `(date, shift, team)` + `(poolUserId, date, shift)`,
+> sodass am gleichen Tag/in derselben Schicht mehrere Teams parallel Dienste
+> haben können, eine Person aber nie zwei Schichten gleichzeitig.
+
 Falls Prisma einen Reset vorschlägt: **Abbrechen**. Bei Fragen lieber
 `DEPLOYMENT-DATENBANK-INITIALISIEREN.md` konsultieren.
 

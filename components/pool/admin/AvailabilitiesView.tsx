@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { POOL_TEAMS, POOL_TEAM_IDS, type PoolTeamId } from '@/lib/pool/teams'
 
 type Member = {
   id: string
@@ -29,7 +30,8 @@ type AvailabilityItem = {
   shift: 'EARLY' | 'LATE'
   poolUser: { id: string; firstName: string; lastName: string; email: string; active: boolean }
   isBooked: boolean
-  bookedBy: { poolUserId: string; firstName: string; lastName: string } | null
+  bookedTeam: PoolTeamId | null
+  bookedTeamLabel: string | null
   bookingId: string | null
 }
 
@@ -237,10 +239,8 @@ export default function AvailabilitiesView() {
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Gebucht
-                        {it.bookedBy && (
-                          <span className="ml-1 text-blue-900">
-                            ({it.bookedBy.firstName} {it.bookedBy.lastName})
-                          </span>
+                        {it.bookedTeamLabel && (
+                          <span className="ml-1 text-blue-900">· {it.bookedTeamLabel}</span>
                         )}
                       </span>
                     ) : (
@@ -293,12 +293,14 @@ function BookingDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
+  const [team, setTeam] = useState<PoolTeamId>('MAENNEDORF_UETIKON')
 
   useEffect(() => {
     if (target) {
       setNotes('')
       setError(null)
       setSaving(false)
+      setTeam('MAENNEDORF_UETIKON')
     }
   }, [target])
 
@@ -314,6 +316,7 @@ function BookingDialog({
           poolUserId: target.poolUser.id,
           date: target.date,
           shift: target.shift,
+          team,
           notes: notes.trim() || undefined,
         }),
       })
@@ -356,6 +359,19 @@ function BookingDialog({
               <span className="font-medium">
                 {target.poolUser.firstName} {target.poolUser.lastName}
               </span>
+            </div>
+            <div>
+              <Label htmlFor="b-team" className="text-xs">Team</Label>
+              <select
+                id="b-team"
+                value={team}
+                onChange={(e) => setTeam(e.target.value as PoolTeamId)}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              >
+                {POOL_TEAM_IDS.map((id) => (
+                  <option key={id} value={id}>{POOL_TEAMS[id].label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label htmlFor="b-notes" className="text-xs">Notiz (optional)</Label>

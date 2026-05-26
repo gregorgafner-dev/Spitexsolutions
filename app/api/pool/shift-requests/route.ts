@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
 import { getPoolSession } from '@/lib/pool/auth'
 import { fromIsoDay, isValidShift, toIsoDay } from '@/lib/pool/dates'
+import { isValidTeam, getTeamLabel } from '@/lib/pool/teams'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,9 +29,11 @@ export async function GET(request: NextRequest) {
   const status = url.searchParams.get('status') ?? 'all'
   const dateFromStr = url.searchParams.get('dateFrom') || ''
   const dateToStr = url.searchParams.get('dateTo') || ''
+  const teamParam = url.searchParams.get('team') || 'all'
 
   const where: Record<string, unknown> = {}
   if (status !== 'all') where.status = status
+  if (teamParam !== 'all' && isValidTeam(teamParam)) where.team = teamParam
 
   const dateRange: Record<string, Date> = {}
   if (dateFromStr) {
@@ -65,6 +68,8 @@ export async function GET(request: NextRequest) {
       id: i.id,
       date: toIsoDay(i.date),
       shift: i.shift,
+      team: i.team,
+      teamLabel: getTeamLabel(i.team),
       status: i.status,
       message: i.message,
       filledAt: i.filledAt ? i.filledAt.toISOString() : null,
@@ -90,10 +95,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
   const dateStr = String(body?.date ?? '')
   const shiftStr = String(body?.shift ?? '')
+  const teamStr = String(body?.team ?? '')
   const message = body?.message ? String(body.message).trim() : null
 
   if (!isValidShift(shiftStr)) {
     return NextResponse.json({ error: 'Ungültige Schicht.' }, { status: 400 })
+  }
+  if (!isValidTeam(teamStr)) {
+    return NextResponse.json({ error: 'Ungültiges oder fehlendes Team.' }, { status: 400 })
   }
   let date: Date
   try {
@@ -102,13 +111,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Ungültiges Datum.' }, { status: 400 })
   }
 
-  // Sanity: schon gebucht? Dann macht eine offene Anfrage keinen Sinn.
+  // Sanity: für (date, shift, team) bereits gebucht? Dann macht eine offene
+  // Anfrage keinen Sinn. Anfragen pro Team sind aber unabhängig - die gleiche
+  // Schicht kann in verschiedenen Teams mehrfach offen sein.
   const existingBooking = await prisma.poolBooking.findUnique({
-    where: { date_shift: { date, shift: shiftStr } },
+    where: { date_shift_team: { date, shift: shiftStr, team: teamStr } },
   })
   if (existingBooking) {
     return NextResponse.json(
-      { error: 'Für diesen Slot existiert bereits eine verbindliche Buchung.' },
+      { error: 'Für dieses Team gibt es an diesem Tag/Schicht bereits eine Buchung.' },
       { status: 409 }
     )
   }
@@ -120,7 +131,8 @@ export async function POST(request: NextRequest) {
   })
 
   const shiftLabel = shiftStr === 'EARLY' ? 'Frühdienst' : 'Spätdienst'
-  const subject = `Dienstanfrage: ${shiftLabel} am ${toIsoDay(date)}`
+  const teamLabel = getTeamLabel(teamStr)
+  const subject = `Dienstanfrage: ${shiftLabel} am ${toIsoDay(date)} · ${teamLabel}`
   const content = message ?? 'Bitte schau im Postfach, ob du diesen Dienst übernehmen kannst.'
 
   const created = await prisma.$transaction(async (tx) => {
@@ -128,6 +140,7 @@ export async function POST(request: NextRequest) {
       data: {
         date,
         shift: shiftStr,
+        team: teamStr,
         status: 'OPEN',
         message,
         createdByType: actor.type,
@@ -154,6 +167,8 @@ export async function POST(request: NextRequest) {
         id: created.id,
         date: toIsoDay(created.date),
         shift: created.shift,
+        team: created.team,
+        teamLabel: getTeamLabel(created.team),
         status: created.status,
         message: created.message,
         notified: members.length,
