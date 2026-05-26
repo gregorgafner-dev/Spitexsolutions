@@ -323,8 +323,8 @@ export default function PoolPlannerCalendar() {
         <div className="flex flex-wrap items-center gap-4">
           <span className="font-medium text-gray-700">Status:</span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-md border border-orange-400 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-900">
-              <AlertCircle className="h-3 w-3 text-orange-600" />
+            <span className="inline-flex items-center gap-1 rounded-md border border-red-400 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-900">
+              <AlertCircle className="h-3 w-3 text-red-600" />
               offen
             </span>
             <span className="text-gray-500">sucht jemanden</span>
@@ -378,14 +378,14 @@ function RequestPill({
   const ShiftIcon = shift === 'EARLY' ? Sun : Moon
   const shiftColor = shift === 'EARLY' ? 'text-amber-600' : 'text-indigo-600'
 
-  // OPEN = orange/amber mit Alarm-Icon (Aktion nötig)
+  // OPEN = rot mit Alarm-Icon (Aktion nötig)
   // FILLED = blau mit Check-Icon (erledigt)
   const containerClass =
     status === 'OPEN'
-      ? 'border border-orange-400 bg-orange-100 text-orange-900'
+      ? 'border border-red-400 bg-red-100 text-red-900'
       : 'border border-blue-400 bg-blue-100 text-blue-900'
   const StatusIcon = status === 'OPEN' ? AlertCircle : CheckCircle2
-  const statusIconClass = status === 'OPEN' ? 'text-orange-600' : 'text-blue-600'
+  const statusIconClass = status === 'OPEN' ? 'text-red-600' : 'text-blue-600'
 
   return (
     <div
@@ -502,9 +502,9 @@ function DayDialog({
 
         {details && (
           <div className="space-y-4">
-            {/* Sektion: Offene Anfragen (orange = Aktion nötig) */}
+            {/* Sektion: Offene Anfragen (rot = Aktion nötig) */}
             <section className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-700">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-700">
                 <AlertCircle className="h-3.5 w-3.5" />
                 Offene Anfragen
               </div>
@@ -669,9 +669,9 @@ function OpenRequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () 
   const team = POOL_TEAMS[req.team]
   const ShiftIcon = req.shift === 'EARLY' ? Sun : Moon
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border-l-4 border border-orange-300 border-l-orange-500 bg-orange-50 p-2">
+    <div className="flex items-center justify-between gap-2 rounded-lg border-l-4 border border-red-300 border-l-red-500 bg-red-50 p-2">
       <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
-        <AlertCircle className="h-4 w-4 shrink-0 text-orange-600" />
+        <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
         <ShiftIcon className={`h-4 w-4 shrink-0 ${req.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
         <span className="font-medium text-gray-900">
           {req.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}

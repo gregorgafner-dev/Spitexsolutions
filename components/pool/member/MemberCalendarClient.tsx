@@ -225,7 +225,7 @@ export default function MemberCalendarClient() {
                       <ShiftPill key={r.id} kind="OPEN" shift={r.shift} team={r.team} />
                     ))}
                     {openReqs.length > 3 && (
-                      <span className="text-[10px] font-medium text-orange-700">+{openReqs.length - 3} weitere offen</span>
+                      <span className="text-[10px] font-medium text-red-700">+{openReqs.length - 3} weitere offen</span>
                     )}
                     {myBookings.slice(0, 3).map((b, i) => (
                       <ShiftPill key={`b-${i}`} kind="BOOKED" shift={b.shift} team={b.team} />
@@ -247,8 +247,8 @@ export default function MemberCalendarClient() {
 
         <div className="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-xs text-gray-600">
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-md border border-orange-400 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-900">
-              <AlertCircle className="h-3 w-3 text-orange-600" />
+            <span className="inline-flex items-center gap-1 rounded-md border border-red-400 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-900">
+              <AlertCircle className="h-3 w-3 text-red-600" />
               offen
             </span>
             <span className="text-gray-500">kannst du übernehmen</span>
@@ -296,10 +296,10 @@ function ShiftPill({
   const shiftColor = shift === 'EARLY' ? 'text-amber-600' : 'text-indigo-600'
   const containerClass =
     kind === 'OPEN'
-      ? 'border border-orange-400 bg-orange-100 text-orange-900'
+      ? 'border border-red-400 bg-red-100 text-red-900'
       : 'border border-blue-400 bg-blue-100 text-blue-900'
   const StatusIcon = kind === 'OPEN' ? AlertCircle : CheckCircle2
-  const statusIconClass = kind === 'OPEN' ? 'text-orange-600' : 'text-blue-600'
+  const statusIconClass = kind === 'OPEN' ? 'text-red-600' : 'text-blue-600'
   return (
     <div
       className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none ${containerClass}`}
@@ -415,7 +415,7 @@ function DayDialog({
           {/* Offene Anfragen */}
           {data.openRequests.length > 0 && (
             <section className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-700">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-700">
                 <AlertCircle className="h-3.5 w-3.5" />
                 Offene Anfragen
               </div>
@@ -424,9 +424,9 @@ function DayDialog({
                 const ShiftIcon = r.shift === 'EARLY' ? Sun : Moon
                 const acceptDisabled = isPast || savingAcceptId === r.id
                 return (
-                  <div key={r.id} className="rounded-lg border-l-4 border border-orange-300 border-l-orange-500 bg-orange-50 p-3">
+                  <div key={r.id} className="rounded-lg border-l-4 border border-red-300 border-l-red-500 bg-red-50 p-3">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <AlertCircle className="h-4 w-4 text-orange-600" />
+                      <AlertCircle className="h-4 w-4 text-red-600" />
                       <ShiftIcon className={`h-4 w-4 ${r.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
                       <span className="font-semibold text-gray-900">
                         {r.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}
