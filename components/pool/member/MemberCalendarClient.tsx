@@ -20,6 +20,7 @@ import {
   Lock,
   CheckCircle2,
   AlertCircle,
+  Users,
 } from 'lucide-react'
 import { POOL_AVAILABLE_YEARS, getHolidayMap } from '@/lib/pool/holidays-zh'
 import { POOL_TEAMS, type PoolTeamId } from '@/lib/pool/teams'
@@ -224,7 +225,7 @@ export default function MemberCalendarClient() {
                       <ShiftPill key={r.id} kind="OPEN" shift={r.shift} team={r.team} />
                     ))}
                     {openReqs.length > 3 && (
-                      <span className="text-[10px] font-medium text-emerald-700">+{openReqs.length - 3} weitere offen</span>
+                      <span className="text-[10px] font-medium text-orange-700">+{openReqs.length - 3} weitere offen</span>
                     )}
                     {myBookings.slice(0, 3).map((b, i) => (
                       <ShiftPill key={`b-${i}`} kind="BOOKED" shift={b.shift} team={b.team} />
@@ -234,8 +235,8 @@ export default function MemberCalendarClient() {
 
                 {/* Eigene Verfügbarkeit dezent unten, sobald keine Buchungen */}
                 {cell.inMonth && myBookings.length === 0 && myAvail.length > 0 && (
-                  <div className="mt-auto flex items-center gap-1 pt-1 text-[10px] text-emerald-700">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <div className="mt-auto flex items-center gap-1 pt-1 text-[10px] text-teal-700">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500" />
                     verfügbar: {myAvail.map((s) => (s === 'EARLY' ? 'F' : 'S')).join('/')}
                   </div>
                 )}
@@ -246,19 +247,27 @@ export default function MemberCalendarClient() {
 
         <div className="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-xs text-gray-600">
           <span className="inline-flex items-center gap-1.5">
-            <AlertCircle className="h-3.5 w-3.5 text-emerald-600" /> offene Anfrage
+            <span className="inline-flex items-center gap-1 rounded-md border border-orange-400 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-900">
+              <AlertCircle className="h-3 w-3 text-orange-600" />
+              offen
+            </span>
+            <span className="text-gray-500">kannst du übernehmen</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> deine Buchung
+            <span className="inline-flex items-center gap-1 rounded-md border border-blue-400 bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-900">
+              <CheckCircle2 className="h-3 w-3 text-blue-600" />
+              gebucht
+            </span>
+            <span className="text-gray-500">deine Schicht</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" /> deine Verfügbarkeit
+            <span className="inline-block h-2 w-2 rounded-full bg-teal-500" /> deine Verfügbarkeit
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1.5">
+            <Sun className="h-3.5 w-3.5 text-amber-500" /> Früh (F)
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Sun className="h-3.5 w-3.5 text-amber-500" /> Frühdienst (F)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Moon className="h-3.5 w-3.5 text-indigo-500" /> Spätdienst (S)
+            <Moon className="h-3.5 w-3.5 text-indigo-500" /> Spät (S)
           </span>
         </div>
       </div>
@@ -284,13 +293,19 @@ function ShiftPill({
 }) {
   const teamDef = POOL_TEAMS[team]
   const ShiftIcon = shift === 'EARLY' ? Sun : Moon
-  const shiftColor = shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'
-  const ring = kind === 'OPEN' ? 'ring-1 ring-emerald-300' : 'ring-1 ring-blue-400'
+  const shiftColor = shift === 'EARLY' ? 'text-amber-600' : 'text-indigo-600'
+  const containerClass =
+    kind === 'OPEN'
+      ? 'border border-orange-400 bg-orange-100 text-orange-900'
+      : 'border border-blue-400 bg-blue-100 text-blue-900'
+  const StatusIcon = kind === 'OPEN' ? AlertCircle : CheckCircle2
+  const statusIconClass = kind === 'OPEN' ? 'text-orange-600' : 'text-blue-600'
   return (
     <div
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${teamDef?.color ?? 'bg-gray-100 text-gray-700'} ${ring}`}
-      title={`${teamDef?.label ?? team} · ${shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} · ${kind === 'OPEN' ? 'offen' : 'gebucht'}`}
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none ${containerClass}`}
+      title={`${teamDef?.label ?? team} · ${shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} · ${kind === 'OPEN' ? 'offen – kannst du übernehmen' : 'von dir gebucht'}`}
     >
+      <StatusIcon className={`h-3 w-3 ${statusIconClass}`} />
       <ShiftIcon className={`h-3 w-3 ${shiftColor}`} />
       {teamDef?.short ?? team}
     </div>
@@ -400,14 +415,18 @@ function DayDialog({
           {/* Offene Anfragen */}
           {data.openRequests.length > 0 && (
             <section className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Offene Anfragen</div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-700">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Offene Anfragen
+              </div>
               {data.openRequests.map((r) => {
                 const teamDef = POOL_TEAMS[r.team]
                 const ShiftIcon = r.shift === 'EARLY' ? Sun : Moon
                 const acceptDisabled = isPast || savingAcceptId === r.id
                 return (
-                  <div key={r.id} className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
+                  <div key={r.id} className="rounded-lg border-l-4 border border-orange-300 border-l-orange-500 bg-orange-50 p-3">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <AlertCircle className="h-4 w-4 text-orange-600" />
                       <ShiftIcon className={`h-4 w-4 ${r.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
                       <span className="font-semibold text-gray-900">
                         {r.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}
@@ -449,12 +468,15 @@ function DayDialog({
           {/* Eigene Buchungen */}
           {data.bookingDetails.length > 0 && (
             <section className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Deine Buchungen</div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Deine Buchungen
+              </div>
               {data.bookingDetails.map((b, i) => {
                 const teamDef = POOL_TEAMS[b.team]
                 const ShiftIcon = b.shift === 'EARLY' ? Sun : Moon
                 return (
-                  <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3 text-sm">
+                  <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border-l-4 border border-blue-300 border-l-blue-500 bg-blue-50 p-3 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-blue-600" />
                     <ShiftIcon className={`h-4 w-4 ${b.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
                     <span className="font-semibold text-gray-900">
@@ -470,10 +492,11 @@ function DayDialog({
             </section>
           )}
 
-          {/* Verfügbarkeit */}
+          {/* Verfügbarkeit / Angebot */}
           <section className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Verfügbarkeit für diesen Tag
+            <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-teal-700">
+              <Users className="h-3.5 w-3.5" />
+              Verfügbarkeit anbieten
             </Label>
             {isPast ? (
               <p className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">

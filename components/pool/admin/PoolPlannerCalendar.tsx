@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Plus, X, Sun, Moon, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, X, Sun, Moon, AlertCircle, CheckCircle2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -284,19 +284,25 @@ export default function PoolPlannerCalendar() {
                 </div>
               )}
 
-              {/* Verfügbarkeits-Indikatoren als kleine Pills unten in der Zelle */}
+              {/* Angebote = Verfügbarkeiten als kleine türkise Pills unten in der Zelle */}
               {cell.inMonth && dayInfo && (dayInfo.availEarly.length > 0 || dayInfo.availLate.length > 0) && (
                 <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
                   {dayInfo.availEarly.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
-                      <Sun className="h-2.5 w-2.5 text-amber-500" />
-                      F:{dayInfo.availEarly.length}
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800"
+                      title={`${dayInfo.availEarly.length} Mitarbeitende für Frühdienst verfügbar`}
+                    >
+                      <Users className="h-2.5 w-2.5" />
+                      F·{dayInfo.availEarly.length}
                     </span>
                   )}
                   {dayInfo.availLate.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
-                      <Moon className="h-2.5 w-2.5 text-indigo-500" />
-                      S:{dayInfo.availLate.length}
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800"
+                      title={`${dayInfo.availLate.length} Mitarbeitende für Spätdienst verfügbar`}
+                    >
+                      <Users className="h-2.5 w-2.5" />
+                      S·{dayInfo.availLate.length}
                     </span>
                   )}
                 </div>
@@ -313,20 +319,40 @@ export default function PoolPlannerCalendar() {
       </div>
 
       {/* Legende */}
-      <div className="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-xs text-gray-600">
-        <span className="font-medium text-gray-700">Teams:</span>
-        {POOL_TEAM_IDS.map((id) => (
-          <span key={id} className="inline-flex items-center gap-1.5">
-            <span className={`inline-block h-2.5 w-2.5 rounded-full ${POOL_TEAMS[id].dotColor}`} />
-            {POOL_TEAMS[id].label}
+      <div className="space-y-2 border-t border-gray-200 px-4 py-3 text-xs text-gray-600">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="font-medium text-gray-700">Status:</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-md border border-orange-400 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-900">
+              <AlertCircle className="h-3 w-3 text-orange-600" />
+              offen
+            </span>
+            <span className="text-gray-500">sucht jemanden</span>
           </span>
-        ))}
-        <span className="ml-auto inline-flex items-center gap-1.5">
-          <AlertCircle className="h-3.5 w-3.5 text-emerald-600" /> offen
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> übernommen
-        </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-md border border-blue-400 bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-900">
+              <CheckCircle2 className="h-3 w-3 text-blue-600" />
+              gebucht
+            </span>
+            <span className="text-gray-500">fix vergeben</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+              <Users className="h-3 w-3" />
+              F·N
+            </span>
+            <span className="text-gray-500">verfügbare Mitarbeitende</span>
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="font-medium text-gray-700">Teams:</span>
+          {POOL_TEAM_IDS.map((id) => (
+            <span key={id} className="inline-flex items-center gap-1.5">
+              <span className={`inline-block h-2.5 w-2.5 rounded-full ${POOL_TEAMS[id].dotColor}`} />
+              {POOL_TEAMS[id].label}
+            </span>
+          ))}
+        </div>
       </div>
 
       <DayDialog
@@ -350,13 +376,23 @@ function RequestPill({
 }) {
   const teamDef = POOL_TEAMS[team]
   const ShiftIcon = shift === 'EARLY' ? Sun : Moon
-  const shiftColor = shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'
-  const ring = status === 'OPEN' ? 'ring-1 ring-emerald-300' : 'ring-1 ring-blue-400'
+  const shiftColor = shift === 'EARLY' ? 'text-amber-600' : 'text-indigo-600'
+
+  // OPEN = orange/amber mit Alarm-Icon (Aktion nötig)
+  // FILLED = blau mit Check-Icon (erledigt)
+  const containerClass =
+    status === 'OPEN'
+      ? 'border border-orange-400 bg-orange-100 text-orange-900'
+      : 'border border-blue-400 bg-blue-100 text-blue-900'
+  const StatusIcon = status === 'OPEN' ? AlertCircle : CheckCircle2
+  const statusIconClass = status === 'OPEN' ? 'text-orange-600' : 'text-blue-600'
+
   return (
     <div
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${teamDef?.color ?? 'bg-gray-100 text-gray-700'} ${ring}`}
-      title={`${teamDef?.label ?? team} · ${shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} · ${status === 'OPEN' ? 'offen' : 'gebucht'}`}
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none ${containerClass}`}
+      title={`${teamDef?.label ?? team} · ${shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} · ${status === 'OPEN' ? 'offen – sucht jemanden' : 'gebucht'}`}
     >
+      <StatusIcon className={`h-3 w-3 ${statusIconClass}`} />
       <ShiftIcon className={`h-3 w-3 ${shiftColor}`} />
       {teamDef?.short ?? team}
     </div>
@@ -466,9 +502,10 @@ function DayDialog({
 
         {details && (
           <div className="space-y-4">
-            {/* Sektion: Offene Anfragen */}
+            {/* Sektion: Offene Anfragen (orange = Aktion nötig) */}
             <section className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-700">
+                <AlertCircle className="h-3.5 w-3.5" />
                 Offene Anfragen
               </div>
               {details.open.length === 0 ? (
@@ -484,10 +521,11 @@ function DayDialog({
               )}
             </section>
 
-            {/* Sektion: Belegte Schichten (alle Buchungen) */}
+            {/* Sektion: Belegte Schichten (blau = fix vergeben) */}
             <section className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Belegte Schichten
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Gebuchte Schichten
               </div>
               {details.bookings.length === 0 ? (
                 <p className="rounded border border-dashed border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
@@ -502,10 +540,11 @@ function DayDialog({
               )}
             </section>
 
-            {/* Sektion: Verfügbarkeiten – Konflikt-Filter (gebuchte Personen ausgeblendet) */}
+            {/* Sektion: Verfügbarkeiten / Angebote (teal = MA angeboten) */}
             <section className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Verfügbar an diesem Tag
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-teal-700">
+                <Users className="h-3.5 w-3.5" />
+                Angeboten (verfügbar)
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <AvailabilityList
@@ -630,8 +669,9 @@ function OpenRequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () 
   const team = POOL_TEAMS[req.team]
   const ShiftIcon = req.shift === 'EARLY' ? Sun : Moon
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/40 p-2">
+    <div className="flex items-center justify-between gap-2 rounded-lg border-l-4 border border-orange-300 border-l-orange-500 bg-orange-50 p-2">
       <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
+        <AlertCircle className="h-4 w-4 shrink-0 text-orange-600" />
         <ShiftIcon className={`h-4 w-4 shrink-0 ${req.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
         <span className="font-medium text-gray-900">
           {req.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'}
@@ -663,7 +703,7 @@ function BookingRow({ booking }: { booking: BookingApi }) {
   const team = POOL_TEAMS[booking.team]
   const ShiftIcon = booking.shift === 'EARLY' ? Sun : Moon
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/40 p-2">
+    <div className="flex items-center justify-between gap-2 rounded-lg border-l-4 border border-blue-300 border-l-blue-500 bg-blue-50 p-2">
       <div className="flex flex-1 flex-wrap items-center gap-2 text-sm">
         <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" />
         <ShiftIcon className={`h-4 w-4 shrink-0 ${booking.shift === 'EARLY' ? 'text-amber-500' : 'text-indigo-500'}`} />
@@ -707,21 +747,21 @@ function AvailabilityList({
   // Personen ausblenden, die für dieselbe (Tag, Schicht) bereits gebucht sind.
   const visible = items.filter((a) => !a.lockedByBooking)
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-2">
-      <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+    <div className="rounded-lg border border-teal-200 bg-teal-50/40 p-2">
+      <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-teal-800">
         {icon}
         {title}
-        <span className="ml-auto rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+        <span className="ml-auto rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium text-teal-800">
           {visible.length}
         </span>
       </div>
       {visible.length === 0 ? (
-        <p className="text-xs text-gray-400">niemand verfügbar</p>
+        <p className="text-xs text-gray-400">niemand angeboten</p>
       ) : (
         <ul className="space-y-0.5 text-xs">
           {visible.map((a) => (
             <li key={a.id} className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500" />
               <span className="text-gray-900">
                 {a.poolUser.firstName} {a.poolUser.lastName}
               </span>
