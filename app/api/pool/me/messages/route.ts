@@ -46,6 +46,11 @@ export async function GET(_request: NextRequest) {
           status: true,
           allowedQualifications: true,
           filledByPoolUserId: true,
+          bookings: {
+            where: { poolUserId: session.poolUserId },
+            select: { id: true, shiftRequestId: true },
+            take: 1,
+          },
         },
       },
     },
@@ -66,6 +71,13 @@ export async function GET(_request: NextRequest) {
     const allowed = m.relatedRequest
       ? parseAllowedQualifications(m.relatedRequest.allowedQualifications)
       : []
+    const myBooking = m.relatedRequest?.bookings?.[0] ?? null
+    // Wenn der User für diese Anfrage eine Buchung hat, deren `shiftRequestId`
+    // NICHT der Anfrage-ID entspricht (typischerweise null), wurde er
+    // direkt durch die Planung gebucht.
+    const bookedByPlanner = Boolean(
+      myBooking && myBooking.shiftRequestId !== m.relatedRequest?.id
+    )
     return {
       id: m.id,
       type: m.type,
@@ -84,6 +96,7 @@ export async function GET(_request: NextRequest) {
             allowedQualifications: allowed,
             allowedQualificationLabels: allowed.map((q) => getQualificationLabel(q) ?? q),
             takenByMe: m.relatedRequest.filledByPoolUserId === session.poolUserId,
+            bookedByPlanner,
           }
         : null,
     }

@@ -23,6 +23,7 @@ type Message = {
     allowedQualifications: string[]
     allowedQualificationLabels: string[]
     takenByMe: boolean
+    bookedByPlanner: boolean
   } | null
 }
 
@@ -157,6 +158,7 @@ function MessageCard({
     !message.relatedRequest?.takenByMe
 
   const wasTakenByMe = message.relatedRequest?.takenByMe === true
+  const bookedByPlanner = message.relatedRequest?.bookedByPlanner === true
   const closedByOthers =
     message.type === 'SHIFT_REQUEST' &&
     message.relatedRequest?.status !== 'OPEN' &&
@@ -218,7 +220,8 @@ function MessageCard({
               )}
               {wasTakenByMe && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> von dir übernommen
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {bookedByPlanner ? 'durch Planung gebucht' : 'von dir übernommen'}
                 </span>
               )}
               {closedByOthers && (
