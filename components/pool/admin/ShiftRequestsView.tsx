@@ -123,7 +123,7 @@ export default function ShiftRequestsView() {
                 <th className="px-4 py-2">Datum</th>
                 <th className="px-4 py-2">Schicht</th>
                 <th className="px-4 py-2">Team</th>
-                <th className="px-4 py-2">Mindestqual.</th>
+                <th className="px-4 py-2">Qualifikation</th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Notiz</th>
                 <th className="px-4 py-2">Erstellt</th>
@@ -377,7 +377,7 @@ function CreateDialog({
             />
           </div>
           <div>
-            <Label>Mindestqualifikation</Label>
+            <Label>Qualifikationen, die in Frage kommen</Label>
             <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {POOL_QUALIFICATION_IDS.map((q) => (
                 <label
@@ -404,7 +404,7 @@ function CreateDialog({
             <p className="mt-1 text-[11px] text-gray-500">
               {allowedQuals.length === 0
                 ? 'Ohne Auswahl ist die Anfrage für alle Mitarbeitenden sichtbar.'
-                : `Nur Mitarbeitende mit Qualifikation ${allowedQuals.join(' / ')} sehen die Anfrage und können sie übernehmen.`}
+                : `Nur Mitarbeitende mit ${allowedQuals.join(' / ')} sehen die Anfrage und können sie übernehmen.`}
             </p>
           </div>
           {error && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>}

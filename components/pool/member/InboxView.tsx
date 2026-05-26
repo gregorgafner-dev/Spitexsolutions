@@ -213,7 +213,7 @@ function MessageCard({
                   className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-800"
                   title={message.relatedRequest.allowedQualificationLabels.join(', ')}
                 >
-                  Mindestqual.: {message.relatedRequest.allowedQualifications.join(' / ')}
+                  für: {message.relatedRequest.allowedQualifications.join(' / ')}
                 </span>
               )}
               {wasTakenByMe && (

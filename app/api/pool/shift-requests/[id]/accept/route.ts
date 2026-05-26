@@ -57,7 +57,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
         if (!isMemberQualifiedForRequest(me?.qualification ?? null, allowed)) {
           throw new HttpError(
             403,
-            `Für diesen Dienst ist die Mindestqualifikation ${allowed.join(', ')} erforderlich.`
+            `Dieser Dienst ist nur für ${allowed.join(', ')} vorgesehen.`
           )
         }
       }

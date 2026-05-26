@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     const parsedBack = parseAllowedQualifications(allowedQualificationsJson)
     if (parsedBack.length !== allowedQualificationsList.length) {
       return NextResponse.json(
-        { error: 'Ungültige Berufsbezeichnung in der Mindestqualifikation.' },
+        { error: 'Ungültige Berufsbezeichnung in der Qualifikations-Auswahl.' },
         { status: 400 }
       )
     }
@@ -182,9 +182,7 @@ export async function POST(request: NextRequest) {
   const shiftLabel = shiftStr === 'EARLY' ? 'Frühdienst' : 'Spätdienst'
   const teamLabel = getTeamLabel(teamStr)
   const qualNote =
-    allowedParsed.length > 0
-      ? ` (Mindestqualifikation: ${allowedParsed.join(', ')})`
-      : ''
+    allowedParsed.length > 0 ? ` (für: ${allowedParsed.join(', ')})` : ''
   const subject = `Dienstanfrage: ${shiftLabel} am ${toIsoDay(date)} · ${teamLabel}${qualNote}`
   const content = message ?? 'Bitte schau im Postfach, ob du diesen Dienst übernehmen kannst.'
 

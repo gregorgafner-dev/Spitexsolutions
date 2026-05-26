@@ -445,7 +445,7 @@ function DayDialog({
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Mindestqualifikation</Label>
+                  <Label className="text-xs">Qualifikationen, die in Frage kommen</Label>
                   <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                     {POOL_QUALIFICATION_IDS.map((q) => (
                       <label
@@ -472,7 +472,7 @@ function DayDialog({
                   <p className="mt-1 text-[11px] text-gray-500">
                     {allowedQuals.length === 0
                       ? 'Ohne Auswahl ist die Anfrage für alle Mitarbeitenden sichtbar.'
-                      : `Nur Mitarbeitende mit Qualifikation ${allowedQuals.join(' / ')} sehen die Anfrage und können sie übernehmen.`}
+                      : `Nur Mitarbeitende mit ${allowedQuals.join(' / ')} sehen die Anfrage und können sie übernehmen.`}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -520,9 +520,9 @@ function RequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () => v
         {req.allowedQualifications.length > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800"
-            title={`Mindestqualifikation: ${req.allowedQualificationLabels.join(', ')}`}
+            title={`Qualifikationen: ${req.allowedQualificationLabels.join(', ')}`}
           >
-            Min: {req.allowedQualifications.join('/')}
+            für: {req.allowedQualifications.join('/')}
           </span>
         )}
         {req.message && (
