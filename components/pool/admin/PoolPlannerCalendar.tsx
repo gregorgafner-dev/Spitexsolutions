@@ -423,6 +423,14 @@ function DayDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [bookingId, setBookingId] = useState<string | null>(null)
+  const [bookingSaving, setBookingSaving] = useState(false)
+
+  // Buchte Team-Slots an diesem Tag ermitteln (Tag+Schicht+Team), damit
+  // Doppelbuchungen optisch unterbunden werden können.
+  const bookedTeamSlots = new Set(
+    (details?.bookings ?? []).map((b) => `${b.shift}:${b.team}`)
+  )
 
   useEffect(() => {
     if (isoDay) {
@@ -434,8 +442,41 @@ function DayDialog({
       setError(null)
       setSuccess(null)
       setSaving(false)
+      setBookingId(null)
+      setBookingSaving(false)
     }
   }, [isoDay])
+
+  async function handleBookAvailability(item: AvailabilityApi, teamId: PoolTeamId) {
+    if (!isoDay) return
+    setBookingSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await fetch('/api/pool/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poolUserId: item.poolUser.id,
+          date: isoDay,
+          shift: item.shift,
+          team: teamId,
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(d.error || 'Buchung fehlgeschlagen.')
+        return
+      }
+      const teamLabel = POOL_TEAMS[teamId]?.label ?? teamId
+      const shiftLabel = item.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'
+      setSuccess(`${item.poolUser.firstName} ${item.poolUser.lastName} für ${shiftLabel} (${teamLabel}) gebucht.`)
+      setBookingId(null)
+      onChanged()
+    } finally {
+      setBookingSaving(false)
+    }
+  }
 
   function toggleQual(q: PoolQualificationId) {
     setAllowedQuals((prev) => (prev.includes(q) ? prev.filter((x) => x !== q) : [...prev, q]))
@@ -551,11 +592,21 @@ function DayDialog({
                   title="Frühdienst"
                   icon={<Sun className="h-3.5 w-3.5 text-amber-500" />}
                   items={details.availEarly}
+                  bookedTeamSlots={bookedTeamSlots}
+                  expandedId={bookingId}
+                  onToggleExpand={(id) => setBookingId((cur) => (cur === id ? null : id))}
+                  onBook={handleBookAvailability}
+                  saving={bookingSaving}
                 />
                 <AvailabilityList
                   title="Spätdienst"
                   icon={<Moon className="h-3.5 w-3.5 text-indigo-500" />}
                   items={details.availLate}
+                  bookedTeamSlots={bookedTeamSlots}
+                  expandedId={bookingId}
+                  onToggleExpand={(id) => setBookingId((cur) => (cur === id ? null : id))}
+                  onBook={handleBookAvailability}
+                  saving={bookingSaving}
                 />
               </div>
             </section>
@@ -739,10 +790,20 @@ function AvailabilityList({
   title,
   icon,
   items,
+  bookedTeamSlots,
+  expandedId,
+  onToggleExpand,
+  onBook,
+  saving,
 }: {
   title: string
   icon: React.ReactNode
   items: AvailabilityApi[]
+  bookedTeamSlots: Set<string>
+  expandedId: string | null
+  onToggleExpand: (id: string) => void
+  onBook: (item: AvailabilityApi, team: PoolTeamId) => void | Promise<void>
+  saving: boolean
 }) {
   // Personen ausblenden, die für dieselbe (Tag, Schicht) bereits gebucht sind.
   const visible = items.filter((a) => !a.lockedByBooking)
@@ -758,23 +819,70 @@ function AvailabilityList({
       {visible.length === 0 ? (
         <p className="text-xs text-gray-400">niemand angeboten</p>
       ) : (
-        <ul className="space-y-0.5 text-xs">
-          {visible.map((a) => (
-            <li key={a.id} className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500" />
-              <span className="text-gray-900">
-                {a.poolUser.firstName} {a.poolUser.lastName}
-              </span>
-              {a.poolUser.qualificationShort && (
-                <span
-                  className="rounded border border-sky-200 bg-sky-50 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-800"
-                  title={a.poolUser.qualification ?? ''}
+        <ul className="space-y-1 text-xs">
+          {visible.map((a) => {
+            const isOpen = expandedId === a.id
+            return (
+              <li key={a.id} className="rounded border border-transparent hover:border-teal-200">
+                <button
+                  type="button"
+                  onClick={() => onToggleExpand(a.id)}
+                  disabled={saving}
+                  className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-teal-100/60 disabled:cursor-not-allowed"
+                  title="Mit einem Team buchen"
                 >
-                  {a.poolUser.qualificationShort}
-                </span>
-              )}
-            </li>
-          ))}
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-500" />
+                  <span className="text-gray-900">
+                    {a.poolUser.firstName} {a.poolUser.lastName}
+                  </span>
+                  {a.poolUser.qualificationShort && (
+                    <span
+                      className="rounded border border-sky-200 bg-sky-50 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-800"
+                      title={a.poolUser.qualification ?? ''}
+                    >
+                      {a.poolUser.qualificationShort}
+                    </span>
+                  )}
+                  <span className="ml-auto text-[9px] font-medium text-teal-700">
+                    {isOpen ? '×' : 'buchen ›'}
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="mt-1 space-y-1 rounded border border-teal-300 bg-white p-1.5">
+                    <div className="text-[10px] text-gray-600">Team für Buchung wählen:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {POOL_TEAM_IDS.map((tid) => {
+                        const teamDef = POOL_TEAMS[tid]
+                        const slotKey = `${a.shift}:${tid}`
+                        const slotTaken = bookedTeamSlots.has(slotKey)
+                        return (
+                          <button
+                            key={tid}
+                            type="button"
+                            disabled={saving || slotTaken}
+                            onClick={() => onBook(a, tid)}
+                            title={
+                              slotTaken
+                                ? `${teamDef.label} · ${a.shift === 'EARLY' ? 'Frühdienst' : 'Spätdienst'} ist bereits gebucht`
+                                : `Bei ${teamDef.label} buchen`
+                            }
+                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none transition ${
+                              slotTaken
+                                ? 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400 line-through'
+                                : 'border border-teal-300 bg-teal-50 text-teal-900 hover:bg-teal-100'
+                            }`}
+                          >
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${teamDef.dotColor}`} />
+                            {teamDef.short}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
