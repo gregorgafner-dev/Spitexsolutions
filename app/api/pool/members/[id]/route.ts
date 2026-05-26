@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
+import { isValidQualification } from '@/lib/pool/qualifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,6 +45,17 @@ export async function PATCH(
   if (typeof body?.phone === 'string') data.phone = body.phone.trim() || null
   if (typeof body?.notes === 'string') data.notes = body.notes.trim() || null
   if (typeof body?.active === 'boolean') data.active = body.active
+  if (body?.qualification === null || body?.qualification === '') {
+    data.qualification = null
+  } else if (typeof body?.qualification === 'string') {
+    if (!isValidQualification(body.qualification)) {
+      return NextResponse.json(
+        { error: 'Ungültige Berufsbezeichnung.' },
+        { status: 400 }
+      )
+    }
+    data.qualification = body.qualification
+  }
 
   // E-Mail-Änderung mit Eindeutigkeits-Check
   if (typeof body?.email === 'string') {
@@ -72,6 +84,7 @@ export async function PATCH(
       active: true,
       phone: true,
       notes: true,
+      qualification: true,
       createdAt: true,
       updatedAt: true,
     },

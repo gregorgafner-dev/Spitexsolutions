@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
 import { hashPoolPassword } from '@/lib/pool/auth'
+import { isValidQualification } from '@/lib/pool/qualifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,6 +23,7 @@ export async function GET() {
       active: true,
       phone: true,
       notes: true,
+      qualification: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -50,6 +52,17 @@ export async function POST(request: NextRequest) {
   const notes = body?.notes ? String(body.notes).trim() : null
   const password = typeof body?.password === 'string' ? body.password : ''
   const active = body?.active !== false
+  const qualificationRaw = body?.qualification
+  let qualification: string | null = null
+  if (qualificationRaw && qualificationRaw !== '') {
+    if (!isValidQualification(qualificationRaw)) {
+      return NextResponse.json(
+        { error: 'Ungültige Berufsbezeichnung.' },
+        { status: 400 }
+      )
+    }
+    qualification = qualificationRaw
+  }
 
   if (!email || !firstName || !lastName || !role) {
     return NextResponse.json(
@@ -80,6 +93,7 @@ export async function POST(request: NextRequest) {
       role,
       phone,
       notes,
+      qualification,
       active,
       password: await hashPoolPassword(password),
     },
@@ -92,6 +106,7 @@ export async function POST(request: NextRequest) {
       active: true,
       phone: true,
       notes: true,
+      qualification: true,
       createdAt: true,
       updatedAt: true,
     },

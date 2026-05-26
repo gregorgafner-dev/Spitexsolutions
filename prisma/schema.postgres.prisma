@@ -218,17 +218,18 @@ model Message {
 // Systemgrenzen zu erzwingen.
 
 model PoolUser {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  password    String   // bcrypt hash
-  firstName   String
-  lastName    String
-  role        String   // "PLANNER" or "MEMBER"
-  active      Boolean  @default(true)
-  phone       String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String   // bcrypt hash
+  firstName     String
+  lastName      String
+  role          String   // "PLANNER" or "MEMBER"
+  active        Boolean  @default(true)
+  phone         String?
+  notes         String?
+  qualification String?  // siehe lib/pool/qualifications.ts (DIPL | FAGE | BKM | SRK | HW)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   availabilities       PoolAvailability[]
   bookings             PoolBooking[]      @relation("PoolBookingMember")

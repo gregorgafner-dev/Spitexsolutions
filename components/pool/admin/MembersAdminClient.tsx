@@ -25,6 +25,12 @@ import {
   Mail,
   Phone,
 } from 'lucide-react'
+import {
+  POOL_QUALIFICATIONS,
+  POOL_QUALIFICATION_IDS,
+  getQualificationShort,
+  type PoolQualificationId,
+} from '@/lib/pool/qualifications'
 
 type Member = {
   id: string
@@ -35,6 +41,7 @@ type Member = {
   active: boolean
   phone: string | null
   notes: string | null
+  qualification: string | null
   createdAt: string
   updatedAt: string
 }
@@ -135,8 +142,19 @@ export default function MembersAdminClient() {
             {members.map((m) => (
               <tr key={m.id} className={m.active ? '' : 'bg-gray-50/50 text-gray-500'}>
                 <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">
-                    {m.lastName}, {m.firstName}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {m.lastName}, {m.firstName}
+                    </span>
+                    {m.qualification && (
+                      <Badge
+                        variant="outline"
+                        className="border-sky-300 bg-sky-50 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide text-sky-800"
+                        title={POOL_QUALIFICATIONS[m.qualification as PoolQualificationId]?.label ?? m.qualification}
+                      >
+                        {getQualificationShort(m.qualification)}
+                      </Badge>
+                    )}
                   </div>
                   {m.notes && (
                     <div className="mt-0.5 line-clamp-1 text-xs text-gray-500">{m.notes}</div>
@@ -279,6 +297,7 @@ function MemberFormDialog({
   const [notes, setNotes] = useState('')
   const [password, setPassword] = useState('')
   const [active, setActive] = useState(true)
+  const [qualification, setQualification] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -294,6 +313,7 @@ function MemberFormDialog({
         setPhone(member.phone ?? '')
         setNotes(member.notes ?? '')
         setActive(member.active)
+        setQualification(member.qualification ?? '')
         setPassword('')
       } else {
         setEmail('')
@@ -303,6 +323,7 @@ function MemberFormDialog({
         setPhone('')
         setNotes('')
         setActive(true)
+        setQualification('')
         setPassword('')
       }
     }
@@ -315,7 +336,16 @@ function MemberFormDialog({
     try {
       const url = isEdit ? `/api/pool/members/${member!.id}` : '/api/pool/members'
       const method = isEdit ? 'PATCH' : 'POST'
-      const body: any = { email, firstName, lastName, role, phone, notes, active }
+      const body: any = {
+        email,
+        firstName,
+        lastName,
+        role,
+        phone,
+        notes,
+        active,
+        qualification: qualification || null,
+      }
       if (!isEdit) body.password = password
       const res = await fetch(url, {
         method,
@@ -374,9 +404,25 @@ function MemberFormDialog({
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="phone">Telefon (optional)</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Label htmlFor="qualification">Berufsbezeichnung (optional)</Label>
+              <select
+                id="qualification"
+                value={qualification}
+                onChange={(e) => setQualification(e.target.value)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">– keine Angabe –</option>
+                {POOL_QUALIFICATION_IDS.map((id) => (
+                  <option key={id} value={id}>
+                    {POOL_QUALIFICATIONS[id].short} – {POOL_QUALIFICATIONS[id].label}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="phone">Telefon (optional)</Label>
+            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           {!isEdit && (
             <div className="space-y-1">

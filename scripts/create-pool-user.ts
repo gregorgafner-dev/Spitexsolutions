@@ -20,6 +20,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import { hashPoolPassword } from '../lib/pool/auth'
+import { isValidQualification } from '../lib/pool/qualifications'
 
 const prisma = new PrismaClient()
 
@@ -41,7 +42,22 @@ async function main() {
   const role = arg('role') as 'PLANNER' | 'MEMBER' | undefined
   const phone = arg('phone') ?? null
   const notes = arg('notes') ?? null
+  const qualificationArg = arg('qualification')
   const update = flag('update')
+
+  let qualification: string | null | undefined = undefined
+  if (qualificationArg !== undefined) {
+    if (qualificationArg === '' || qualificationArg.toUpperCase() === 'NONE') {
+      qualification = null
+    } else if (!isValidQualification(qualificationArg)) {
+      console.error(
+        `FEHLER: --qualification muss einer von DIPL|FAGE|BKM|SRK|HW sein (oder NONE).`
+      )
+      process.exit(1)
+    } else {
+      qualification = qualificationArg
+    }
+  }
 
   if (!email) {
     console.error('FEHLER: --email ist erforderlich.')
@@ -73,6 +89,7 @@ async function main() {
         ...(lastName ? { lastName } : {}),
         ...(phone !== undefined ? { phone } : {}),
         ...(notes !== undefined ? { notes } : {}),
+        ...(qualification !== undefined ? { qualification } : {}),
       },
     })
     console.log(
@@ -99,6 +116,7 @@ async function main() {
       role,
       phone: phone ?? undefined,
       notes: notes ?? undefined,
+      qualification: qualification ?? undefined,
       active: true,
     },
   })
