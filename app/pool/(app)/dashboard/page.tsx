@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getPoolSession } from '@/lib/pool/auth'
 import MemberCalendarClient from '@/components/pool/member/MemberCalendarClient'
-import { Inbox } from 'lucide-react'
+import { Inbox, ClipboardList } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,13 +22,22 @@ export default async function PoolMemberDashboardPage() {
             Hier siehst du deinen persönlichen Kalender und kannst deine Verfügbarkeit eintragen.
           </p>
         </div>
-        <Link
-          href="/pool/postfach"
-          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-        >
-          <Inbox className="h-4 w-4" />
-          Postfach
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/pool/dienste"
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+          >
+            <ClipboardList className="h-4 w-4" />
+            Meine Dienste
+          </Link>
+          <Link
+            href="/pool/postfach"
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            <Inbox className="h-4 w-4" />
+            Postfach
+          </Link>
+        </div>
       </div>
 
       <MemberCalendarClient />
