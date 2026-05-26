@@ -319,12 +319,14 @@ function DayDialog({
   const [savingAvail, setSavingAvail] = useState(false)
   const [savingAcceptId, setSavingAcceptId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (data) {
       setEarly(data.availability.includes('EARLY') || data.bookings.includes('EARLY'))
       setLate(data.availability.includes('LATE') || data.bookings.includes('LATE'))
       setError(null)
+      setSuccess(null)
       setSavingAvail(false)
       setSavingAcceptId(null)
     }
@@ -339,6 +341,7 @@ function DayDialog({
     if (!data) return
     setSavingAvail(true)
     setError(null)
+    setSuccess(null)
     try {
       const shifts: string[] = []
       if (early) shifts.push('EARLY')
@@ -353,7 +356,14 @@ function DayDialog({
         setError(d.error || 'Speichern fehlgeschlagen.')
         return
       }
+      const note =
+        shifts.length === 0
+          ? 'Verfügbarkeit entfernt.'
+          : `Verfügbarkeit gespeichert (${shifts.map((s) => (s === 'EARLY' ? 'Frühdienst' : 'Spätdienst')).join(', ')}).`
+      setSuccess(note)
       onChanged()
+      // Dialog kurz offen lassen, damit der Hinweis sichtbar bleibt, dann schliessen.
+      setTimeout(() => onClose(), 1100)
     } finally {
       setSavingAvail(false)
     }
@@ -362,6 +372,7 @@ function DayDialog({
   async function handleAccept(reqId: string) {
     setSavingAcceptId(reqId)
     setError(null)
+    setSuccess(null)
     try {
       const res = await fetch(`/api/pool/shift-requests/${reqId}/accept`, { method: 'POST' })
       const d = await res.json().catch(() => ({}))
@@ -369,7 +380,9 @@ function DayDialog({
         setError(d.error || 'Übernahme fehlgeschlagen.')
         return
       }
+      setSuccess('Dienst übernommen.')
       onChanged()
+      setTimeout(() => onClose(), 1100)
     } finally {
       setSavingAcceptId(null)
     }
@@ -499,6 +512,12 @@ function DayDialog({
 
           {error && (
             <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>
+          )}
+          {success && (
+            <div className="flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 p-2 text-sm font-medium text-emerald-800">
+              <CheckCircle2 className="h-4 w-4" />
+              {success}
+            </div>
           )}
         </div>
 
