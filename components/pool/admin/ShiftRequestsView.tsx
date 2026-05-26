@@ -15,6 +15,11 @@ import {
 } from '@/components/ui/dialog'
 import { Sun, Moon, Loader2, Plus, X, CheckCircle2, AlertCircle, Send } from 'lucide-react'
 import { POOL_TEAMS, POOL_TEAM_IDS, type PoolTeamId } from '@/lib/pool/teams'
+import {
+  POOL_QUALIFICATIONS,
+  POOL_QUALIFICATION_IDS,
+  type PoolQualificationId,
+} from '@/lib/pool/qualifications'
 
 type ShiftRequest = {
   id: string
@@ -24,6 +29,8 @@ type ShiftRequest = {
   teamLabel: string
   status: 'OPEN' | 'FILLED' | 'CANCELLED'
   message: string | null
+  allowedQualifications: PoolQualificationId[]
+  allowedQualificationLabels: string[]
   filledAt: string | null
   filledByPoolUser: { id: string; firstName: string; lastName: string } | null
   createdAt: string
@@ -116,6 +123,7 @@ export default function ShiftRequestsView() {
                 <th className="px-4 py-2">Datum</th>
                 <th className="px-4 py-2">Schicht</th>
                 <th className="px-4 py-2">Team</th>
+                <th className="px-4 py-2">Mindestqual.</th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Notiz</th>
                 <th className="px-4 py-2">Erstellt</th>
@@ -125,7 +133,7 @@ export default function ShiftRequestsView() {
             <tbody className="divide-y divide-gray-100">
               {items.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">
                     Keine Anfragen vorhanden.
                   </td>
                 </tr>
@@ -151,6 +159,18 @@ export default function ShiftRequestsView() {
                       <span className={`inline-block h-1.5 w-1.5 rounded-full ${teamDef?.dotColor ?? 'bg-gray-500'}`} />
                       {teamDef?.label ?? it.team}
                     </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    {it.allowedQualifications.length === 0 ? (
+                      <span className="text-xs text-gray-400">alle</span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-800"
+                        title={it.allowedQualificationLabels.join(', ')}
+                      >
+                        {it.allowedQualifications.join(' / ')}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <StatusBadge status={it.status} filledBy={it.filledByPoolUser} />
@@ -249,6 +269,7 @@ function CreateDialog({
   const [shift, setShift] = useState<'EARLY' | 'LATE'>('EARLY')
   const [team, setTeam] = useState<PoolTeamId>('MAENNEDORF_UETIKON')
   const [message, setMessage] = useState('')
+  const [allowedQuals, setAllowedQuals] = useState<PoolQualificationId[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [okInfo, setOkInfo] = useState<string | null>(null)
@@ -259,11 +280,16 @@ function CreateDialog({
       setShift('EARLY')
       setTeam('MAENNEDORF_UETIKON')
       setMessage('')
+      setAllowedQuals([])
       setError(null)
       setOkInfo(null)
       setSaving(false)
     }
   }, [open])
+
+  function toggleQual(q: PoolQualificationId) {
+    setAllowedQuals((prev) => (prev.includes(q) ? prev.filter((x) => x !== q) : [...prev, q]))
+  }
 
   async function handleSubmit() {
     setSaving(true)
@@ -273,14 +299,26 @@ function CreateDialog({
       const res = await fetch('/api/pool/shift-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, shift, team, message: message.trim() || undefined }),
+        body: JSON.stringify({
+          date,
+          shift,
+          team,
+          message: message.trim() || undefined,
+          allowedQualifications: allowedQuals.length > 0 ? allowedQuals : undefined,
+        }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
         setError(d.error || 'Anfrage konnte nicht erstellt werden.')
         return
       }
-      setOkInfo(`Anfrage erstellt und an ${d.request?.notified ?? 0} Mitarbeitende geschickt.`)
+      const notified = d.request?.notified ?? 0
+      const total = d.request?.memberTotal ?? notified
+      const note =
+        allowedQuals.length > 0
+          ? `Anfrage erstellt – an ${notified} von ${total} qualifizierten Mitarbeitenden geschickt.`
+          : `Anfrage erstellt und an ${notified} Mitarbeitende geschickt.`
+      setOkInfo(note)
       setTimeout(() => onCreated(), 800)
     } finally {
       setSaving(false)
@@ -337,6 +375,37 @@ function CreateDialog({
               placeholder="z.B. ‘Pflegeintensiver Klient, Erfahrung mit Dekubitus von Vorteil’"
               rows={3}
             />
+          </div>
+          <div>
+            <Label>Mindestqualifikation</Label>
+            <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {POOL_QUALIFICATION_IDS.map((q) => (
+                <label
+                  key={q}
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs ${
+                    allowedQuals.includes(q)
+                      ? 'border-sky-400 bg-sky-50 text-sky-900'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={allowedQuals.includes(q)}
+                    onChange={() => toggleQual(q)}
+                    className="h-3.5 w-3.5 rounded border-gray-300"
+                  />
+                  <span className="font-semibold">{POOL_QUALIFICATIONS[q].short}</span>
+                  <span className="truncate text-[10px] text-gray-500">
+                    {POOL_QUALIFICATIONS[q].label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-gray-500">
+              {allowedQuals.length === 0
+                ? 'Ohne Auswahl ist die Anfrage für alle Mitarbeitenden sichtbar.'
+                : `Nur Mitarbeitende mit Qualifikation ${allowedQuals.join(' / ')} sehen die Anfrage und können sie übernehmen.`}
+            </p>
           </div>
           {error && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>}
           {okInfo && <div className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">{okInfo}</div>}

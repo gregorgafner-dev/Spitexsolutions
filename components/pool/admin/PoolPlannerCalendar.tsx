@@ -16,6 +16,11 @@ import {
 } from '@/components/ui/dialog'
 import { POOL_AVAILABLE_YEARS, getHolidayMap } from '@/lib/pool/holidays-zh'
 import { POOL_TEAMS, POOL_TEAM_IDS, type PoolTeamId } from '@/lib/pool/teams'
+import {
+  POOL_QUALIFICATIONS,
+  POOL_QUALIFICATION_IDS,
+  type PoolQualificationId,
+} from '@/lib/pool/qualifications'
 
 const MONTH_NAMES = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -31,6 +36,8 @@ type ShiftRequestApi = {
   teamLabel: string
   status: 'OPEN' | 'FILLED' | 'CANCELLED'
   message: string | null
+  allowedQualifications: PoolQualificationId[]
+  allowedQualificationLabels: string[]
   filledByPoolUser: { id: string; firstName: string; lastName: string } | null
   createdAt: string
 }
@@ -290,6 +297,7 @@ function DayDialog({
   const [shift, setShift] = useState<'EARLY' | 'LATE'>('EARLY')
   const [team, setTeam] = useState<PoolTeamId>('MAENNEDORF_UETIKON')
   const [message, setMessage] = useState('')
+  const [allowedQuals, setAllowedQuals] = useState<PoolQualificationId[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -300,11 +308,16 @@ function DayDialog({
       setShift('EARLY')
       setTeam('MAENNEDORF_UETIKON')
       setMessage('')
+      setAllowedQuals([])
       setError(null)
       setSuccess(null)
       setSaving(false)
     }
   }, [isoDay])
+
+  function toggleQual(q: PoolQualificationId) {
+    setAllowedQuals((prev) => (prev.includes(q) ? prev.filter((x) => x !== q) : [...prev, q]))
+  }
 
   async function handleCreate() {
     if (!isoDay) return
@@ -315,16 +328,29 @@ function DayDialog({
       const res = await fetch('/api/pool/shift-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: isoDay, shift, team, message: message.trim() || undefined }),
+        body: JSON.stringify({
+          date: isoDay,
+          shift,
+          team,
+          message: message.trim() || undefined,
+          allowedQualifications: allowedQuals.length > 0 ? allowedQuals : undefined,
+        }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
         setError(d.error || 'Anfrage konnte nicht erstellt werden.')
         return
       }
-      setSuccess(`Anfrage erstellt und an ${d.request?.notified ?? 0} Mitarbeitende geschickt.`)
+      const notified = d.request?.notified ?? 0
+      const total = d.request?.memberTotal ?? notified
+      const note =
+        allowedQuals.length > 0
+          ? `Anfrage erstellt – an ${notified} von ${total} Mitarbeitenden mit passender Qualifikation geschickt.`
+          : `Anfrage erstellt und an ${notified} Mitarbeitende geschickt.`
+      setSuccess(note)
       setCreating(false)
       setMessage('')
+      setAllowedQuals([])
       onChanged()
     } finally {
       setSaving(false)
@@ -418,6 +444,37 @@ function DayDialog({
                     rows={2}
                   />
                 </div>
+                <div>
+                  <Label className="text-xs">Mindestqualifikation</Label>
+                  <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    {POOL_QUALIFICATION_IDS.map((q) => (
+                      <label
+                        key={q}
+                        className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs ${
+                          allowedQuals.includes(q)
+                            ? 'border-sky-400 bg-sky-50 text-sky-900'
+                            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allowedQuals.includes(q)}
+                          onChange={() => toggleQual(q)}
+                          className="h-3.5 w-3.5 rounded border-gray-300"
+                        />
+                        <span className="font-semibold">{POOL_QUALIFICATIONS[q].short}</span>
+                        <span className="truncate text-[10px] text-gray-500">
+                          {POOL_QUALIFICATIONS[q].label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {allowedQuals.length === 0
+                      ? 'Ohne Auswahl ist die Anfrage für alle Mitarbeitenden sichtbar.'
+                      : `Nur Mitarbeitende mit Qualifikation ${allowedQuals.join(' / ')} sehen die Anfrage und können sie übernehmen.`}
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={() => setCreating(false)} disabled={saving} className="flex-1">
                     Abbrechen
@@ -460,6 +517,14 @@ function RequestRow({ req, onCancel }: { req: ShiftRequestApi; onCancel: () => v
           <span className={`inline-block h-1.5 w-1.5 rounded-full ${team?.dotColor ?? 'bg-gray-500'}`} />
           {team?.label ?? req.team}
         </span>
+        {req.allowedQualifications.length > 0 && (
+          <span
+            className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800"
+            title={`Mindestqualifikation: ${req.allowedQualificationLabels.join(', ')}`}
+          >
+            Min: {req.allowedQualifications.join('/')}
+          </span>
+        )}
         {req.message && (
           <span className="ml-1 truncate text-xs text-gray-600" title={req.message}>· {req.message}</span>
         )}

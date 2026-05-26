@@ -56,3 +56,60 @@ export function getQualificationLabel(value: string | null | undefined): string 
   if (isValidQualification(value)) return POOL_QUALIFICATIONS[value].label
   return value
 }
+
+/**
+ * Erlaubt-Qualifikationen werden in `PoolShiftRequest.allowedQualifications`
+ * als JSON-Array von IDs gespeichert (kompatibel mit SQLite und Postgres).
+ *
+ * - `null` oder leerer Array → keine Restriktion, alle aktiven Mitarbeitenden
+ *   sehen die Anfrage.
+ * - sonst: nur Mitarbeitende, deren `qualification` in der Liste enthalten
+ *   ist (oder die selbst keine Qualifikation hinterlegt haben), sehen die
+ *   Anfrage NICHT – Personen ohne Qualifikation werden bei einer Restriktion
+ *   bewusst ausgeschlossen, weil ihre Eignung unklar ist.
+ */
+
+export function parseAllowedQualifications(value: string | null | undefined): PoolQualificationId[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    const out: PoolQualificationId[] = []
+    for (const v of parsed) {
+      if (isValidQualification(v) && !out.includes(v)) out.push(v)
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+export function serializeAllowedQualifications(
+  ids: ReadonlyArray<unknown>
+): string | null {
+  const clean: PoolQualificationId[] = []
+  for (const v of ids) {
+    if (isValidQualification(v) && !clean.includes(v)) clean.push(v)
+  }
+  if (clean.length === 0) return null
+  return JSON.stringify(clean)
+}
+
+/**
+ * Prüft, ob ein Pool-Member mit gegebener Qualifikation die Anfrage sehen /
+ * übernehmen darf.
+ *
+ * Regel:
+ *   - keine Restriktion (leeres Array) → ja
+ *   - Restriktion vorhanden, Member hat keine Qualifikation → nein
+ *   - Restriktion vorhanden, Member-Qualifikation in Liste → ja
+ *   - Restriktion vorhanden, Member-Qualifikation nicht in Liste → nein
+ */
+export function isMemberQualifiedForRequest(
+  memberQualification: string | null | undefined,
+  allowed: ReadonlyArray<string>
+): boolean {
+  if (!allowed || allowed.length === 0) return true
+  if (!memberQualification) return false
+  return allowed.includes(memberQualification)
+}

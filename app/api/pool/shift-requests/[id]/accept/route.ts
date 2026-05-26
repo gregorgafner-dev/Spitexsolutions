@@ -4,6 +4,10 @@ import { prisma } from '@/lib/db'
 import { getPoolSession } from '@/lib/pool/auth'
 import { toIsoDay } from '@/lib/pool/dates'
 import { getTeamLabel } from '@/lib/pool/teams'
+import {
+  isMemberQualifiedForRequest,
+  parseAllowedQualifications,
+} from '@/lib/pool/qualifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,6 +45,22 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
       const req = await tx.poolShiftRequest.findUnique({ where: { id } })
       if (!req) throw new HttpError(404, 'Anfrage nicht gefunden.')
       if (req.status !== 'OPEN') throw new HttpError(409, 'Diese Anfrage ist nicht mehr offen.')
+
+      // Qualifikations-Check: Wenn die Anfrage eine Mindestqualifikation
+      // verlangt, muss der Member sie erfüllen.
+      const allowed = parseAllowedQualifications(req.allowedQualifications)
+      if (allowed.length > 0) {
+        const me = await tx.poolUser.findUnique({
+          where: { id: session.poolUserId },
+          select: { qualification: true },
+        })
+        if (!isMemberQualifiedForRequest(me?.qualification ?? null, allowed)) {
+          throw new HttpError(
+            403,
+            `Für diesen Dienst ist die Mindestqualifikation ${allowed.join(', ')} erforderlich.`
+          )
+        }
+      }
 
       const booking = await tx.poolBooking.create({
         data: {

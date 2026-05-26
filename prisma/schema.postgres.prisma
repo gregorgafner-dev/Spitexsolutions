@@ -288,6 +288,7 @@ model PoolShiftRequest {
   team            String    // siehe lib/pool/teams.ts (MAENNEDORF_UETIKON | MEILEN | HERRLIBERG_ERLENBACH)
   status          String    @default("OPEN") // OPEN | FILLED | CANCELLED
   message         String?   // optionale Info an Mitarbeitende
+  allowedQualifications String? // JSON-Array von Qualifikations-IDs; null = alle
   // Audit: wer hat die Anfrage erstellt
   createdByType   String    // "POOL_PLANNER" | "SZS_ADMIN"
   createdById     String

@@ -4,6 +4,12 @@ import { getPoolActor, unauthorizedPoolActor } from '@/lib/pool/actor'
 import { getPoolSession } from '@/lib/pool/auth'
 import { fromIsoDay, isValidShift, toIsoDay } from '@/lib/pool/dates'
 import { isValidTeam, getTeamLabel } from '@/lib/pool/teams'
+import {
+  getQualificationLabel,
+  isMemberQualifiedForRequest,
+  parseAllowedQualifications,
+  serializeAllowedQualifications,
+} from '@/lib/pool/qualifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -63,19 +69,42 @@ export async function GET(request: NextRequest) {
     },
   })
 
+  // Wenn der Aufrufer ein eingeloggter Member ist (also kein Planer/Admin),
+  // gelten Qualifikations-Restriktionen: Anfragen, für die der Member nicht
+  // qualifiziert ist, sind nicht sichtbar.
+  let memberQualification: string | null = null
+  if (!actor && session) {
+    const me = await prisma.poolUser.findUnique({
+      where: { id: session.poolUserId },
+      select: { qualification: true },
+    })
+    memberQualification = me?.qualification ?? null
+  }
+
+  const filtered = items.filter((i) => {
+    if (actor) return true // Planer/Admin sehen alles
+    const allowed = parseAllowedQualifications(i.allowedQualifications)
+    return isMemberQualifiedForRequest(memberQualification, allowed)
+  })
+
   return NextResponse.json({
-    items: items.map((i) => ({
-      id: i.id,
-      date: toIsoDay(i.date),
-      shift: i.shift,
-      team: i.team,
-      teamLabel: getTeamLabel(i.team),
-      status: i.status,
-      message: i.message,
-      filledAt: i.filledAt ? i.filledAt.toISOString() : null,
-      filledByPoolUser: i.filledByPoolUser,
-      createdAt: i.createdAt.toISOString(),
-    })),
+    items: filtered.map((i) => {
+      const allowed = parseAllowedQualifications(i.allowedQualifications)
+      return {
+        id: i.id,
+        date: toIsoDay(i.date),
+        shift: i.shift,
+        team: i.team,
+        teamLabel: getTeamLabel(i.team),
+        status: i.status,
+        message: i.message,
+        allowedQualifications: allowed,
+        allowedQualificationLabels: allowed.map((q) => getQualificationLabel(q) ?? q),
+        filledAt: i.filledAt ? i.filledAt.toISOString() : null,
+        filledByPoolUser: i.filledByPoolUser,
+        createdAt: i.createdAt.toISOString(),
+      }
+    }),
   })
 }
 
@@ -97,12 +126,28 @@ export async function POST(request: NextRequest) {
   const shiftStr = String(body?.shift ?? '')
   const teamStr = String(body?.team ?? '')
   const message = body?.message ? String(body.message).trim() : null
+  const allowedQualificationsRaw: unknown = body?.allowedQualifications
+  const allowedQualificationsList: string[] = Array.isArray(allowedQualificationsRaw)
+    ? allowedQualificationsRaw.map((v) => String(v))
+    : []
+  const allowedQualificationsJson = serializeAllowedQualifications(allowedQualificationsList)
 
   if (!isValidShift(shiftStr)) {
     return NextResponse.json({ error: 'Ungültige Schicht.' }, { status: 400 })
   }
   if (!isValidTeam(teamStr)) {
     return NextResponse.json({ error: 'Ungültiges oder fehlendes Team.' }, { status: 400 })
+  }
+  // Wenn der Body explizit ein Array geschickt hat, müssen alle Einträge
+  // gültig sein – sonst Ablehnen.
+  if (Array.isArray(allowedQualificationsRaw)) {
+    const parsedBack = parseAllowedQualifications(allowedQualificationsJson)
+    if (parsedBack.length !== allowedQualificationsList.length) {
+      return NextResponse.json(
+        { error: 'Ungültige Berufsbezeichnung in der Mindestqualifikation.' },
+        { status: 400 }
+      )
+    }
   }
   let date: Date
   try {
@@ -124,15 +169,23 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Aktive MEMBER ermitteln
-  const members = await prisma.poolUser.findMany({
+  // Aktive MEMBER ermitteln und nach Mindestqualifikation filtern.
+  const allMembers = await prisma.poolUser.findMany({
     where: { role: 'MEMBER', active: true },
-    select: { id: true },
+    select: { id: true, qualification: true },
   })
+  const allowedParsed = parseAllowedQualifications(allowedQualificationsJson)
+  const recipients = allMembers.filter((m) =>
+    isMemberQualifiedForRequest(m.qualification, allowedParsed)
+  )
 
   const shiftLabel = shiftStr === 'EARLY' ? 'Frühdienst' : 'Spätdienst'
   const teamLabel = getTeamLabel(teamStr)
-  const subject = `Dienstanfrage: ${shiftLabel} am ${toIsoDay(date)} · ${teamLabel}`
+  const qualNote =
+    allowedParsed.length > 0
+      ? ` (Mindestqualifikation: ${allowedParsed.join(', ')})`
+      : ''
+  const subject = `Dienstanfrage: ${shiftLabel} am ${toIsoDay(date)} · ${teamLabel}${qualNote}`
   const content = message ?? 'Bitte schau im Postfach, ob du diesen Dienst übernehmen kannst.'
 
   const created = await prisma.$transaction(async (tx) => {
@@ -143,13 +196,14 @@ export async function POST(request: NextRequest) {
         team: teamStr,
         status: 'OPEN',
         message,
+        allowedQualifications: allowedQualificationsJson,
         createdByType: actor.type,
         createdById: actor.id,
       },
     })
-    if (members.length > 0) {
+    if (recipients.length > 0) {
       await tx.poolMessage.createMany({
-        data: members.map((m) => ({
+        data: recipients.map((m) => ({
           recipientPoolUserId: m.id,
           type: 'SHIFT_REQUEST',
           subject,
@@ -171,7 +225,10 @@ export async function POST(request: NextRequest) {
         teamLabel: getTeamLabel(created.team),
         status: created.status,
         message: created.message,
-        notified: members.length,
+        allowedQualifications: allowedParsed,
+        notified: recipients.length,
+        eligibleTotal: recipients.length,
+        memberTotal: allMembers.length,
       },
     },
     { status: 201 }
