@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Users,
   ClipboardList,
-  Building2,
   ShieldCheck,
   LogIn,
 } from 'lucide-react'
@@ -71,27 +70,6 @@ export default function LoginPortalPage() {
             </div>
             <p className="relative z-10 text-sm text-indigo-50">
               Dienstanfragen erstellen, Verfügbarkeiten einsehen und buchen.
-            </p>
-            <span className="relative z-10 mt-auto inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-all duration-200 group-hover:bg-white/30">
-              Anmelden
-              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-            </span>
-          </Link>
-
-          {/* Domus-Mitarbeitende */}
-          <Link
-            href="/login"
-            className="group relative flex flex-col gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 p-7 text-white shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl"
-          >
-            <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-2xl transition-transform duration-300 group-hover:scale-110" />
-            <div className="relative z-10 flex items-center gap-3">
-              <div className="rounded-xl bg-white/15 p-3 backdrop-blur-sm">
-                <Building2 className="h-6 w-6 text-white" />
-              </div>
-              <h2 className="text-xl font-bold">Domus-Mitarbeitende</h2>
-            </div>
-            <p className="relative z-10 text-sm text-amber-50">
-              Zeiterfassung, Lohnauszüge und persönliche Auswertungen.
             </p>
             <span className="relative z-10 mt-auto inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-all duration-200 group-hover:bg-white/30">
               Anmelden
