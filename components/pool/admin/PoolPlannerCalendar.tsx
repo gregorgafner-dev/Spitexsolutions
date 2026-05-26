@@ -284,29 +284,36 @@ export default function PoolPlannerCalendar() {
                 </div>
               )}
 
-              {/* Angebote = Verfügbarkeiten als kleine türkise Pills unten in der Zelle */}
-              {cell.inMonth && dayInfo && (dayInfo.availEarly.length > 0 || dayInfo.availLate.length > 0) && (
-                <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
-                  {dayInfo.availEarly.length > 0 && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800"
-                      title={`${dayInfo.availEarly.length} Mitarbeitende für Frühdienst verfügbar`}
-                    >
-                      <Users className="h-2.5 w-2.5" />
-                      F·{dayInfo.availEarly.length}
-                    </span>
-                  )}
-                  {dayInfo.availLate.length > 0 && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800"
-                      title={`${dayInfo.availLate.length} Mitarbeitende für Spätdienst verfügbar`}
-                    >
-                      <Users className="h-2.5 w-2.5" />
-                      S·{dayInfo.availLate.length}
-                    </span>
-                  )}
-                </div>
-              )}
+              {/* Angebote = Verfügbarkeiten als kleine türkise Pills unten in der Zelle.
+                  WICHTIG: nur noch *buchbare* Verfügbarkeiten zählen (lockedByBooking ausschliessen),
+                  damit nach einer Buchung keine "Phantom-Pille" stehen bleibt. */}
+              {cell.inMonth && dayInfo && (() => {
+                const freeEarly = dayInfo.availEarly.filter((a) => !a.lockedByBooking).length
+                const freeLate = dayInfo.availLate.filter((a) => !a.lockedByBooking).length
+                if (freeEarly === 0 && freeLate === 0) return null
+                return (
+                  <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
+                    {freeEarly > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800"
+                        title={`${freeEarly} Mitarbeitende für Frühdienst verfügbar`}
+                      >
+                        <Users className="h-2.5 w-2.5" />
+                        F·{freeEarly}
+                      </span>
+                    )}
+                    {freeLate > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800"
+                        title={`${freeLate} Mitarbeitende für Spätdienst verfügbar`}
+                      >
+                        <Users className="h-2.5 w-2.5" />
+                        S·{freeLate}
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
 
               {cell.inMonth && (!dayInfo || (dayInfo.open.length === 0 && dayInfo.bookings.length === 0 && dayInfo.availEarly.length === 0 && dayInfo.availLate.length === 0)) && (
                 <div className="mt-auto flex items-end justify-end opacity-0 transition-opacity group-hover:opacity-100">
