@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Plus, X, Sun, Moon, AlertCircle, CheckCircle2, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, X, Sun, Moon, AlertCircle, CheckCircle2, Users, CalendarDays, TableProperties } from 'lucide-react'
+import PoolPlannerRoster from '@/components/pool/admin/PoolPlannerRoster'
+import { getQualificationShort } from '@/lib/pool/qualifications'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -100,13 +102,24 @@ function formatDayLong(isoStr: string): string {
   return date.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+type MemberListItem = {
+  id: string
+  firstName: string
+  lastName: string
+  qualificationShort: string | null
+  role: 'MEMBER' | 'PLANNER'
+  active: boolean
+}
+
 export default function PoolPlannerCalendar() {
   const today = new Date()
   const [year, setYear] = useState<number>(today.getFullYear())
   const [monthIndex, setMonthIndex] = useState<number>(today.getMonth())
+  const [viewMode, setViewMode] = useState<'roster' | 'calendar'>('roster')
   const [requests, setRequests] = useState<ShiftRequestApi[]>([])
   const [bookings, setBookings] = useState<BookingApi[]>([])
   const [availabilities, setAvailabilities] = useState<AvailabilityApi[]>([])
+  const [members, setMembers] = useState<MemberListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [openDay, setOpenDay] = useState<string | null>(null)
 
@@ -138,6 +151,34 @@ export default function PoolPlannerCalendar() {
   }, [monthStart, monthEnd])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    fetch('/api/pool/members', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        const list = (d.members ?? []) as Array<{
+          id: string
+          firstName: string
+          lastName: string
+          role: 'MEMBER' | 'PLANNER'
+          active: boolean
+          qualification: string | null
+        }>
+        setMembers(
+          list
+            .filter((m) => m.active && m.role === 'MEMBER')
+            .map((m) => ({
+              id: m.id,
+              firstName: m.firstName,
+              lastName: m.lastName,
+              role: m.role,
+              active: m.active,
+              qualificationShort: getQualificationShort(m.qualification),
+            }))
+        )
+      })
+      .catch(() => setMembers([]))
+  }, [])
 
   // Aggregierte Sicht pro Tag:
   //  - open: offene Anfragen
@@ -198,10 +239,15 @@ export default function PoolPlannerCalendar() {
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3">
-        <button onClick={prevMonth} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100" aria-label="Vorheriger Monat">
-          <ChevronLeft className="h-5 w-5" />
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center gap-1">
+          <button onClick={prevMonth} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100" aria-label="Vorheriger Monat">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button onClick={nextMonth} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100" aria-label="Nächster Monat">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-gray-900">{MONTH_NAMES[monthIndex]} {year}</h2>
           <select
@@ -213,11 +259,47 @@ export default function PoolPlannerCalendar() {
           </select>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
         </div>
-        <button onClick={nextMonth} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100" aria-label="Nächster Monat">
-          <ChevronRight className="h-5 w-5" />
-        </button>
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode('roster')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              viewMode === 'roster'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-white'
+            }`}
+          >
+            <TableProperties className="h-3.5 w-3.5" />
+            Einsatzplan
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('calendar')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              viewMode === 'calendar'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-white'
+            }`}
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            Kalender
+          </button>
+        </div>
       </div>
 
+      {viewMode === 'roster' ? (
+        <PoolPlannerRoster
+          year={year}
+          monthIndex={monthIndex}
+          holidayMap={holidayMap}
+          requests={requests}
+          bookings={bookings}
+          availabilities={availabilities}
+          members={members}
+          onDayClick={setOpenDay}
+        />
+      ) : (
+      <>
       <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-600">
         {WEEKDAY_NAMES.map((d, i) => (
           <div key={d} className={`px-2 py-2 text-center ${i >= 5 ? 'text-red-600' : ''}`}>{d}</div>
@@ -324,32 +406,55 @@ export default function PoolPlannerCalendar() {
           )
         })}
       </div>
+      </>
+      )}
 
       {/* Legende */}
       <div className="space-y-2 border-t border-gray-200 px-4 py-3 text-xs text-gray-600">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="font-medium text-gray-700">Status:</span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-md border border-red-400 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-900">
-              <AlertCircle className="h-3 w-3 text-red-600" />
-              offen
-            </span>
-            <span className="text-gray-500">sucht jemanden</span>
+          <span className="font-medium text-gray-700">
+            {viewMode === 'roster' ? 'Einsatzplan:' : 'Status:'}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-md border border-blue-400 bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-900">
-              <CheckCircle2 className="h-3 w-3 text-blue-600" />
-              gebucht
-            </span>
-            <span className="text-gray-500">fix vergeben</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
-              <Users className="h-3 w-3" />
-              F·N
-            </span>
-            <span className="text-gray-500">verfügbare Mitarbeitende</span>
-          </span>
+          {viewMode === 'roster' ? (
+            <>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-red-500 text-[10px] font-bold text-white">F</span>
+                <span className="text-gray-500">offener Bedarf (Früh/Spät)</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-blue-600 text-[10px] font-bold text-white">S</span>
+                <span className="text-gray-500">gebucht</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm border-2 border-teal-400 bg-teal-50 text-[10px] font-bold text-teal-800">F</span>
+                <span className="text-gray-500">verfügbar angeboten</span>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-md border border-red-400 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-900">
+                  <AlertCircle className="h-3 w-3 text-red-600" />
+                  offen
+                </span>
+                <span className="text-gray-500">sucht jemanden</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-md border border-blue-400 bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-900">
+                  <CheckCircle2 className="h-3 w-3 text-blue-600" />
+                  gebucht
+                </span>
+                <span className="text-gray-500">fix vergeben</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                  <Users className="h-3 w-3" />
+                  F·N
+                </span>
+                <span className="text-gray-500">verfügbare Mitarbeitende</span>
+              </span>
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <span className="font-medium text-gray-700">Teams:</span>
