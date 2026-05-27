@@ -141,20 +141,13 @@ export default function PoolPlannerRoster({
     return map
   }, [availabilities])
 
-  // Nur Mitarbeitende anzeigen, die im Monat aktiv sind (Buchung/Verfügbarkeit)
-  // oder explizit in der Mitgliederliste stehen und mindestens eine Zeile haben.
+  // Alle aktiven Pool-Mitarbeitenden anzeigen (auch ohne Einträge im Monat),
+  // analog zum klassischen Einsatzplan-Raster.
   const visibleMembers = useMemo(() => {
-    const idsWithActivity = new Set<string>()
-    for (const b of bookings) idsWithActivity.add(b.poolUser.id)
-    for (const a of availabilities) {
-      if (!a.lockedByBooking) idsWithActivity.add(a.poolUser.id)
-    }
-    return members
-      .filter((m) => idsWithActivity.has(m.id))
-      .sort((a, b) =>
-        `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'de')
-      )
-  }, [members, bookings, availabilities])
+    return [...members].sort((a, b) =>
+      `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'de')
+    )
+  }, [members])
 
   return (
     <div className="overflow-x-auto">
@@ -260,7 +253,7 @@ export default function PoolPlannerRoster({
                 colSpan={days.length + 1}
                 className="border border-gray-300 px-4 py-6 text-center text-sm text-gray-500"
               >
-                Keine Verfügbarkeiten oder Buchungen in diesem Monat.
+                Keine aktiven Pool-Mitarbeitenden erfasst.
               </td>
             </tr>
           ) : (
