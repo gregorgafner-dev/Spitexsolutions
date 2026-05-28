@@ -325,3 +325,13 @@ model PoolMessage {
   @@index([recipientPoolUserId, createdAt])
 }
 
+// Singleton: Cockpit Fahrzeug-Auslastung (Tages-Checkboxen, Mobility, Soll, Flotte).
+model CockpitFahrzeugState {
+  id        String   @id @default("singleton")
+  payload   String   // JSON: daySlots, mobilityByDate, utilization, fleet
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("cockpit_fahrzeug_state")
+}
+

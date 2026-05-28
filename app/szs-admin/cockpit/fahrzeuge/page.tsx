@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Navigation from "@/components/admin-szs/cockpit/Navigation";
 import * as XLSX from "xlsx";
 
@@ -77,6 +77,7 @@ const dayUtilizationPct = (slots: DaySlots): number => {
 const TRACKING_STORAGE_KEY = "cockpit-fahrzeug-tagesauslastung";
 const FLEET_STORAGE_KEY = "cockpit-fahrzeug-flotte-v1";
 const MOBILITY_STORAGE_KEY = "cockpit-fahrzeug-mobility-v1";
+const UTILIZATION_STORAGE_KEY = "cockpit-fahrzeug-soll-v1";
 
 const MOBILITY_SLOT_IDS = ["mobility-1", "mobility-2"] as const;
 type MobilitySlotId = (typeof MOBILITY_SLOT_IDS)[number];
@@ -247,6 +248,56 @@ function persistMobility(data: MobilityByDate) {
   }
 }
 
+function loadUtilizationFromStorage(): Record<string, UtilizationValue> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(UTILIZATION_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, UtilizationValue>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistUtilization(data: Record<string, UtilizationValue>) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(UTILIZATION_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+function hasAnyPersistedContent(payload: {
+  daySlots?: Record<string, unknown>;
+  mobilityByDate?: Record<string, unknown>;
+  utilization?: Record<string, unknown>;
+  fleet?: unknown;
+}): boolean {
+  return (
+    Object.keys(payload.daySlots ?? {}).length > 0 ||
+    Object.keys(payload.mobilityByDate ?? {}).length > 0 ||
+    Object.keys(payload.utilization ?? {}).length > 0 ||
+    Boolean(payload.fleet)
+  );
+}
+
+function buildPersistPayload(
+  daySlots: Record<string, Record<string, DaySlots>>,
+  mobilityByDate: MobilityByDate,
+  utilization: Record<string, UtilizationValue>,
+  fleet: FleetResponse | null
+) {
+  return {
+    version: 1 as const,
+    daySlots,
+    mobilityByDate,
+    utilization,
+    fleet,
+  };
+}
+
 export default function FahrzeugePage() {
   const [data, setData] = useState<FleetResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -256,50 +307,164 @@ export default function FahrzeugePage() {
   const [trackingDate, setTrackingDate] = useState<string>(() => toDateInputValue(new Date()));
   const [daySlots, setDaySlots] = useState<Record<string, Record<string, DaySlots>>>({});
   const [mobilityByDate, setMobilityByDate] = useState<MobilityByDate>({});
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const persistReady = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef({
+    daySlots: {} as Record<string, Record<string, DaySlots>>,
+    mobilityByDate: {} as MobilityByDate,
+    utilization: {} as Record<string, UtilizationValue>,
+    fleet: null as FleetResponse | null,
+  });
 
   useEffect(() => {
-    setDaySlots(loadDaySlotsFromStorage());
-    setMobilityByDate(loadMobilityFromStorage());
-    const cached = loadFleetFromStorage();
-    if (cached) {
-      setData(cached);
-      setSourceLabel(cached.sourceFile || "Gespeicherte Flotte");
-      return;
-    }
+    stateRef.current = { daySlots, mobilityByDate, utilization, fleet: data };
+  }, [daySlots, mobilityByDate, utilization, data]);
 
+  const pushPersistToServer = useCallback(async () => {
+    const snapshot = stateRef.current;
+    const payload = buildPersistPayload(
+      snapshot.daySlots,
+      snapshot.mobilityByDate,
+      snapshot.utilization,
+      snapshot.fleet
+    );
+    persistDaySlots(snapshot.daySlots);
+    persistMobility(snapshot.mobilityByDate);
+    persistUtilization(snapshot.utilization);
+    if (snapshot.fleet) persistFleet(snapshot.fleet);
+
+    setSaveStatus("saving");
+    try {
+      const res = await fetch("/api/szs-admin/cockpit/fahrzeuge/tracking", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: payload }),
+      });
+      setSaveStatus(res.ok ? "saved" : "error");
+    } catch {
+      setSaveStatus("error");
+    }
+  }, []);
+
+  const schedulePersist = useCallback(() => {
+    if (!persistReady.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void pushPersistToServer();
+    }, 500);
+  }, [pushPersistToServer]);
+
+  const applyFleet = useCallback((fleet: FleetResponse, label: string) => {
+    setData(fleet);
+    setSourceLabel(label);
+    stateRef.current.fleet = fleet;
+    persistFleet(fleet);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    fetch("/api/szs-admin/cockpit/fahrzeuge", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return (await res.json()) as FleetResponse;
-      })
-      .then((serverData) => {
-        if (cancelled) return;
+
+    async function loadDefaultFleet() {
+      const cached = loadFleetFromStorage();
+      if (cached) {
+        if (!cancelled) applyFleet(cached, cached.sourceFile || "Gespeicherte Flotte");
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch("/api/szs-admin/cockpit/fahrzeuge", { cache: "no-store" });
+        if (!res.ok) return;
+        const serverData = (await res.json()) as FleetResponse;
         if (!serverData || !Array.isArray(serverData.autos)) return;
         if (!serverData.totals) {
           serverData.totals = {
             autosGesamt: serverData.autos.length,
             autosAktiv: serverData.autos.filter((a) => a.status === "aktiv").length,
-            autosAusserBetrieb: serverData.autos.filter((a) => a.status === "ausser-betrieb")
-              .length,
+            autosAusserBetrieb: serverData.autos.filter((a) => a.status === "ausser-betrieb").length,
             ebikesGesamt: Array.isArray(serverData.ebikes) ? serverData.ebikes.length : 0,
           };
         }
         if (!Array.isArray(serverData.ebikes)) serverData.ebikes = [];
-        setData(serverData);
-        setSourceLabel(serverData.sourceFile || "Server-Flotte");
-      })
-      .catch(() => {
-      })
-      .finally(() => {
+        if (!cancelled) applyFleet(serverData, serverData.sourceFile || "Server-Flotte");
+      } catch {
+        // ignore
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    }
 
+    async function init() {
+      const localSlots = loadDaySlotsFromStorage();
+      const localMobility = loadMobilityFromStorage();
+      const localUtil = loadUtilizationFromStorage();
+      const localFleet = loadFleetFromStorage();
+
+      setDaySlots(localSlots);
+      setMobilityByDate(localMobility);
+      if (Object.keys(localUtil).length > 0) setUtilization(localUtil);
+
+      let fleetLoaded = Boolean(localFleet);
+
+      try {
+        const res = await fetch("/api/szs-admin/cockpit/fahrzeuge/tracking", { cache: "no-store" });
+        if (res.ok && !cancelled) {
+          const body = (await res.json()) as { state?: ReturnType<typeof buildPersistPayload> };
+          const state = body.state;
+          if (state) {
+            const serverHasData = hasAnyPersistedContent(state);
+            const localPayload = buildPersistPayload(
+              localSlots,
+              localMobility,
+              localUtil,
+              localFleet
+            );
+            const localHasData = hasAnyPersistedContent(localPayload);
+
+            if (serverHasData) {
+              setDaySlots(state.daySlots ?? {});
+              setMobilityByDate(state.mobilityByDate ?? {});
+              if (state.utilization) setUtilization(state.utilization);
+              if (state.fleet) {
+                fleetLoaded = true;
+                applyFleet(state.fleet as FleetResponse, (state.fleet as FleetResponse).sourceFile || "Gespeicherte Flotte");
+              }
+              persistDaySlots(state.daySlots ?? {});
+              persistMobility(state.mobilityByDate ?? {});
+              if (state.utilization) persistUtilization(state.utilization);
+            } else if (localHasData) {
+              await fetch("/api/szs-admin/cockpit/fahrzeuge/tracking", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ state: localPayload }),
+              });
+              if (localFleet) {
+                fleetLoaded = true;
+                applyFleet(localFleet, localFleet.sourceFile || "Gespeicherte Flotte");
+              }
+            }
+          }
+        }
+      } catch {
+        // Server nicht erreichbar – lokale Daten bleiben aktiv
+      }
+
+      if (!cancelled && !fleetLoaded) {
+        await loadDefaultFleet();
+      }
+
+      if (!cancelled) {
+        persistReady.current = true;
+      }
+    }
+
+    void init();
     return () => {
       cancelled = true;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, []);
+  }, [applyFleet]);
 
   useEffect(() => {
     if (!data?.autos?.length) return;
@@ -347,6 +512,7 @@ export default function FahrzeugePage() {
       byDate[vehicleId] = current;
       const next = { ...prev, [dateKey]: byDate };
       persistDaySlots(next);
+      schedulePersist();
       return next;
     });
   };
@@ -373,6 +539,7 @@ export default function FahrzeugePage() {
       byDate[slotId] = current;
       const next: MobilityByDate = { ...prev, [dateKey]: byDate };
       persistMobility(next);
+      schedulePersist();
       return next;
     });
   };
@@ -408,12 +575,17 @@ export default function FahrzeugePage() {
     `${new Intl.NumberFormat("de-CH", { maximumFractionDigits: 1 }).format(n)}%`;
 
   const handleSollChange = (id: string, value: string) => {
-    setUtilization((prev) => ({
-      ...prev,
-      [id]: {
-        soll: value,
-      },
-    }));
+    setUtilization((prev) => {
+      const next = {
+        ...prev,
+        [id]: {
+          soll: value,
+        },
+      };
+      persistUtilization(next);
+      schedulePersist();
+      return next;
+    });
   };
 
   const handleExcelUpload = async (file: File) => {
@@ -423,8 +595,8 @@ export default function FahrzeugePage() {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const fleetData = buildFleetFromWorkbook(workbook, file.name);
-      persistFleet(fleetData);
-      setData(fleetData);
+      applyFleet(fleetData, file.name);
+      schedulePersist();
       setSourceLabel(file.name);
     } catch (e) {
       setError(
@@ -441,7 +613,9 @@ export default function FahrzeugePage() {
     clearFleetStorage();
     setData(null);
     setSourceLabel("noch nicht geladen");
+    stateRef.current.fleet = null;
     setError(null);
+    schedulePersist();
     try {
       setLoading(true);
       const res = await fetch("/api/szs-admin/cockpit/fahrzeuge", { cache: "no-store" });
@@ -457,8 +631,8 @@ export default function FahrzeugePage() {
         };
       }
       if (!Array.isArray(serverData.ebikes)) serverData.ebikes = [];
-      setData(serverData);
-      setSourceLabel(serverData.sourceFile || "Server-Flotte");
+      applyFleet(serverData, serverData.sourceFile || "Server-Flotte");
+      schedulePersist();
     } catch {
     } finally {
       setLoading(false);
@@ -478,7 +652,7 @@ export default function FahrzeugePage() {
             <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-4">
               <div className="text-sm font-semibold text-gray-900">Excel-Datei (Flotte)</div>
               <p className="mt-1 text-xs font-medium text-gray-700">
-                Nach dem ersten Upload wird die Flotte im Browser gespeichert — du musst die Datei
+                Nach dem ersten Upload wird die Flotte zentral gespeichert — du musst die Datei
                 nicht bei jedem Besuch erneut auswählen. Bei einer neuen Excel-Version einfach
                 erneut hochladen oder zuerst die gespeicherte Flotte löschen.
               </p>
@@ -648,9 +822,23 @@ export default function FahrzeugePage() {
                         className="mt-1 block rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900"
                       />
                     </label>
-                    <p className="text-xs font-medium text-indigo-950 max-w-xl">
-                      Die Eingaben werden lokal im Browser gespeichert (pro Datum und Fahrzeug).
-                    </p>
+                    <div className="flex flex-col gap-1 sm:items-end">
+                      <p className="text-xs font-medium text-indigo-950 max-w-xl">
+                        Die Eingaben werden zentral auf dem Server gespeichert — sichtbar für alle
+                        SZS-Admins, unabhängig vom Browser oder Gerät.
+                      </p>
+                      {saveStatus === "saving" && (
+                        <span className="text-xs font-semibold text-indigo-800">Speichere…</span>
+                      )}
+                      {saveStatus === "saved" && (
+                        <span className="text-xs font-semibold text-emerald-800">Gespeichert</span>
+                      )}
+                      {saveStatus === "error" && (
+                        <span className="text-xs font-semibold text-rose-800">
+                          Speichern fehlgeschlagen — bitte erneut versuchen
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
