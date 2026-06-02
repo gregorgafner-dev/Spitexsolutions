@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Navigation from "@/components/admin-szs/cockpit/Navigation";
+import FahrzeugAuswertungPanel from "@/components/admin-szs/cockpit/FahrzeugAuswertungPanel";
 import * as XLSX from "xlsx";
 
 type AutoEntry = {
@@ -1038,6 +1039,8 @@ export default function FahrzeugePage() {
                 </div>
               </>
             )}
+
+            <FahrzeugAuswertungPanel />
           </div>
         </div>
       </main>
