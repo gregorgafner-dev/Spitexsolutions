@@ -118,11 +118,19 @@ const BETREUUNG_STUNDENLOHN_CHF = 34;
 /** Lohntabelle Kanton ZH liefert Jahreslöhne inkl. 13. Monatslohn. */
 const MONATE_PRO_JAHR = 12;
 
-/** Annahmen für Stundenlohn-Berechnung (transparent im UI ausgewiesen). */
-const VOLLZEIT_JAHRESSTUNDEN = 2080;
+/**
+ * Kanton ZH: Stundenlohn = 1/2184 des Grundlohnes inkl. 13. Monatslohn.
+ * Der 13. ML ist im Grundlohn enthalten und wird nicht separat aufgeschlagen.
+ */
+const STUNDENLOHN_STUNDEN_JAHR = 2184;
 const FERIEN_ZULAGE_PCT = 10.64;
 const FEIERTAGE_ZULAGE_PCT = 3.5;
+/** Nur für fixen Betreuungs-Stundenlohn (Rückrechnung aus Brutto-Total). */
 const DREIZEHNTER_ML_ZULAGE_PCT = 8.33;
+
+/** Rechner-interne Skala entspricht der Technischen Stufe (1–31). Lookup nutzt Lohnstufe/Anlauf. */
+const MIN_TECHNISCHE_STUFE = 1;
+const MAX_TECHNISCHE_STUFE = 31;
 // #endregion
 
 // #region Helpers
@@ -139,44 +147,48 @@ function formatChf(n: number, fractionDigits = 0): string {
   }).format(n);
 }
 
-function formatStufe(n: number): string {
-  return new Intl.NumberFormat("de-CH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
 function getKlasseForFunktion(funktion: FunktionKey | ""): number | null {
   if (!funktion || funktion === "betreuung") return null;
   return FUNKTION_KLASSE[funktion as Exclude<FunktionKey, "betreuung">] ?? null;
 }
 
+/** Technische Stufe (Kreuztabelle) → Zeilen-Key «Lohnstufe oder Anlaufstufe». */
+function technischeStufeToRowKey(technischeStufe: number): string {
+  const ts = Math.round(technischeStufe);
+  if (ts <= 1) return "AS 2";
+  if (ts === 2) return "AS 1";
+  return `LS ${clamp(ts - 2, 1, 29)}`;
+}
+
+function formatLohnstufenLabel(technischeStufe: number): string {
+  return technischeStufeToRowKey(technischeStufe);
+}
+
+function findRowByKey(table: Lohntabelle, rowKey: string) {
+  return table.rows.find((r) => r.stufe === rowKey) ?? null;
+}
+
 function getJahreslohn(
   table: Lohntabelle,
   klasse: number,
-  stufe: number
+  technischeStufe: number
 ): number | null {
   if (!table?.rows?.length) return null;
   const klasseStr = String(klasse).padStart(2, "0");
   const colIdx = table.meta.classes.findIndex((c) => c === klasseStr);
   if (colIdx < 0) return null;
 
-  const stufeRange = table.rows
-    .map((r) => Number(r.stufe.replace(/[^0-9.]/g, "")))
-    .filter((n) => Number.isFinite(n));
-  if (!stufeRange.length) return null;
-  const minLs = Math.min(...stufeRange);
-  const maxLs = Math.max(...stufeRange);
-  const clamped = clamp(stufe, minLs, maxLs);
-  const lower = Math.floor(clamped);
-  const upper = Math.ceil(clamped);
-  const frac = clamped - lower;
+  const clamped = clamp(
+    technischeStufe,
+    MIN_TECHNISCHE_STUFE,
+    MAX_TECHNISCHE_STUFE
+  );
+  const lowerTs = Math.floor(clamped);
+  const upperTs = Math.ceil(clamped);
+  const frac = clamped - lowerTs;
 
-  const findRow = (ls: number) =>
-    table.rows.find((r) => Number(r.stufe.replace(/[^0-9.]/g, "")) === ls);
-
-  const lowerRow = findRow(lower);
-  const upperRow = findRow(upper);
+  const lowerRow = findRowByKey(table, technischeStufeToRowKey(lowerTs));
+  const upperRow = findRowByKey(table, technischeStufeToRowKey(upperTs));
   if (!lowerRow || !upperRow) return null;
   const lowerVal = lowerRow.values[colIdx];
   const upperVal = upperRow.values[colIdx];
@@ -185,13 +197,8 @@ function getJahreslohn(
   return lowerVal * (1 - frac) + upperVal * frac;
 }
 
-function getStufenRange(table: Lohntabelle | null): { min: number; max: number } {
-  if (!table?.rows?.length) return { min: 1, max: 29 };
-  const stufenZahlen = table.rows
-    .map((r) => Number(r.stufe.replace(/[^0-9.]/g, "")))
-    .filter((n) => Number.isFinite(n));
-  if (!stufenZahlen.length) return { min: 1, max: 29 };
-  return { min: Math.min(...stufenZahlen), max: Math.max(...stufenZahlen) };
+function getStufenRange(_table: Lohntabelle | null): { min: number; max: number } {
+  return { min: MIN_TECHNISCHE_STUFE, max: MAX_TECHNISCHE_STUFE };
 }
 
 /** Berechnet die rohe Mittel-Stufe (vor Clamp und vor Floor). */
@@ -255,13 +262,11 @@ function getAusbildungWarnung(
 function aufteilenStundenlohnFromJahreslohn(
   jahreslohnInkl13: number
 ): StundenlohnAufteilung {
-  const jahreslohnOhne13 = (jahreslohnInkl13 * 12) / 13;
-  const grundlohn = jahreslohnOhne13 / VOLLZEIT_JAHRESSTUNDEN;
+  const grundlohn = jahreslohnInkl13 / STUNDENLOHN_STUNDEN_JAHR;
   const ferien = grundlohn * (FERIEN_ZULAGE_PCT / 100);
   const feiertage = grundlohn * (FEIERTAGE_ZULAGE_PCT / 100);
-  const dreizehnter = grundlohn * (DREIZEHNTER_ML_ZULAGE_PCT / 100);
-  const total = grundlohn + ferien + feiertage + dreizehnter;
-  return { grundlohn, ferien, feiertage, dreizehnter, total };
+  const total = grundlohn + ferien + feiertage;
+  return { grundlohn, ferien, feiertage, dreizehnter: 0, total };
 }
 
 function aufteilenStundenlohnFromBruttoTotal(
@@ -934,15 +939,16 @@ function EinstufungsBadge({
           Klasse {String(klasse).padStart(2, "0")}
         </div>
         <div className="text-sm font-medium text-indigo-900">
-          Mittel: LS {formatStufe(stufeMittel)}
+          Mittel: {formatLohnstufenLabel(stufeMittel)}
           {wasFloored ? (
             <span className="ml-1 text-xs text-indigo-700">
-              (rechnerisch LS {formatStufe(stufeMittelRaw)}, abgerundet)
+              (rechnerisch {formatLohnstufenLabel(stufeMittelRaw)}, abgerundet)
             </span>
           ) : null}
         </div>
         <div className="text-sm font-medium text-indigo-900">
-          Bandbreite: LS {formatStufe(stufeMin)} – LS {formatStufe(stufeMax)}
+          Bandbreite: {formatLohnstufenLabel(stufeMin)} –{" "}
+          {formatLohnstufenLabel(stufeMax)}
         </div>
       </div>
     </div>
@@ -1155,7 +1161,12 @@ function StundenlohnTabelle({
         </thead>
         <tbody className="divide-y divide-gray-100">
           <tr>
-            <td className="px-4 py-2 font-medium text-gray-900">Grundlohn</td>
+            <td className="px-4 py-2 font-medium text-gray-900">
+              Grundlohn
+              <span className="block text-xs font-normal text-gray-500">
+                inkl. 13. Monatslohn
+              </span>
+            </td>
             {zellen(aufMin?.grundlohn)}
             {zellen(aufMittel?.grundlohn, true)}
             {zellen(aufMax?.grundlohn)}
@@ -1182,17 +1193,19 @@ function StundenlohnTabelle({
             {zellen(aufMittel?.feiertage)}
             {zellen(aufMax?.feiertage)}
           </tr>
-          <tr>
-            <td className="px-4 py-2 text-gray-900">
-              13. Monatslohn
-              <span className="block text-xs text-gray-500">
-                {DREIZEHNTER_ML_ZULAGE_PCT}%
-              </span>
-            </td>
-            {zellen(aufMin?.dreizehnter)}
-            {zellen(aufMittel?.dreizehnter)}
-            {zellen(aufMax?.dreizehnter)}
-          </tr>
+          {aufMittel?.dreizehnter ? (
+            <tr>
+              <td className="px-4 py-2 text-gray-900">
+                13. Monatslohn
+                <span className="block text-xs text-gray-500">
+                  {DREIZEHNTER_ML_ZULAGE_PCT}%
+                </span>
+              </td>
+              {zellen(aufMin?.dreizehnter)}
+              {zellen(aufMittel?.dreizehnter)}
+              {zellen(aufMax?.dreizehnter)}
+            </tr>
+          ) : null}
           <tr className="bg-gray-50">
             <td className="px-4 py-2 font-bold text-gray-900">Brutto Total</td>
             {zellen(aufMin?.total, true)}
@@ -1246,7 +1259,7 @@ function StundenlohnBandResultat({
 
       <StundenlohnTabelle
         title="Stundenlohn-Bandbreite"
-        subtitle={`Vollzeit-Basis ${VOLLZEIT_JAHRESSTUNDEN} h/Jahr · Grundlohn ohne Zulagen, Zulagen separat ausgewiesen`}
+        subtitle={`Kanton ZH: Grundlohn inkl. 13. ML = Jahreslohn / ${STUNDENLOHN_STUNDEN_JAHR} h · Ferien- und Feiertagszulage separat`}
         aufMin={aufMin}
         aufMittel={aufMittel}
         aufMax={aufMax}
@@ -1260,9 +1273,10 @@ function StundenlohnBandResultat({
       </div>
 
       <p className="text-xs text-gray-500">
-        Berechnung: Grundlohn = Jahreslohn (ohne 13. ML) / {VOLLZEIT_JAHRESSTUNDEN} h. Zulagen
-        prozentual auf Grundlohn. Ferien {FERIEN_ZULAGE_PCT}%, Feiertage {FEIERTAGE_ZULAGE_PCT}%,
-        13. ML {DREIZEHNTER_ML_ZULAGE_PCT}%. Quelle Jahreslohn: Lohntabelle Kanton Zürich.
+        Berechnung gemäss Lohnband Kanton: Grundlohn inkl. 13. ML = Jahreslohn /{" "}
+        {STUNDENLOHN_STUNDEN_JAHR} h. Ferien {FERIEN_ZULAGE_PCT}% und Feiertage{" "}
+        {FEIERTAGE_ZULAGE_PCT}% werden auf den Grundlohn aufgerechnet — der 13. Monatslohn ist
+        bereits im Grundlohn enthalten. Quelle Jahreslohn: Lohntabelle Kanton Zürich.
       </p>
     </div>
   );
