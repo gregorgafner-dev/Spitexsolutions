@@ -744,8 +744,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     let blocksToSave = workBlocks.filter(block => {
       // Keine SLEEP-Einträge speichern (werden automatisch erstellt)
       if (block.entryType === 'SLEEP' || block.entryType === 'SLEEP_INTERRUPTION') return false
-      // Wenn Nachtdienst nicht aktiviert, speichere nur normale Blöcke (keine Nachtdienst-Blöcke)
-      if (!isNightShift && isNightShiftBlock(block)) return false
+      // Komplett leere Blöcke (z.B. versehentlich via "Block hinzufügen" erstellt) ignorieren,
+      // damit sie das Speichern der ausgefüllten Blöcke nicht blockieren.
+      if (!block.startTime && !block.endTime) return false
+      // WICHTIG: Wenn "Nachtdienst" NICHT aktiviert ist, sind ALLE Blöcke normale
+      // Arbeitszeit – auch ein Abendeinsatz 19:00–23:00. Diese dürfen NICHT anhand
+      // ihrer Uhrzeit als Nachtdienst erkannt und verworfen werden.
       return true
     })
     
@@ -2069,10 +2073,12 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
                   const displayedBlocks = workBlocks.filter(block => {
                     // SLEEP-Einträge werden separat angezeigt
                     if (block.entryType === 'SLEEP' || block.entryType === 'SLEEP_INTERRUPTION') return false
-                    if (isNightShift) return true
-                    const isNightShiftBlock = (block.startTime === '19:00' && block.endTime === '23:00') || 
-                                             (block.startTime === '06:01')
-                    return !isNightShiftBlock
+                    // Komplett leere Blöcke ignorieren – sie dürfen das Speichern nicht blockieren.
+                    if (!block.startTime && !block.endTime) return false
+                    // WICHTIG: Wenn "Nachtdienst" NICHT aktiviert ist, sind alle Blöcke normale
+                    // Arbeitszeit (auch 19:00–23:00). Sie dürfen NICHT anhand der Uhrzeit
+                    // ausgeblendet werden, sonst lässt sich ein Abendeinsatz nicht speichern.
+                    return true
                   })
                   
                   // Admins können immer speichern (keine Datumsvalidierung)
