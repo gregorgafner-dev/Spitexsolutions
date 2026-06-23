@@ -96,8 +96,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
     }
 
-    const dateObj = new Date(date)
-    dateObj.setHours(0, 0, 0, 0)
+    // Buchungsdatum zeitzonenunabhängig auf UTC-Mitternacht normalisieren.
+    // WICHTIG: `setHours(0,0,0,0)` würde auf einem Server mit lokaler (nicht-UTC)
+    // Zeitzone den Tag verschieben und so das bekannte Off-by-one im `date`-Feld
+    // erzeugen. Bei reinem Datum (yyyy-MM-dd) parsen wir daher explizit als UTC.
+    const dateObj =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? new Date(`${date}T00:00:00.000Z`)
+        : (() => {
+            const d = new Date(date)
+            return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+          })()
 
     // Validierung 1: Prüfe fehlende Endzeit (nur für WORK-Einträge)
     if (checkMissingEndTime(entryType || 'WORK', endTime ? new Date(endTime) : null)) {
