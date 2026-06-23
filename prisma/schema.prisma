@@ -135,6 +135,11 @@ model HourBalanceAdjustment {
   employeeId      String
   effectiveDate   DateTime // Datum, ab dem die Anpassung gilt (z.B. Auszahlung)
   minutes         Int      // signiert (z.B. -120 = -2h, +30 = +0.5h)
+  // Art der Anpassung:
+  // - "SALDO": wirkt auf den Monatslohn-Stundensaldo (z.B. Auszahlung Plusstunden)
+  // - "WORK":  nacherfasste Arbeitsstunden, fliessen in die Perioden-Berechnung (Stundenlohn)
+  // - "SLEEP": nacherfasste Schlafstunden, fliessen in die Perioden-Berechnung (Stundenlohn)
+  kind            String   @default("SALDO")
   reason          String
   createdByUserId String?
   createdAt       DateTime @default(now())

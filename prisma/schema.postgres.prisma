@@ -135,6 +135,8 @@ model HourBalanceAdjustment {
   employeeId      String
   effectiveDate   DateTime
   minutes         Int
+  // "SALDO" = Monatslohn-Stundensaldo, "WORK"/"SLEEP" = Perioden-Nacherfassung (Stundenlohn)
+  kind            String   @default("SALDO")
   reason          String
   createdByUserId String?
   createdAt       DateTime @default(now())

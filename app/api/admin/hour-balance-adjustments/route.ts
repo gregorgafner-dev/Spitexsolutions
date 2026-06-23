@@ -52,12 +52,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json().catch(() => null)) as
-      | { employeeId?: string; effectiveDate?: string; amount?: string; reason?: string }
+      | { employeeId?: string; effectiveDate?: string; amount?: string; reason?: string; kind?: string }
       | null
     const employeeId = body?.employeeId ?? ''
     const effectiveDateRaw = body?.effectiveDate ?? ''
     const amountRaw = body?.amount ?? ''
     const reason = (body?.reason ?? '').trim()
+    const kind = (body?.kind ?? 'SALDO').toUpperCase()
+
+    if (!['SALDO', 'WORK', 'SLEEP'].includes(kind)) {
+      return NextResponse.json({ error: 'Ungültige Art (kind).' }, { status: 400 })
+    }
 
     if (!employeeId || !effectiveDateRaw || !amountRaw || !reason) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -96,7 +101,10 @@ export async function POST(request: NextRequest) {
       select: { employmentType: true },
     })
     if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
-    if (employee.employmentType !== 'MONTHLY_SALARY') {
+    // SALDO-Anpassungen wirken auf den Monatslohn-Stundensaldo und sind nur für Monatslöhner sinnvoll.
+    // WORK/SLEEP-Nacherfassungen fliessen in die Perioden-Berechnung (typischerweise Stundenlohn) und
+    // sind für alle Anstellungsarten erlaubt.
+    if (kind === 'SALDO' && employee.employmentType !== 'MONTHLY_SALARY') {
       return NextResponse.json({ error: 'Nur Monatslöhner können Stundensaldo-Anpassungen erhalten.' }, { status: 400 })
     }
 
@@ -105,6 +113,7 @@ export async function POST(request: NextRequest) {
         employeeId,
         effectiveDate,
         minutes,
+        kind,
         reason,
         createdByUserId: session.user.id,
       },

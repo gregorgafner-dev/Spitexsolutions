@@ -18,10 +18,30 @@ type AdjustmentRow = {
   employeeId: string
   effectiveDate: string
   minutes: number
+  kind?: string
   reason: string
   createdAt: string
   employee?: { user?: { firstName: string; lastName: string } }
   createdByUser?: { email?: string } | null
+}
+
+function kindLabel(kind?: string): string {
+  switch (kind) {
+    case 'WORK':
+      return 'Arbeitsstunden (Nacherfassung)'
+    case 'SLEEP':
+      return 'Schlafstunden (Nacherfassung)'
+    default:
+      return 'Stundensaldo'
+  }
+}
+
+function formatMinutesSigned(minutes: number): string {
+  const sign = minutes < 0 ? '-' : '+'
+  const abs = Math.abs(minutes)
+  const h = Math.floor(abs / 60)
+  const m = abs % 60
+  return `${sign}${h}:${String(m).padStart(2, '0')}`
 }
 
 const START_SALDI_NOV_2025: Array<{ matchFirstName: string; matchLastNameContains?: string; value: string }> = [
@@ -50,6 +70,11 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
     [employees]
   )
 
+  const hourlyWageEmployees = useMemo(
+    () => employees.filter((e) => e.employmentType === 'HOURLY_WAGE'),
+    [employees]
+  )
+
   const [startSaldoByEmployeeId, setStartSaldoByEmployeeId] = useState<Record<string, string>>({})
   const [initResult, setInitResult] = useState<any>(null)
   const [initLoading, setInitLoading] = useState(false)
@@ -62,6 +87,15 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
   const [adjLoading, setAdjLoading] = useState(false)
   const [adjError, setAdjError] = useState('')
   const [adjustments, setAdjustments] = useState<AdjustmentRow[]>([])
+
+  // Nacherfassung Stunden für Lohn-Periode (Stundenlohn)
+  const [nacEmployeeId, setNacEmployeeId] = useState<string>('')
+  const [nacDate, setNacDate] = useState<string>('')
+  const [nacWork, setNacWork] = useState<string>('')
+  const [nacSleep, setNacSleep] = useState<string>('')
+  const [nacReason, setNacReason] = useState<string>('Nacherfassung Nachtdienst')
+  const [nacLoading, setNacLoading] = useState(false)
+  const [nacError, setNacError] = useState('')
 
   useEffect(() => {
     // Prefill the provided start saldi for Nov 2025.
@@ -152,6 +186,66 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
       setAdjError('Speichern fehlgeschlagen')
     } finally {
       setAdjLoading(false)
+    }
+  }
+
+  async function handleCreateNacherfassung() {
+    setNacError('')
+    if (!nacEmployeeId) {
+      setNacError('Bitte Mitarbeiter auswählen')
+      return
+    }
+    if (!nacDate) {
+      setNacError('Bitte Datum innerhalb der Lohn-Periode wählen')
+      return
+    }
+    const work = nacWork.trim()
+    const sleep = nacSleep.trim()
+    if (!work && !sleep) {
+      setNacError('Bitte Arbeits- und/oder Schlafstunden erfassen (Format HH:MM)')
+      return
+    }
+    const reason = nacReason.trim() || 'Nacherfassung'
+
+    setNacLoading(true)
+    try {
+      const requests: Array<{ kind: 'WORK' | 'SLEEP'; amount: string }> = []
+      if (work) requests.push({ kind: 'WORK', amount: work })
+      if (sleep) requests.push({ kind: 'SLEEP', amount: sleep })
+
+      for (const req of requests) {
+        const res = await fetch('/api/admin/hour-balance-adjustments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: nacEmployeeId,
+            effectiveDate: nacDate,
+            amount: req.amount,
+            reason,
+            kind: req.kind,
+          }),
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          setNacError(
+            data?.details
+              ? `${data?.error || 'Speichern fehlgeschlagen'} (${data.details})`
+              : data?.error || 'Speichern fehlgeschlagen'
+          )
+          setNacLoading(false)
+          await loadAdjustments()
+          return
+        }
+      }
+
+      setNacWork('')
+      setNacSleep('')
+      setNacReason('Nacherfassung Nachtdienst')
+      await loadAdjustments()
+    } catch {
+      setNacError('Speichern fehlgeschlagen')
+    } finally {
+      setNacLoading(false)
     }
   }
 
@@ -265,7 +359,7 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
                         {(a.employee?.user?.firstName ?? '') + ' ' + (a.employee?.user?.lastName ?? '')}
                       </div>
                       <div className="text-gray-600">
-                        {new Date(a.effectiveDate).toLocaleDateString('de-CH')} | {a.minutes} min | {a.reason}
+                        {new Date(a.effectiveDate).toLocaleDateString('de-CH')} | {formatMinutesSigned(a.minutes)} ({a.minutes} min) | {kindLabel(a.kind)} | {a.reason}
                       </div>
                       {a.createdByUser?.email ? (
                         <div className="text-xs text-gray-400">Erfasst von: {a.createdByUser.email}</div>
@@ -278,6 +372,69 @@ export default function HourBalanceManager({ employees }: { employees: EmployeeL
                 ))
               )}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Nacherfassung Stunden für Lohn-Periode (Stundenlohn)</CardTitle>
+          <CardDescription>
+            Für Stundenlöhner: nachträglich geleistete Arbeits- und/oder Schlafstunden erfassen.
+            Diese werden in der Periode der &quot;Berechnung ziehen&quot; (Lohn) zusätzlich zu den real
+            erfassten Stunden gutgeschrieben. Das Datum muss in die jeweilige Lohn-Periode fallen.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+            <div className="space-y-1">
+              <Label>Mitarbeiter</Label>
+              <Select value={nacEmployeeId} onValueChange={setNacEmployeeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hourlyWageEmployees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {fullName(e)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Datum (in Lohn-Periode)</Label>
+              <Input type="date" value={nacDate} onChange={(e) => setNacDate(e.target.value)} />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Arbeitsstunden (HH:MM)</Label>
+              <Input value={nacWork} onChange={(e) => setNacWork(e.target.value)} placeholder="z.B. 8:00" />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Schlafstunden (HH:MM)</Label>
+              <Input value={nacSleep} onChange={(e) => setNacSleep(e.target.value)} placeholder="z.B. 7:00" />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Grund</Label>
+              <Input value={nacReason} onChange={(e) => setNacReason(e.target.value)} placeholder="z.B. Nacherfassung Nachtdienst" />
+            </div>
+          </div>
+
+          {hourlyWageEmployees.length === 0 && (
+            <div className="text-sm text-gray-500">Keine Stundenlöhner vorhanden.</div>
+          )}
+
+          {nacError && <div className="text-sm text-red-600">{nacError}</div>}
+          <Button onClick={handleCreateNacherfassung} disabled={nacLoading || !nacEmployeeId}>
+            {nacLoading ? 'Speichere…' : 'Nacherfassung speichern'}
+          </Button>
+
+          <div className="text-xs text-gray-500">
+            Tipp: Negative Werte sind möglich (z.B. <span className="font-mono">-2:00</span> für eine Korrektur nach unten).
           </div>
         </CardContent>
       </Card>

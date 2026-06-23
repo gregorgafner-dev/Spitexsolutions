@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
           where: {
             employeeId: { in: employeeIds },
             effectiveDate: { lte: monthEnd },
+            // Nur Stundensaldo-Anpassungen. WORK/SLEEP-Nacherfassungen gehören in die
+            // Perioden-Berechnung (Stundenlohn) und dürfen den Saldo nicht verändern.
+            kind: 'SALDO',
           },
           select: { employeeId: true, minutes: true, effectiveDate: true },
         })

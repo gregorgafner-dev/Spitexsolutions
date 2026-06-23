@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
 import { calculateWorkHours } from '@/lib/calculations'
+import { getPeriodCorrectionsByEmployee } from '@/lib/hour-balance-corrections'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { readFile } from 'fs/promises'
@@ -50,6 +51,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Keine Mitarbeiter gefunden' }, { status: 404 })
     }
 
+    // Manuelle Nacherfassungen (Arbeits-/Schlafstunden) im Zeitraum laden
+    const corrections = await getPeriodCorrectionsByEmployee(
+      employees.map((e) => e.id),
+      start,
+      end
+    )
+
     const results = []
 
     for (const employee of employees) {
@@ -89,17 +97,27 @@ export async function POST(request: NextRequest) {
       // Die Unterbrechung markiert ein Zeitfenster INNERHALB des Schlafblocks und
       // zählt bereits zur Arbeitszeit – ohne Abzug würden diese Minuten doppelt
       // erscheinen (Schlaf + Arbeit).
-      const sleepHours = Math.max(0, sleepHoursGross - sleepInterruptionHours)
+      const sleepHoursFromEntries = Math.max(0, sleepHoursGross - sleepInterruptionHours)
+
+      // Manuelle Nacherfassung (im Zeitraum) hinzurechnen
+      const corr = corrections.get(employee.id)
+      const manualWorkHours = (corr?.workMinutes ?? 0) / 60
+      const manualSleepHours = (corr?.sleepMinutes ?? 0) / 60
+
+      const hoursTotal = hours + manualWorkHours
+      const sleepHours = Math.max(0, sleepHoursFromEntries + manualSleepHours)
 
       results.push({
         employeeId: employee.id,
         employeeName: `${employee.user.lastName}, ${employee.user.firstName}`,
         employmentType: employee.employmentType,
-        hours: hours,
+        hours: hoursTotal,
         surchargeHours: surchargeHours,
         sleepHours: sleepHours,
         sleepInterruptionHours: sleepInterruptionHours,
-        totalHours: hours + surchargeHours,
+        manualWorkHours,
+        manualSleepHours,
+        totalHours: hoursTotal + surchargeHours,
       })
     }
 
@@ -227,6 +245,22 @@ export async function POST(request: NextRequest) {
       doc.setFont('helvetica', 'normal')
       doc.text(`Arbeitsstunden: ${result.hours.toFixed(2)}h`, 25, currentY)
       currentY += 7.5 // Mehr Abstand zwischen Zeilen
+
+      // Hinweis auf manuelle Nacherfassung (Transparenz für Lohn)
+      if ((result.manualWorkHours || 0) !== 0 || (result.manualSleepHours || 0) !== 0) {
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(128, 128, 128)
+        doc.text(
+          `davon nacherfasst: Arbeit ${(result.manualWorkHours || 0).toFixed(2)}h, Schlaf ${(result.manualSleepHours || 0).toFixed(2)}h`,
+          30,
+          currentY
+        )
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.setTextColor(0, 0, 0)
+        currentY += 6
+      }
       
       // Zeitzuschlag
       if (result.surchargeHours > 0) {

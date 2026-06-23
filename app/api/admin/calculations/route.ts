@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
 import { calculateWorkHours } from '@/lib/calculations'
+import { getPeriodCorrectionsByEmployee } from '@/lib/hour-balance-corrections'
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +46,13 @@ export async function POST(request: NextRequest) {
     if (employees.length === 0) {
       return NextResponse.json({ error: 'Keine Mitarbeiter gefunden' }, { status: 404 })
     }
+
+    // Manuelle Nacherfassungen (Arbeits-/Schlafstunden) im Zeitraum laden
+    const corrections = await getPeriodCorrectionsByEmployee(
+      employees.map((e) => e.id),
+      start,
+      end
+    )
 
     const results = []
 
@@ -93,17 +101,27 @@ export async function POST(request: NextRequest) {
       }
 
       // Effektive Schlafstunden = Brutto-Schlaf MINUS Unterbrechungen
-      const sleepHours = Math.max(0, sleepHoursGross - sleepInterruptionHours)
+      const sleepHoursFromEntries = Math.max(0, sleepHoursGross - sleepInterruptionHours)
+
+      // Manuelle Nacherfassung (im Zeitraum) hinzurechnen
+      const corr = corrections.get(employee.id)
+      const manualWorkHours = (corr?.workMinutes ?? 0) / 60
+      const manualSleepHours = (corr?.sleepMinutes ?? 0) / 60
+
+      const hoursTotal = hours + manualWorkHours
+      const sleepHours = Math.max(0, sleepHoursFromEntries + manualSleepHours)
 
       results.push({
         employeeId: employee.id,
         employeeName: `${employee.user.lastName}, ${employee.user.firstName}`,
         employmentType: employee.employmentType, // MONTHLY_SALARY oder HOURLY_WAGE
-        hours: hours,
+        hours: hoursTotal,
         surchargeHours: surchargeHours,
         sleepHours: sleepHours,
         sleepInterruptionHours: sleepInterruptionHours,
-        totalHours: hours + surchargeHours,
+        manualWorkHours,
+        manualSleepHours,
+        totalHours: hoursTotal + surchargeHours,
       })
     }
 

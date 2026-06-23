@@ -27,6 +27,8 @@ interface CalculationResult {
   surchargeHours: number
   sleepHours: number
   sleepInterruptionHours: number
+  manualWorkHours?: number
+  manualSleepHours?: number
   totalHours: number
 }
 
@@ -218,8 +220,6 @@ export default function CalculationsPage() {
 
   const UI_BUILD = 'calc-breakdown-v4'
 
-  const totalWorkHours = results.reduce((sum, r) => sum + (r.hours || 0), 0)
-  const totalSurchargeHours = results.reduce((sum, r) => sum + (r.surchargeHours || 0), 0)
   const totalHours = results.reduce((sum, r) => sum + (r.totalHours || 0), 0) // Arbeitszeit inkl. Zuschläge
   const totalSleepHours = results.reduce((sum, r) => sum + (r.sleepHours || 0), 0)
   const totalHoursHourlyWage = results
@@ -228,52 +228,6 @@ export default function CalculationsPage() {
   const totalHoursMonthlySalary = results
     .filter((r) => r.employmentType === 'MONTHLY_SALARY')
     .reduce((sum, r) => sum + (r.totalHours || 0), 0)
-
-  useEffect(() => {
-    if (results.length === 0) return
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'C1',
-        location: 'app/admin/calculations/page.tsx:totals',
-        message: 'Calculations totals rendered',
-        data: {
-          UI_BUILD,
-          resultsLength: results.length,
-          totalWorkHours,
-          totalSurchargeHours,
-          totalHours,
-          totalSleepHours,
-          totalHoursHourlyWage,
-          totalHoursMonthlySalary,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-    // eslint-disable-next-line no-console
-    console.log('[Calculations]', UI_BUILD, {
-      resultsLength: results.length,
-      totalWorkHours,
-      totalSurchargeHours,
-      totalHours,
-      totalSleepHours,
-      totalHoursHourlyWage,
-      totalHoursMonthlySalary,
-    })
-  }, [
-    results,
-    totalHours,
-    totalSleepHours,
-    totalSurchargeHours,
-    totalWorkHours,
-    totalHoursHourlyWage,
-    totalHoursMonthlySalary,
-  ])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -463,6 +417,11 @@ export default function CalculationsPage() {
                         </div>
                         <div className="text-xs text-gray-600 mt-1 space-y-0.5">
                           <div>Arbeitsstunden: {result.hours.toFixed(2)}h</div>
+                          {((result.manualWorkHours || 0) !== 0 || (result.manualSleepHours || 0) !== 0) && (
+                            <div className="text-purple-600">
+                              davon nacherfasst: Arbeit {(result.manualWorkHours || 0).toFixed(2)}h, Schlaf {(result.manualSleepHours || 0).toFixed(2)}h
+                            </div>
+                          )}
                           {result.surchargeHours > 0 && (
                             <div className="font-medium text-orange-600">
                               Zeitzuschlag (Sonn-/Feiertage): {result.surchargeHours.toFixed(2)}h
