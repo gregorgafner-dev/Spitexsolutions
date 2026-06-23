@@ -63,22 +63,8 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
   const ymdKey = (d: Date) => format(d, 'yyyy-MM-dd')
   const shouldDebugDate = (d: Date) => debugDateKeys.has(ymdKey(d))
 
-  const debugLog = (location: string, message: string, data: any, hypothesisId: string) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c4ee99e0-3287-4046-98fb-464abd62c89f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId,
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
+  const debugLog = (_location: string, _message: string, _data: any, _hypothesisId: string) => {
+    // No-op: frühere Debug-Instrumentierung entfernt (sendete an localhost).
   }
 
   const monthStart = startOfMonth(currentMonth)
@@ -940,6 +926,17 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
         debugLog('components/admin/admin-time-tracking-client.tsx:handleSave', 'POST nightshift WORK 06:01-07:00', { dateStr, status: resW2.status }, 'S2')
         // #endregion
 
+        // WICHTIG: Speicherfehler der Nachtdienst-Blöcke sichtbar machen, statt
+        // sie zu verschlucken (sonst wirken die Zeiten nach dem Speichern "weg").
+        if (!resW1.ok || !resS1.ok || !resS2.ok || !resW2.ok) {
+          const failed = [resW1, resS1, resS2, resW2].find((r) => !r.ok)!
+          const errData = await failed.json().catch(() => ({}))
+          setError(errData.error || 'Nachtdienst konnte nicht vollständig gespeichert werden.')
+          await loadEntriesForMonth()
+          await loadEntriesForDate(selectedDate)
+          return
+        }
+
         // Speichere jetzt noch normale Blöcke (die nicht Nachtdienst-Blöcke sind)
         const normalBlocksToSave = blocksToSave.filter(block => !isNightShiftBlock(block))
         if (normalBlocksToSave.length > 0) {
@@ -970,6 +967,25 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
     }
 
     try {
+      // SCHUTZ VOR DATENVERLUST: Validiere ZUERST alle Blöcke, bevor irgendein
+      // bestehender Eintrag gelöscht wird. Andernfalls könnte ein unvollständiger
+      // Block dazu führen, dass alte Einträge gelöscht werden und der Speichervorgang
+      // danach abbricht – die Zeiten wären dann "weg".
+      for (const block of blocksToSave) {
+        const vIsFirst = isNightShift && !block.startTime.startsWith('06:01') && block.endTime === '23:00'
+        const vIsSecond = isNightShift && block.startTime.startsWith('06:01')
+        const vStart = vIsSecond ? '06:01' : block.startTime
+        const vEnd = vIsFirst ? '23:00' : block.endTime
+        if (!vStart) {
+          setError('Bitte füllen Sie alle Startzeiten aus')
+          return
+        }
+        if (!vEnd) {
+          setError('Bitte füllen Sie alle Endzeiten aus')
+          return
+        }
+      }
+
       // WICHTIG: Alle Nachtdienst-Einträge werden am Startdatum gebucht
       // Lösche bestehende Einträge, die nicht in blocksToSave vorhanden sind
       // Unterscheide zwischen Nachtdienst-Einträgen und normalen Einträgen
@@ -980,12 +996,34 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
       // Behalte nur die IDs, die in blocksToSave vorhanden sind
       const blockIds = blocksToSave.filter(b => !b.id.startsWith('new-')).map(b => b.id)
-      
+
+      // Erkennt, ob ein bestehender Eintrag zu einem Nachtdienst gehört (für die
+      // Sonderbehandlung alter, über zwei Tage gesplitteter Einträge).
+      const entryHasNightShiftSignature = (e: TimeEntry): boolean => {
+        if (e.entryType === 'SLEEP' || e.entryType === 'SLEEP_INTERRUPTION') return true
+        const st = format(parseISO(e.startTime), 'HH:mm')
+        if (st === '06:01') return true
+        if (e.endTime) {
+          const et = format(parseISO(e.endTime), 'HH:mm')
+          if (st.startsWith('19:') && et === '23:00') return true
+        }
+        return false
+      }
+
       // Lösche nur Einträge, die nicht in blocksToSave sind
       // Für Nachtdienst-Einträge: Prüfe auch auf SLEEP und SLEEP_INTERRUPTION
       const entriesToDelete = existingEntries.filter(e => {
         if (blockIds.includes(e.id)) return false // Behalte, wenn in blocksToSave
-        
+
+        // SCHUTZ: Einträge am FOLGETAG nur löschen, wenn sie zu einem (alten,
+        // gesplitteten) Nachtdienst gehören. Normale Einträge des Folgetags dürfen
+        // beim Speichern des aktuellen Tages NIEMALS gelöscht werden.
+        const entryDate = new Date(e.date)
+        const isNextDay = isSameDay(entryDate, addDays(selectedDate, 1))
+        if (isNextDay && !entryHasNightShiftSignature(e)) {
+          return false
+        }
+
         // Für SLEEP_INTERRUPTION-Einträge: Lösche wenn keine Nachtdienst-Blöcke vorhanden sind
         // (unabhängig davon, ob isNightShift aktiv ist oder nicht)
         if (e.entryType === 'SLEEP_INTERRUPTION') {
@@ -1009,9 +1047,16 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
       })
 
       for (const entry of entriesToDelete) {
-        await fetch(`/api/admin/time-entries/${entry.id}`, {
+        const delRes = await fetch(`/api/admin/time-entries/${entry.id}`, {
           method: 'DELETE',
         })
+        if (!delRes.ok) {
+          const delErr = await delRes.json().catch(() => ({}))
+          setError(delErr.error || 'Fehler beim Aktualisieren: Ein bestehender Eintrag konnte nicht gelöscht werden.')
+          await loadEntriesForMonth()
+          await loadEntriesForDate(selectedDate)
+          return
+        }
       }
 
       // Prüfe Gesamtarbeitszeit und Pausen zwischen Blöcken
@@ -1098,9 +1143,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
         
         // Prüfe ob es ein bestehender Eintrag ist
+        let response: Response
         if (!block.id.startsWith('new-')) {
           // Bestehender Eintrag - aktualisiere
-          const response = await fetch(`/api/admin/time-entries/${block.id}`, {
+          response = await fetch(`/api/admin/time-entries/${block.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1112,7 +1158,7 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
           })
         } else {
           // Neuer Eintrag
-          const response = await fetch('/api/admin/time-entries', {
+          response = await fetch('/api/admin/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1124,6 +1170,19 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               entryType: block.entryType || 'WORK',
             }),
           })
+        }
+
+        // WICHTIG: Fehler beim Speichern nicht verschlucken. Sonst wirkt es so,
+        // als seien die nacherfassten Zeiten "nach dem Speichern wieder weg".
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          setError(
+            errData.error ||
+              `Block ${blocksToSave.indexOf(block) + 1} konnte nicht gespeichert werden (Status ${response.status}).`
+          )
+          await loadEntriesForMonth()
+          await loadEntriesForDate(selectedDate)
+          return
         }
       }
 
