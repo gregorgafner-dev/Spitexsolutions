@@ -36,6 +36,8 @@ type LohnrechnerForm = {
   ausserhalbErfahrungJahre: number;
   ausbildung: AusbildungKey;
   pensumProzent: number;
+  /** Alter der/des Mitarbeitenden – steuert im Stundenlohn den Ferienanspruch. */
+  alter: number;
   zusatzdiplom: JaNeinType;
   zusatzdiplomArt: ZusatzdiplomArtType;
 };
@@ -47,8 +49,12 @@ type Lohntabelle = {
 
 type StundenlohnAufteilung = {
   grundlohn: number;
-  ferien: number;
-  feiertage: number;
+  /** Kombinierte Ferien- & Feiertagsentschädigung (CHF/h). */
+  ferienFeiertage: number;
+  /** Angewandter Prozentsatz der Ferien-/Feiertagsentschädigung. */
+  ferienFeiertagePct: number;
+  /** Zugrunde gelegter Ferienanspruch in Tagen. */
+  ferientage: number;
   dreizehnter: number;
   total: number;
 };
@@ -115,16 +121,49 @@ const BAND_BREITE_STUFEN = 2;
 /** Spezialfall Betreuung: fixer Bruttostundenlohn (CHF). */
 const BETREUUNG_STUNDENLOHN_CHF = 34;
 
-/** Lohntabelle Kanton ZH liefert Jahreslöhne inkl. 13. Monatslohn. */
-const MONATE_PRO_JAHR = 12;
+/**
+ * Jahreslohn (inkl. 13. ML) = 13 × Grund-Monatslohn.
+ * Grund-Monatslohn (12×) = Jahreslohn / 13, der 13. ML entspricht ebenfalls Jahreslohn / 13.
+ */
+const ML_TEILER_INKL_13 = 13;
 
 /**
  * Kanton ZH: Stundenlohn = 1/2184 des Grundlohnes inkl. 13. Monatslohn.
  * Der 13. ML ist im Grundlohn enthalten und wird nicht separat aufgeschlagen.
  */
 const STUNDENLOHN_STUNDEN_JAHR = 2184;
-const FERIEN_ZULAGE_PCT = 10.64;
-const FEIERTAGE_ZULAGE_PCT = 3.5;
+
+/**
+ * Ferien und Feiertage werden im Stundenlohn durch EINEN Lohnzuschlag abgegolten
+ * (Reglement Ziff. 4.6.2). Der Prozentsatz richtet sich nach dem Ferienanspruch,
+ * der wiederum vom Alter abhängt.
+ */
+const FERIEN_FEIERTAGE_PCT_BY_TAGE: Record<number, number> = {
+  25: 15.55,
+  27: 16.59,
+  30: 18.18,
+};
+
+/**
+ * Alter → Ferienanspruch (Tage). ANNAHME (in der CH übliche Staffelung):
+ *   < 50 Jahre  → 25 Tage
+ *   50–59 Jahre → 27 Tage
+ *   ≥ 60 Jahre  → 30 Tage
+ * Bitte bei abweichendem Personalreglement hier anpassen.
+ */
+const FERIEN_ALTERSGRENZE_27 = 50;
+const FERIEN_ALTERSGRENZE_30 = 60;
+
+function ferientageForAlter(alter: number): 25 | 27 | 30 {
+  if (Number.isFinite(alter) && alter >= FERIEN_ALTERSGRENZE_30) return 30;
+  if (Number.isFinite(alter) && alter >= FERIEN_ALTERSGRENZE_27) return 27;
+  return 25;
+}
+
+function ferienFeiertagePctForTage(ferientage: number): number {
+  return FERIEN_FEIERTAGE_PCT_BY_TAGE[ferientage] ?? FERIEN_FEIERTAGE_PCT_BY_TAGE[25];
+}
+
 /** Nur für fixen Betreuungs-Stundenlohn (Rückrechnung aus Brutto-Total). */
 const DREIZEHNTER_ML_ZULAGE_PCT = 8.33;
 
@@ -260,27 +299,40 @@ function getAusbildungWarnung(
 }
 
 function aufteilenStundenlohnFromJahreslohn(
-  jahreslohnInkl13: number
+  jahreslohnInkl13: number,
+  ferientage: number
 ): StundenlohnAufteilung {
+  const pct = ferienFeiertagePctForTage(ferientage);
   const grundlohn = jahreslohnInkl13 / STUNDENLOHN_STUNDEN_JAHR;
-  const ferien = grundlohn * (FERIEN_ZULAGE_PCT / 100);
-  const feiertage = grundlohn * (FEIERTAGE_ZULAGE_PCT / 100);
-  const total = grundlohn + ferien + feiertage;
-  return { grundlohn, ferien, feiertage, dreizehnter: 0, total };
+  const ferienFeiertage = grundlohn * (pct / 100);
+  const total = grundlohn + ferienFeiertage;
+  return {
+    grundlohn,
+    ferienFeiertage,
+    ferienFeiertagePct: pct,
+    ferientage,
+    dreizehnter: 0,
+    total,
+  };
 }
 
 function aufteilenStundenlohnFromBruttoTotal(
-  brutto: number
+  brutto: number,
+  ferientage: number
 ): StundenlohnAufteilung {
-  const faktor =
-    1 +
-    (FERIEN_ZULAGE_PCT + FEIERTAGE_ZULAGE_PCT + DREIZEHNTER_ML_ZULAGE_PCT) /
-      100;
+  const pct = ferienFeiertagePctForTage(ferientage);
+  const faktor = 1 + (pct + DREIZEHNTER_ML_ZULAGE_PCT) / 100;
   const grundlohn = brutto / faktor;
-  const ferien = grundlohn * (FERIEN_ZULAGE_PCT / 100);
-  const feiertage = grundlohn * (FEIERTAGE_ZULAGE_PCT / 100);
+  const ferienFeiertage = grundlohn * (pct / 100);
   const dreizehnter = grundlohn * (DREIZEHNTER_ML_ZULAGE_PCT / 100);
-  return { grundlohn, ferien, feiertage, dreizehnter, total: brutto };
+  return {
+    grundlohn,
+    ferienFeiertage,
+    ferienFeiertagePct: pct,
+    ferientage,
+    dreizehnter,
+    total: brutto,
+  };
 }
 // #endregion
 
@@ -309,6 +361,7 @@ export default function LohnrechnerPage() {
       ausserhalbErfahrungJahre: 0,
       ausbildung: "",
       pensumProzent: 100,
+      alter: 30,
       zusatzdiplom: "nein",
       zusatzdiplomArt: "",
     },
@@ -316,6 +369,8 @@ export default function LohnrechnerPage() {
 
   const zusatzdiplomValue = watch("zusatzdiplom");
   const erfahrungInPflegeValue = watch("erfahrungInPflege");
+  const lohnartValue = watch("lohnart");
+  const alterValue = watch("alter");
 
   useEffect(() => {
     if (zusatzdiplomValue !== "ja") {
@@ -367,10 +422,12 @@ export default function LohnrechnerPage() {
   const result = useMemo(() => {
     if (!submitted) return null;
     const funktion = submitted.funktion as FunktionKey | "";
+    const ferientage = ferientageForAlter(submitted.alter);
 
     if (funktion === "betreuung") {
       const aufteilung = aufteilenStundenlohnFromBruttoTotal(
-        BETREUUNG_STUNDENLOHN_CHF
+        BETREUUNG_STUNDENLOHN_CHF,
+        ferientage
       );
       return { kind: "stundenlohn-fix" as const, aufteilung };
     }
@@ -400,15 +457,15 @@ export default function LohnrechnerPage() {
         stufeMax: max,
         aufMin:
           jahresLohnMin != null
-            ? aufteilenStundenlohnFromJahreslohn(jahresLohnMin)
+            ? aufteilenStundenlohnFromJahreslohn(jahresLohnMin, ferientage)
             : null,
         aufMittel:
           jahresLohnMittel != null
-            ? aufteilenStundenlohnFromJahreslohn(jahresLohnMittel)
+            ? aufteilenStundenlohnFromJahreslohn(jahresLohnMittel, ferientage)
             : null,
         aufMax:
           jahresLohnMax != null
-            ? aufteilenStundenlohnFromJahreslohn(jahresLohnMax)
+            ? aufteilenStundenlohnFromJahreslohn(jahresLohnMax, ferientage)
             : null,
       };
     }
@@ -723,6 +780,49 @@ export default function LohnrechnerPage() {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Alter (Jahre)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min={15}
+                    max={75}
+                    {...register("alter", {
+                      valueAsNumber: true,
+                      required: "Alter ist erforderlich",
+                      min: { value: 15, message: "Bitte ein plausibles Alter eingeben" },
+                      max: { value: 75, message: "Bitte ein plausibles Alter eingeben" },
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    placeholder="z. B. 35"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bestimmt den Ferienanspruch: bis {FERIEN_ALTERSGRENZE_27 - 1}. Altersjahr →
+                    25 Tage, ab {FERIEN_ALTERSGRENZE_27}. → 27 Tage, ab {FERIEN_ALTERSGRENZE_30}.
+                    → 30 Tage.
+                    {lohnartValue === "stundenlohn"
+                      ? ` Im Stundenlohn entspricht das dem Ferien-/Feiertagszuschlag (25 Tage = ${FERIEN_FEIERTAGE_PCT_BY_TAGE[25]}%, 27 Tage = ${FERIEN_FEIERTAGE_PCT_BY_TAGE[27]}%, 30 Tage = ${FERIEN_FEIERTAGE_PCT_BY_TAGE[30]}%).`
+                      : ""}
+                    {Number.isFinite(alterValue) ? (
+                      <>
+                        {" "}
+                        Aktuell: {ferientageForAlter(alterValue)} Tage
+                        {lohnartValue === "stundenlohn"
+                          ? ` · ${ferienFeiertagePctForTage(
+                              ferientageForAlter(alterValue)
+                            )}%`
+                          : ""}
+                        .
+                      </>
+                    ) : null}
+                  </p>
+                  {errors.alter && (
+                    <p className="text-red-500 text-sm mt-1">{errors.alter.message}</p>
+                  )}
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Funktionsrelevantes Zusatzdiplom
                   </label>
@@ -911,6 +1011,18 @@ function EingabenZusammenfassung({ submitted }: { submitted: LohnrechnerForm }) 
         }
       />
       <ZeileLabelWert label="Pensum" value={`${submitted.pensumProzent}%`} />
+      <ZeileLabelWert
+        label="Alter / Ferienanspruch"
+        value={
+          submitted.lohnart === "stundenlohn"
+            ? `${submitted.alter} J. · ${ferientageForAlter(
+                submitted.alter
+              )} Tage (${ferienFeiertagePctForTage(
+                ferientageForAlter(submitted.alter)
+              )}%)`
+            : `${submitted.alter} J. · ${ferientageForAlter(submitted.alter)} Tage`
+        }
+      />
     </div>
   );
 }
@@ -982,14 +1094,6 @@ function BandbreitenResultat({
 }) {
   const pensumFaktor = clamp(pensumProzent, 0, 100) / 100;
 
-  const monatMin = jahresLohnMin != null ? jahresLohnMin / MONATE_PRO_JAHR : null;
-  const monatMittel = jahresLohnMittel != null ? jahresLohnMittel / MONATE_PRO_JAHR : null;
-  const monatMax = jahresLohnMax != null ? jahresLohnMax / MONATE_PRO_JAHR : null;
-
-  const monatMinPensum = monatMin != null ? monatMin * pensumFaktor : null;
-  const monatMittelPensum = monatMittel != null ? monatMittel * pensumFaktor : null;
-  const monatMaxPensum = monatMax != null ? monatMax * pensumFaktor : null;
-
   const jahrMinPensum = jahresLohnMin != null ? jahresLohnMin * pensumFaktor : null;
   const jahrMittelPensum = jahresLohnMittel != null ? jahresLohnMittel * pensumFaktor : null;
   const jahrMaxPensum = jahresLohnMax != null ? jahresLohnMax * pensumFaktor : null;
@@ -1012,10 +1116,7 @@ function BandbreitenResultat({
 
       <BandTabelle
         title="Bei 100 % Pensum"
-        subtitle="Direkt aus der Lohntabelle (inkl. 13. Monatslohn)"
-        monatMin={monatMin}
-        monatMittel={monatMittel}
-        monatMax={monatMax}
+        subtitle="Direkt aus der Lohntabelle (13. Monatslohn separat ausgewiesen)"
         jahresMin={jahresLohnMin}
         jahresMittel={jahresLohnMittel}
         jahresMax={jahresLohnMax}
@@ -1023,9 +1124,6 @@ function BandbreitenResultat({
       <BandTabelle
         title={`Bei ${pensumProzent} % Pensum`}
         subtitle="Linear skaliert"
-        monatMin={monatMinPensum}
-        monatMittel={monatMittelPensum}
-        monatMax={monatMaxPensum}
         jahresMin={jahrMinPensum}
         jahresMittel={jahrMittelPensum}
         jahresMax={jahrMaxPensum}
@@ -1040,7 +1138,8 @@ function BandbreitenResultat({
 
       <p className="text-xs text-gray-500">
         Quelle: Lohntabelle Kanton Zürich (Kreuztabelle). Jahreslohn inkl. 13. Monatslohn.
-        Monatslohn = Jahreslohn / 12 (anteiliger 13. ML integriert).
+        Grund-Monatslohn (12×) = Jahreslohn / {ML_TEILER_INKL_13}; der 13. Monatslohn entspricht
+        einem weiteren Grund-Monatslohn und wird separat ausgewiesen.
       </p>
     </div>
   );
@@ -1049,22 +1148,32 @@ function BandbreitenResultat({
 function BandTabelle({
   title,
   subtitle,
-  monatMin,
-  monatMittel,
-  monatMax,
   jahresMin,
   jahresMittel,
   jahresMax,
 }: {
   title: string;
   subtitle: string;
-  monatMin: number | null;
-  monatMittel: number | null;
-  monatMax: number | null;
   jahresMin: number | null;
   jahresMittel: number | null;
   jahresMax: number | null;
 }) {
+  const teile = (jahres: number | null) =>
+    jahres != null ? jahres / ML_TEILER_INKL_13 : null;
+  const monatMin = teile(jahresMin);
+  const monatMittel = teile(jahresMittel);
+  const monatMax = teile(jahresMax);
+
+  const cell = (val: number | null, bold = false) => (
+    <td
+      className={`px-3 py-2 text-right tabular-nums text-gray-900 ${
+        bold ? "font-semibold" : ""
+      }`}
+    >
+      {val != null ? formatChf(val) : "—"}
+    </td>
+  );
+
   return (
     <div className="rounded-md border border-gray-200 overflow-hidden">
       <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -1085,35 +1194,34 @@ function BandTabelle({
             <td className="px-4 py-2 font-medium text-gray-900">
               Monatslohn
               <span className="block text-xs font-normal text-gray-500">
-                inkl. anteiligem 13. ML
+                12× (ohne 13. ML)
               </span>
             </td>
-            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-              {monatMin != null ? formatChf(monatMin) : "—"}
-            </td>
-            <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900">
-              {monatMittel != null ? formatChf(monatMittel) : "—"}
-            </td>
-            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-              {monatMax != null ? formatChf(monatMax) : "—"}
-            </td>
+            {cell(monatMin)}
+            {cell(monatMittel, true)}
+            {cell(monatMax)}
           </tr>
           <tr>
             <td className="px-4 py-2 font-medium text-gray-900">
+              13. Monatslohn
+              <span className="block text-xs font-normal text-gray-500">
+                separat ausgewiesen
+              </span>
+            </td>
+            {cell(monatMin)}
+            {cell(monatMittel)}
+            {cell(monatMax)}
+          </tr>
+          <tr className="bg-gray-50">
+            <td className="px-4 py-2 font-bold text-gray-900">
               Jahreslohn
               <span className="block text-xs font-normal text-gray-500">
                 inkl. 13. ML
               </span>
             </td>
-            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-              {jahresMin != null ? formatChf(jahresMin) : "—"}
-            </td>
-            <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900">
-              {jahresMittel != null ? formatChf(jahresMittel) : "—"}
-            </td>
-            <td className="px-3 py-2 text-right tabular-nums text-gray-900">
-              {jahresMax != null ? formatChf(jahresMax) : "—"}
-            </td>
+            {cell(jahresMin, true)}
+            {cell(jahresMittel, true)}
+            {cell(jahresMax, true)}
           </tr>
         </tbody>
       </table>
@@ -1173,25 +1281,16 @@ function StundenlohnTabelle({
           </tr>
           <tr>
             <td className="px-4 py-2 text-gray-900">
-              Ferienzulage
+              Ferien- &amp; Feiertagsentschädigung
               <span className="block text-xs text-gray-500">
-                {FERIEN_ZULAGE_PCT}% (5 Wochen Ferien)
+                {aufMittel
+                  ? `${aufMittel.ferientage} Tage Ferien · ${aufMittel.ferienFeiertagePct}% (Reglement 4.6.2)`
+                  : "gemäss Reglement 4.6.2"}
               </span>
             </td>
-            {zellen(aufMin?.ferien)}
-            {zellen(aufMittel?.ferien)}
-            {zellen(aufMax?.ferien)}
-          </tr>
-          <tr>
-            <td className="px-4 py-2 text-gray-900">
-              Feiertagszulage
-              <span className="block text-xs text-gray-500">
-                {FEIERTAGE_ZULAGE_PCT}%
-              </span>
-            </td>
-            {zellen(aufMin?.feiertage)}
-            {zellen(aufMittel?.feiertage)}
-            {zellen(aufMax?.feiertage)}
+            {zellen(aufMin?.ferienFeiertage)}
+            {zellen(aufMittel?.ferienFeiertage)}
+            {zellen(aufMax?.ferienFeiertage)}
           </tr>
           {aufMittel?.dreizehnter ? (
             <tr>
@@ -1259,7 +1358,7 @@ function StundenlohnBandResultat({
 
       <StundenlohnTabelle
         title="Stundenlohn-Bandbreite"
-        subtitle={`Kanton ZH: Grundlohn inkl. 13. ML = Jahreslohn / ${STUNDENLOHN_STUNDEN_JAHR} h · Ferien- und Feiertagszulage separat`}
+        subtitle={`Kanton ZH: Grundlohn inkl. 13. ML = Jahreslohn / ${STUNDENLOHN_STUNDEN_JAHR} h · Ferien-/Feiertagszuschlag gemäss Reglement 4.6.2`}
         aufMin={aufMin}
         aufMittel={aufMittel}
         aufMax={aufMax}
@@ -1274,9 +1373,13 @@ function StundenlohnBandResultat({
 
       <p className="text-xs text-gray-500">
         Berechnung gemäss Lohnband Kanton: Grundlohn inkl. 13. ML = Jahreslohn /{" "}
-        {STUNDENLOHN_STUNDEN_JAHR} h. Ferien {FERIEN_ZULAGE_PCT}% und Feiertage{" "}
-        {FEIERTAGE_ZULAGE_PCT}% werden auf den Grundlohn aufgerechnet — der 13. Monatslohn ist
-        bereits im Grundlohn enthalten. Quelle Jahreslohn: Lohntabelle Kanton Zürich.
+        {STUNDENLOHN_STUNDEN_JAHR} h. Ferien und Feiertage sind im Stundenlohn durch einen
+        Lohnzuschlag abgegolten (Reglement Ziff. 4.6.2)
+        {aufMittel
+          ? `: ${aufMittel.ferientage} Tage Ferien = ${aufMittel.ferienFeiertagePct}%`
+          : ""}
+        . Der Zuschlag wird auf den Grundlohn aufgerechnet — der 13. Monatslohn ist bereits im
+        Grundlohn enthalten. Quelle Jahreslohn: Lohntabelle Kanton Zürich.
       </p>
     </div>
   );
@@ -1327,8 +1430,8 @@ function StundenlohnFixResultat({
       </div>
 
       <p className="text-xs text-gray-500">
-        Berechnung Grundlohn = Brutto Total / (1 + Ferien {FERIEN_ZULAGE_PCT}% + Feiertage{" "}
-        {FEIERTAGE_ZULAGE_PCT}% + 13. ML {DREIZEHNTER_ML_ZULAGE_PCT}%).
+        Berechnung Grundlohn = Brutto Total / (1 + Ferien-/Feiertagszuschlag{" "}
+        {aufteilung.ferienFeiertagePct}% + 13. ML {DREIZEHNTER_ML_ZULAGE_PCT}%).
       </p>
     </div>
   );
