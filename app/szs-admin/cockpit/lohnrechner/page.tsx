@@ -170,6 +170,12 @@ const DREIZEHNTER_ML_ZULAGE_PCT = 8.33;
 /** Rechner-interne Skala entspricht der Technischen Stufe (1–31). Lookup nutzt Lohnstufe/Anlauf. */
 const MIN_TECHNISCHE_STUFE = 1;
 const MAX_TECHNISCHE_STUFE = 31;
+/**
+ * Technische Stufe 3 entspricht «LS 1» (Stufe 1 = «AS 2», Stufe 2 = «AS 1»).
+ * Ausgelernte Mitarbeitende starten mindestens bei LS 1 – die Anlaufstufen (AS)
+ * gelten nur für Personen ohne abgeschlossene relevante Ausbildung.
+ */
+const LS1_TECHNISCHE_STUFE = 3;
 // #endregion
 
 // #region Helpers
@@ -189,6 +195,11 @@ function formatChf(n: number, fractionDigits = 0): string {
 function getKlasseForFunktion(funktion: FunktionKey | ""): number | null {
   if (!funktion || funktion === "betreuung") return null;
   return FUNKTION_KLASSE[funktion as Exclude<FunktionKey, "betreuung">] ?? null;
+}
+
+/** Abgeschlossene relevante Ausbildung → Einstufung mindestens LS 1 (keine Anlaufstufe). */
+function istAusgebildet(ausbildung: AusbildungKey): boolean {
+  return ausbildung === "dipl_hf" || ausbildung === "fage" || ausbildung === "srk";
 }
 
 /** Technische Stufe (Kreuztabelle) → Zeilen-Key «Lohnstufe oder Anlaufstufe». */
@@ -437,11 +448,15 @@ export default function LohnrechnerPage() {
     if (!klasse) return null;
 
     const { min: stufeMin, max: stufeMax } = getStufenRange(lohntabelle);
+    // Ausgelernte Mitarbeitende starten mindestens bei LS 1 (keine Anlaufstufe).
+    const stufeUntergrenze = istAusgebildet(submitted.ausbildung as AusbildungKey)
+      ? Math.max(stufeMin, LS1_TECHNISCHE_STUFE)
+      : stufeMin;
     const mittelRaw = computeMittelStufeRaw(submitted);
-    // Erst clampen, dann abrunden auf ganze Lohnstufe
-    const mittel = Math.floor(clamp(mittelRaw, stufeMin, stufeMax));
-    const min = clamp(mittel - BAND_BREITE_STUFEN, stufeMin, stufeMax);
-    const max = clamp(mittel + BAND_BREITE_STUFEN, stufeMin, stufeMax);
+    // Erst clampen (inkl. Ausbildungs-Untergrenze), dann abrunden auf ganze Lohnstufe
+    const mittel = Math.floor(clamp(mittelRaw, stufeUntergrenze, stufeMax));
+    const min = clamp(mittel - BAND_BREITE_STUFEN, stufeUntergrenze, stufeMax);
+    const max = clamp(mittel + BAND_BREITE_STUFEN, stufeUntergrenze, stufeMax);
 
     const jahresLohnMin = getJahreslohn(lohntabelle, klasse, min);
     const jahresLohnMittel = getJahreslohn(lohntabelle, klasse, mittel);
@@ -1040,7 +1055,8 @@ function EinstufungsBadge({
   stufeMin: number;
   stufeMax: number;
 }) {
-  const wasFloored = Math.abs(stufeMittelRaw - stufeMittel) > 0.001;
+  const wasFloored = stufeMittelRaw - stufeMittel > 0.001;
+  const wasRaised = stufeMittel - stufeMittelRaw > 0.001;
   return (
     <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4">
       <div className="text-xs uppercase tracking-wide text-indigo-800 font-semibold">
@@ -1055,6 +1071,12 @@ function EinstufungsBadge({
           {wasFloored ? (
             <span className="ml-1 text-xs text-indigo-700">
               (rechnerisch {formatLohnstufenLabel(stufeMittelRaw)}, abgerundet)
+            </span>
+          ) : null}
+          {wasRaised ? (
+            <span className="ml-1 text-xs text-indigo-700">
+              (rechnerisch {formatLohnstufenLabel(stufeMittelRaw)}, Mindesteinstufung
+              LS 1 bei abgeschlossener Ausbildung)
             </span>
           ) : null}
         </div>
