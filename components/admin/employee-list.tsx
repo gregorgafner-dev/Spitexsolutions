@@ -534,7 +534,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
             <DialogDescription>
               {archivingEmployee && (
                 <>
-                  Mitarbeiter „{archivingEmployee.user.firstName} {archivingEmployee.user.lastName}" archivieren.
+                  Mitarbeiter „{archivingEmployee.user.firstName} {archivingEmployee.user.lastName}“ archivieren.
                   Es werden KEINE Daten gelöscht – alle Einträge bleiben erhalten und jederzeit abrufbar.
                   Die Archivierung kann jederzeit rückgängig gemacht werden.
                 </>
