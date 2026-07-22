@@ -1805,18 +1805,23 @@ export default function TimeTrackingPage() {
 
           // Erstelle SLEEP-Eintrag (00:00-06:00) NUR wenn noch keiner existiert.
           // Neues System: Buchungsdatum = dateStr, auch wenn der Zeitstempel am Folgetag liegt.
-          // Fallback: alte Daten können noch auf nextDayEntries liegen.
-          const existingSleep00 = nextDayEntries.some(e => {
-            if (e.entryType !== 'SLEEP' || !e.endTime) return false
-            const startTime = format(parseISO(e.startTime), 'HH:mm')
-            return startTime === '00:00' || startTime.startsWith('00:00')
-          }) || entries.some(e => {
-            const entryDate = new Date(e.date)
-            if (!isSameDay(entryDate, selectedDate)) return false
-            if (e.entryType !== 'SLEEP' || !e.endTime) return false
-            const startTime = format(parseISO(e.startTime), 'HH:mm')
-            return startTime === '00:00' || startTime.startsWith('00:00')
-          })
+          // WICHTIG (Bugfix): Früher wurde hier nextDayEntries geprüft. Bei zwei
+          // aufeinanderfolgenden Nachtdiensten fand das fälschlich den 00:00-Block des
+          // FOLGE-Nachtdienstes (der am Folgetag gebucht ist) und übersprang deshalb das
+          // Anlegen des Blocks für den AKTUELLEN Nachtdienst -> nur 0:59 Schlaf.
+          // Deshalb prüfen wir jetzt frisch das aktuelle Buchungsdatum (currentDayEntries).
+          const existingSleep00 =
+            currentDayEntries.some(e => {
+              if (e.entryType !== 'SLEEP' || !e.endTime) return false
+              return format(parseISO(e.startTime), 'HH:mm') === '00:00'
+            }) ||
+            // Fallback nur für echtes altes Split-Modell: 00:00-Block liegt am Folgetag
+            // UND date == startTime-Kalendertag (kennzeichnet einen alten Split-Eintrag).
+            nextDayEntries.some(e => {
+              if (e.entryType !== 'SLEEP' || !e.endTime) return false
+              if (!isSameDay(new Date(e.date), parseISO(e.startTime))) return false
+              return format(parseISO(e.startTime), 'HH:mm') === '00:00'
+            })
           
           if (!existingSleep00) {
             console.log('Erstelle SLEEP-Eintrag (00:00-06:00) auf Buchungsdatum:', dateStr)

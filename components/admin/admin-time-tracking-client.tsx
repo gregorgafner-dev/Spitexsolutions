@@ -1192,15 +1192,42 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
 
       // Bei Nachtdienst: Erstelle SLEEP-Einträge am Startdatum (23:01-23:59 und 00:00-06:00)
       if (isNightShift) {
-        // Prüfe ob SLEEP-Einträge für aktuellen Tag bereits existieren
-        const currentDaySleepEntries = entries.filter(e => {
-          const entryDate = new Date(e.date)
-          return isSameDay(entryDate, selectedDate) && e.entryType === 'SLEEP'
+        // WICHTIG: Existenz frisch vom Server prüfen (nicht aus dem evtl. veralteten
+        // Client-State). Ein veralteter State konnte fälschlich "existiert bereits"
+        // liefern, wodurch der 00:00-06:00-Block nie erstellt wurde (-> nur 0:59 Schlaf).
+        let currentDaySleepFresh: TimeEntry[] = []
+        try {
+          const sleepCheckResponse = await fetch(`/api/admin/time-entries?employeeId=${selectedEmployeeId}&date=${dateStr}`)
+          currentDaySleepFresh = sleepCheckResponse.ok
+            ? await sleepCheckResponse.json()
+            : entries.filter(e => isSameDay(new Date(e.date), selectedDate))
+        } catch {
+          currentDaySleepFresh = entries.filter(e => isSameDay(new Date(e.date), selectedDate))
+        }
+
+        const hasSleep2359 = currentDaySleepFresh.some(e => {
+          if (e.entryType !== 'SLEEP' || !e.endTime) return false
+          return format(parseISO(e.startTime), 'HH:mm') === '23:01'
+        })
+        const hasSleep0006 = currentDaySleepFresh.some(e => {
+          if (e.entryType !== 'SLEEP' || !e.endTime) return false
+          return format(parseISO(e.startTime), 'HH:mm') === '00:00'
         })
 
-        if (currentDaySleepEntries.length === 0) {
+        // Gemeinsame Fehlerbehandlung: KEIN stiller Datenverlust mehr.
+        const handleSleepSaveError = async (response: Response, label: string) => {
+          const errData = await response.json().catch(() => ({}))
+          setError(
+            errData.error ||
+              `Schlaf-Block "${label}" konnte nicht gespeichert werden (Status ${response.status}).`
+          )
+          await loadEntriesForMonth()
+          await loadEntriesForDate(selectedDate)
+        }
+
+        if (!hasSleep2359) {
           // Erstelle SLEEP-Eintrag für aktuellen Tag (23:01-23:59:59 = 59 Minuten)
-          await fetch('/api/admin/time-entries', {
+          const sleep2359Response = await fetch('/api/admin/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1212,20 +1239,16 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               entryType: 'SLEEP',
             }),
           })
+          if (!sleep2359Response.ok) {
+            await handleSleepSaveError(sleep2359Response, '23:01-23:59')
+            return
+          }
         }
 
         // WICHTIG: SLEEP-Einträge werden am Startdatum gebucht (00:00-06:00)
-        // Prüfe ob SLEEP-Einträge für 00:00-06:00 bereits existieren
-        const nightSleepEntries = entries.filter(e => {
-          const entryDate = new Date(e.date)
-          if (!isSameDay(entryDate, selectedDate) || e.entryType !== 'SLEEP') return false
-          const startTime = format(parseISO(e.startTime), 'HH:mm')
-          return startTime === '00:00'
-        })
-
-        if (nightSleepEntries.length === 0) {
+        if (!hasSleep0006) {
           // Erstelle SLEEP-Eintrag für Startdatum (00:00-06:00)
-          await fetch('/api/admin/time-entries', {
+          const sleep0006Response = await fetch('/api/admin/time-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1238,6 +1261,10 @@ export default function AdminTimeTrackingClient({ employees }: AdminTimeTracking
               entryType: 'SLEEP',
             }),
           })
+          if (!sleep0006Response.ok) {
+            await handleSleepSaveError(sleep0006Response, '00:00-06:00')
+            return
+          }
         }
 
         // Speichere/aktualisiere Unterbrechungen während des Schlafens
