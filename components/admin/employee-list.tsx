@@ -50,6 +50,13 @@ function formatDate(value?: string | null): string {
   return d.toLocaleDateString('de-CH')
 }
 
+// Heutiges Datum als yyyy-MM-dd (Ortszeit) für das Datums-Eingabefeld.
+function todayStr(): string {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 export default function EmployeeList({ employees: initialEmployees }: EmployeeListProps) {
   const [employees, setEmployees] = useState(initialEmployees)
   const [view, setView] = useState<'active' | 'archived'>('active')
@@ -67,6 +74,12 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Archivieren-Dialog: erlaubt das Setzen eines (auch zukünftigen) Austrittsdatums.
+  const [archivingEmployee, setArchivingEmployee] = useState<Employee | null>(null)
+  const [archiveDate, setArchiveDate] = useState('')
+  const [archiveError, setArchiveError] = useState('')
+  const [archiveLoading, setArchiveLoading] = useState(false)
 
   const activeEmployees = employees.filter(e => !isArchived(e))
   const archivedEmployees = employees.filter(e => isArchived(e))
@@ -171,30 +184,53 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
     }
   }
 
-  const handleArchive = async (employee: Employee) => {
-    if (
-      !confirm(
-        `Mitarbeiter "${employee.user.firstName} ${employee.user.lastName}" archivieren?\n\n` +
-          'Der Mitarbeiter wird mit Austrittsdatum heute archiviert und kann sich nicht mehr einloggen. ' +
-          'Es werden KEINE Daten gelöscht – alle Einträge bleiben erhalten und jederzeit abrufbar. ' +
-          'Die Archivierung kann jederzeit rückgängig gemacht werden.'
-      )
-    ) {
+  const openArchiveDialog = (employee: Employee) => {
+    setArchivingEmployee(employee)
+    // Vorbelegung: bereits gesetztes Austrittsdatum, sonst heute.
+    setArchiveDate(employee.exitDate ? String(employee.exitDate).slice(0, 10) : todayStr())
+    setArchiveError('')
+  }
+
+  const closeArchiveDialog = () => {
+    setArchivingEmployee(null)
+    setArchiveDate('')
+    setArchiveError('')
+    setArchiveLoading(false)
+  }
+
+  const submitArchive = async () => {
+    if (!archivingEmployee) return
+    if (!archiveDate) {
+      setArchiveError('Bitte ein Austrittsdatum wählen.')
       return
     }
 
+    setArchiveLoading(true)
+    setArchiveError('')
     try {
-      const response = await fetch(`/api/admin/employees/${employee.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/admin/employees/${archivingEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: archivingEmployee.user.firstName,
+          lastName: archivingEmployee.user.lastName,
+          email: archivingEmployee.user.email,
+          employmentType: archivingEmployee.employmentType,
+          pensum: archivingEmployee.pensum,
+          exitDate: archiveDate,
+        }),
       })
       if (response.ok) {
         window.location.reload()
       } else {
         const data = await response.json().catch(() => ({}))
-        alert(data.error || 'Archivieren fehlgeschlagen')
+        setArchiveError(data.error || 'Archivieren fehlgeschlagen')
+        setArchiveLoading(false)
       }
     } catch (error) {
       console.error('Fehler beim Archivieren:', error)
+      setArchiveError('Archivieren fehlgeschlagen')
+      setArchiveLoading(false)
     }
   }
 
@@ -313,7 +349,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleArchive(employee)}
+                      onClick={() => openArchiveDialog(employee)}
                       title="Archivieren (Austritt)"
                     >
                       <Archive className="h-4 w-4" />
@@ -488,6 +524,52 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!archivingEmployee} onOpenChange={(open) => { if (!open) closeArchiveDialog() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mitarbeiter archivieren</DialogTitle>
+            <DialogDescription>
+              {archivingEmployee && (
+                <>
+                  Mitarbeiter „{archivingEmployee.user.firstName} {archivingEmployee.user.lastName}" archivieren.
+                  Es werden KEINE Daten gelöscht – alle Einträge bleiben erhalten und jederzeit abrufbar.
+                  Die Archivierung kann jederzeit rückgängig gemacht werden.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="archiveDate">Austrittsdatum</Label>
+            <Input
+              id="archiveDate"
+              type="date"
+              value={archiveDate}
+              onChange={(e) => setArchiveDate(e.target.value)}
+            />
+            <p className="text-xs text-gray-500">
+              Ab dem Austrittsdatum wird der Mitarbeiter automatisch archiviert (Login gesperrt,
+              nicht mehr in aktiven Listen). Ein Datum in der Zukunft lässt ihn bis dahin aktiv.
+            </p>
+          </div>
+
+          {archiveError && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+              {archiveError}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeArchiveDialog} disabled={archiveLoading}>
+              Abbrechen
+            </Button>
+            <Button type="button" onClick={submitArchive} disabled={archiveLoading}>
+              {archiveLoading ? 'Archivieren...' : 'Archivieren'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
