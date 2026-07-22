@@ -44,6 +44,7 @@ model Employee {
   userId          String   @unique
   employmentType  String   // "MONTHLY_SALARY" or "HOURLY_WAGE"
   pensum          Float    // 0 - 100 (z.B. 50 = 50%)
+  exitDate        DateTime? // Austrittsdatum. null = aktiv. Ab diesem Datum gilt der MA als archiviert (Login gesperrt, aus aktiven Listen entfernt); alle Daten bleiben erhalten.
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

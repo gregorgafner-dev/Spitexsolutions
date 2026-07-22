@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Users, Calendar, Settings, Plane, FileText, Clock, Calculator, MessageSquare, AlertTriangle } from 'lucide-react'
 import { calculateWorkHours } from '@/lib/calculations'
 import { format, parseISO, isSameDay } from 'date-fns'
+import { activeEmployeeWhere } from '@/lib/employee-status'
 
 export default async function AdminDashboard() {
   const session = await getSession()
@@ -21,7 +22,7 @@ export default async function AdminDashboard() {
 
   console.log('[AdminDashboard] session ok', { role: session.user.role })
 
-  const employeeCount = await prisma.employee.count()
+  const employeeCount = await prisma.employee.count({ where: activeEmployeeWhere() })
   const serviceCount = await prisma.service.count()
   const pendingVacationCount = await prisma.vacation.count({
     where: {
@@ -35,8 +36,9 @@ export default async function AdminDashboard() {
   })
 
   // Hole Plausibilisierungen
-  // Prüfe für alle Mitarbeiter die Zeiteinträge
+  // Prüfe für alle aktiven Mitarbeiter die Zeiteinträge (archivierte ausklammern)
   const employees = await prisma.employee.findMany({
+    where: activeEmployeeWhere(),
     include: {
       user: true,
     },
