@@ -1,6 +1,8 @@
 import { EmployeeSidebar } from '@/components/employee/employee-sidebar'
 import { getSession } from '@/lib/get-session'
 import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/db'
+import { isEmployeeArchived } from '@/lib/employee-status'
 
 export default async function EmployeeLayout({
   children,
@@ -15,6 +17,18 @@ export default async function EmployeeLayout({
       role: session?.user?.role ?? null,
     })
     redirect('/login')
+  }
+
+  // Archivierte Mitarbeiter (ausgetreten) aussperren, auch bei noch gültiger Session.
+  if (session.user.employeeId) {
+    const employee = await prisma.employee.findUnique({
+      where: { id: session.user.employeeId },
+      select: { exitDate: true },
+    })
+    if (!employee || isEmployeeArchived(employee)) {
+      console.log('[EmployeeLayout] redirect -> /login (archiviert/kein Employee)')
+      redirect('/login')
+    }
   }
 
   return (

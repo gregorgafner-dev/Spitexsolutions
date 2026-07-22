@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './db'
 import bcrypt from 'bcryptjs'
+import { isEmployeeArchived } from './employee-status'
 
 // Debug: Konfiguration sichtbar machen (ohne Secrets/PII)
 console.log('[AuthConfig]', {
@@ -70,6 +71,12 @@ export const authOptions: NextAuthOptions = {
 
           if (!isPasswordValid) {
             console.log('[NextAuth] Passwort ungültig')
+            return null
+          }
+
+          // Archivierte Mitarbeiter (Austrittsdatum erreicht) dürfen sich nicht mehr einloggen.
+          if (user.employee && isEmployeeArchived(user.employee)) {
+            console.log('[NextAuth] Login abgelehnt: Mitarbeiter archiviert (ausgetreten)')
             return null
           }
 

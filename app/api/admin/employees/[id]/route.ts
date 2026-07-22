@@ -57,13 +57,22 @@ export async function PUT(
     // Prüfe ob Pensum geändert wurde
     const pensumChanged = employee.pensum !== parseFloat(pensum)
 
+    // Austrittsdatum: nur ändern, wenn das Feld im Request enthalten ist.
+    // - leerer String / null  -> Austritt zurücknehmen (Reaktivierung)
+    // - Datum (yyyy-MM-dd)     -> Austritt setzen (Archivierung ab diesem Tag)
+    const employeeData: { employmentType: string; pensum: number; exitDate?: Date | null } = {
+      employmentType,
+      pensum: parseFloat(pensum), // Pensum als Prozent (0-100)
+    }
+    if ('exitDate' in body) {
+      const raw = body.exitDate
+      employeeData.exitDate = raw ? new Date(`${String(raw).slice(0, 10)}T00:00:00`) : null
+    }
+
     // Update Employee
     const updatedEmployee = await prisma.employee.update({
       where: { id: params.id },
-      data: {
-        employmentType,
-        pensum: parseFloat(pensum), // Pensum als Prozent (0-100)
-      },
+      data: employeeData,
       include: {
         user: true,
       },
@@ -86,6 +95,12 @@ export async function PUT(
   }
 }
 
+/**
+ * "Löschen" ist bewusst NICHT destruktiv: Mitarbeiter werden archiviert, nicht gelöscht.
+ * Diese Route setzt das Austrittsdatum auf heute, wodurch der MA sofort archiviert wird
+ * (Login gesperrt, aus aktiven Listen entfernt). Sämtliche Daten bleiben erhalten und
+ * jederzeit abrufbar. Ein Hard-Delete gibt es nicht mehr.
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -106,14 +121,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
     }
 
-    // Lösche Employee (User wird durch Cascade gelöscht)
-    await prisma.employee.delete({
+    // Archivieren: Austrittsdatum = heute (Tagesbeginn). Keine Löschung.
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const archived = await prisma.employee.update({
       where: { id: params.id },
+      data: { exitDate: today },
+      include: { user: true },
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, archived: true, employee: archived })
   } catch (error) {
-    console.error('Error deleting employee:', error)
+    console.error('Error archiving employee:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

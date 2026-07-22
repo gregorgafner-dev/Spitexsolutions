@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import SchedulePlanner from '@/components/admin/schedule-planner'
+import { activeEmployeeWhere } from '@/lib/employee-status'
 export default async function SchedulePage() {
   const session = await getSession()
 
@@ -11,7 +12,9 @@ export default async function SchedulePage() {
     redirect('/admin/login')
   }
 
+  // Nur aktive Mitarbeiter planen (archivierte/ausgetretene ausblenden)
   const employees = await prisma.employee.findMany({
+    where: activeEmployeeWhere(),
     include: {
       user: true,
     },

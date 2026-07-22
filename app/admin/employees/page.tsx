@@ -17,6 +17,7 @@ export default async function EmployeesPage() {
       id: true,
       employmentType: true,
       pensum: true,
+      exitDate: true,
       user: {
         select: {
           id: true,
@@ -39,6 +40,7 @@ export default async function EmployeesPage() {
     id: emp.id,
     employmentType: emp.employmentType as 'MONTHLY_SALARY' | 'HOURLY_WAGE',
     pensum: emp.pensum,
+    exitDate: emp.exitDate ? emp.exitDate.toISOString() : null,
     user: {
       id: emp.user.id,
       firstName: emp.user.firstName,
