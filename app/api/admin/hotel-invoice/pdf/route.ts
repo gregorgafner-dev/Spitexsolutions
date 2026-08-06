@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
-import { calculateWorkHours } from '@/lib/calculations'
+import { calculateWorkHours, DEFAULT_WEEKLY_HOURS } from '@/lib/calculations'
+import { computeCreditedAbsenceHours, qualifyingAbsenceServices } from '@/lib/absence-credit'
 import { endOfMonth, format, startOfMonth } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { readFile } from 'fs/promises'
@@ -72,14 +73,20 @@ export async function POST(request: NextRequest) {
     const periodEnd = endOfMonth(monthDate)
     periodEnd.setHours(23, 59, 59, 999)
 
-    // Employee employment type map
+    // Employee employment type + pensum map
     const employees = await prisma.employee.findMany({
-      select: { id: true, employmentType: true },
+      select: { id: true, employmentType: true, pensum: true },
     })
     const employmentTypeByEmployeeId = new Map<string, string>()
+    const pensumByEmployeeId = new Map<string, number>()
     for (const e of employees) {
       employmentTypeByEmployeeId.set(e.id, e.employmentType)
+      pensumByEmployeeId.set(e.id, e.pensum)
     }
+
+    // Wochenstunden für Soll-basierte Absenz-Gutschrift.
+    const workTimeConfig = await prisma.workTimeConfig.findUnique({ where: { year } })
+    const weeklyHours = workTimeConfig?.weeklyHours ?? DEFAULT_WEEKLY_HOURS
 
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
@@ -88,6 +95,7 @@ export async function POST(request: NextRequest) {
       },
       select: {
         employeeId: true,
+        date: true,
         entryType: true,
         startTime: true,
         endTime: true,
@@ -100,6 +108,19 @@ export async function POST(request: NextRequest) {
     let workHourlyWage = 0
     let sleepHourlyWageGross = 0
     let sleepInterruptionHoursHourlyWage = 0
+
+    // Bereits gearbeitete Stunden je Mitarbeiter/Kalendertag (für Absenz-Deckelung).
+    const workedByEmployeeDay = new Map<string, Map<string, number>>()
+    const addWorked = (employeeId: string, date: Date, hours: number) => {
+      if (hours === 0) return
+      const key = format(date, 'yyyy-MM-dd')
+      let m = workedByEmployeeDay.get(employeeId)
+      if (!m) {
+        m = new Map<string, number>()
+        workedByEmployeeDay.set(employeeId, m)
+      }
+      m.set(key, (m.get(key) || 0) + hours)
+    }
 
     for (const entry of timeEntries) {
       const employmentType = employmentTypeByEmployeeId.get(entry.employeeId) ?? 'UNKNOWN'
@@ -124,6 +145,7 @@ export async function POST(request: NextRequest) {
           workHourlyWage += hours
           sleepInterruptionHoursHourlyWage += hours
         }
+        addWorked(entry.employeeId, entry.date, hours)
         continue
       }
 
@@ -132,12 +154,48 @@ export async function POST(request: NextRequest) {
       const hours = calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
       if (employmentType === 'MONTHLY_SALARY') workMonthlySalary += hours
       else if (employmentType === 'HOURLY_WAGE') workHourlyWage += hours
+      addWorked(entry.employeeId, entry.date, hours)
     }
+
+    // Bezahlte Absenzen (Krankheit/Ferien) "gem. Soll" als Arbeitsstunden in die
+    // Belastung aufnehmen (Spitex zahlt Absenzen -> Hotel trägt 50% Arbeitsanteil mit).
+    // Monatslohn: K+FE, Stundenlohn: nur K. Deckelung auf Tages-Soll je Werktag.
+    const scheduleAbsences = await prisma.scheduleEntry.findMany({
+      where: {
+        employeeId: { in: employees.map((e) => e.id) },
+        date: { gte: periodStart, lte: periodEnd },
+        service: { name: { in: ['K', 'FE'] } },
+      },
+      select: { employeeId: true, date: true, service: { select: { name: true } } },
+    })
+
+    const absenceDaysByEmployee = new Map<string, Date[]>()
+    for (const a of scheduleAbsences) {
+      const employmentType = employmentTypeByEmployeeId.get(a.employeeId) ?? 'UNKNOWN'
+      const allowed = qualifyingAbsenceServices(employmentType)
+      if (!allowed.includes(a.service.name)) continue
+      const list = absenceDaysByEmployee.get(a.employeeId) ?? []
+      list.push(a.date)
+      absenceDaysByEmployee.set(a.employeeId, list)
+    }
+
+    let paidAbsenceWorkHours = 0
+    for (const [employeeId, absenceDays] of absenceDaysByEmployee) {
+      const credited = computeCreditedAbsenceHours({
+        weeklyHours,
+        pensum: pensumByEmployeeId.get(employeeId) ?? 0,
+        year,
+        absenceDays,
+        workedHoursByDay: workedByEmployeeDay.get(employeeId) ?? new Map<string, number>(),
+      })
+      paidAbsenceWorkHours += credited
+    }
+    paidAbsenceWorkHours = Math.round(paidAbsenceWorkHours * 100) / 100
 
     // Effektive Schlafzeit (Stundenlöhner): Brutto-Schlaf abzüglich Unterbrechungen.
     const sleepHourlyWage = Math.max(0, sleepHourlyWageGross - sleepInterruptionHoursHourlyWage)
 
-    const totalWorkHours = workMonthlySalary + workHourlyWage
+    const totalWorkHours = workMonthlySalary + workHourlyWage + paidAbsenceWorkHours
     const totalSleepHours = sleepHourlyWage
 
     const productivity = totalWorkHours > 0 ? (klvHours / totalWorkHours) * 100 : 0
@@ -168,6 +226,7 @@ export async function POST(request: NextRequest) {
       klvHours,
       workMonthlySalary,
       workHourlyWage,
+      paidAbsenceWorkHours,
       totalSleepHours,
       productivity,
       leerstundenWork,

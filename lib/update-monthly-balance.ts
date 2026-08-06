@@ -1,6 +1,8 @@
 import { prisma } from './db'
 import { calculateWorkHours } from './calculations'
 import { calculateMonthlyTargetHours, DEFAULT_WEEKLY_HOURS } from './calculations'
+import { computeCreditedAbsenceHours, qualifyingAbsenceServices } from './absence-credit'
+import { format } from 'date-fns'
 
 export async function updateMonthlyBalance(employeeId: string, date: Date) {
   const year = date.getFullYear()
@@ -57,35 +59,45 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
     return sum + (entry.surchargeHours || 0)
   }, 0)
 
-  // Dienstplan-Absenzen (Ferien/Krankheit) sollen in den Stundensaldo einfliessen.
-  // Regel: Zähle FE/K Stunden aus dem Dienstplan als "Ist", aber nur an Tagen OHNE Zeiterfassung,
-  // um Doppelzählungen zu vermeiden.
+  // Bezahlte Dienstplan-Absenzen (Krankheit/Ferien) fliessen "gem. Soll" in den
+  // Stundensaldo ein: pro Werktag max. das Tages-Soll (keine Überstunden durch
+  // Absenz), Wochenende/Feiertag = 0. Monatslohn: K+FE, Stundenlohn: nur K.
+  // Ein voll krankgeschriebener Monat ergibt damit exakt das Soll -> Saldo ±0.
+  const allowedAbsenceServices = qualifyingAbsenceServices(employee.employmentType)
   const scheduleAbsences = await prisma.scheduleEntry.findMany({
     where: {
       employeeId,
       date: { gte: monthStart, lte: monthEnd },
-      service: { name: { in: ['FE', 'K'] } },
+      service: { name: { in: allowedAbsenceServices } },
     },
     include: { service: true },
   })
 
-  const isoDay = (d: Date) => d.toISOString().slice(0, 10)
-  const daysWithTimeEntries = new Set(timeEntries.map((t) => isoDay(t.date)))
-  const scheduleAbsenceHoursTotal = scheduleAbsences.reduce((sum, e) => {
-    const h = (e.endTime.getTime() - e.startTime.getTime()) / (1000 * 60 * 60)
-    return sum + h
-  }, 0)
-  const scheduleAbsenceHoursCredited = scheduleAbsences.reduce((sum, e) => {
-    const day = isoDay(e.date)
-    if (daysWithTimeEntries.has(day)) return sum
-    const h = (e.endTime.getTime() - e.startTime.getTime()) / (1000 * 60 * 60)
-    return sum + h
-  }, 0)
+  // Bereits gearbeitete Stunden je Kalendertag (für die Deckelung auf das Tages-Soll).
+  const workedHoursByDay = new Map<string, number>()
+  for (const entry of timeEntries) {
+    let h = 0
+    if (entry.entryType === 'SLEEP' || entry.entryType === 'SLEEP_INTERRUPTION') {
+      if (entry.entryType === 'SLEEP_INTERRUPTION') h = (entry.sleepInterruptionMinutes || 0) / 60
+    } else if (entry.endTime) {
+      h = calculateWorkHours(entry.startTime, entry.endTime, entry.breakMinutes)
+    }
+    if (h === 0) continue
+    const key = format(entry.date, 'yyyy-MM-dd')
+    workedHoursByDay.set(key, (workedHoursByDay.get(key) || 0) + h)
+  }
 
-  const actualHours =
-    employee.employmentType === 'MONTHLY_SALARY'
-      ? actualHoursFromTimeEntries + scheduleAbsenceHoursCredited
-      : actualHoursFromTimeEntries
+  const creditedAbsenceHours = computeCreditedAbsenceHours({
+    weeklyHours: workTimeConfig.weeklyHours,
+    pensum: employee.pensum,
+    year,
+    absenceDays: scheduleAbsences.map((e) => e.date),
+    workedHoursByDay,
+  })
+
+  // Gutschrift gilt neu für Monats- UND Stundenlohn (bei Stundenlohn nur Krankheit,
+  // siehe qualifyingAbsenceServices).
+  const actualHours = actualHoursFromTimeEntries + creditedAbsenceHours
 
   // Berechne Soll-Stunden für den Monat
   const targetHours = calculateMonthlyTargetHours(
