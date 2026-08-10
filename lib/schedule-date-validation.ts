@@ -10,9 +10,11 @@ type ScheduleEditOptions = {
   adminRetroOverride?: boolean
 }
 
-// TEMP: Ausnahmefenster "ab jetzt + 2 Tage" (automatisch ablaufend).
-// Hinweis: Zeitangabe in CEST (Schweiz, +02:00). Danach greift wieder die Standardregel.
-const ADMIN_RETRO_OVERRIDE_UNTIL = new Date('2026-04-17T23:59:59.999+02:00')
+// TEMP: Ausnahmefenster für rückwirkende Admin-Anpassung des Dienstplans
+// (v.a. Juli). Läuft automatisch ab; danach greift wieder die Standardregel
+// (bearbeitbar nur bis zum 5. Tag des Folgemonats -> Juli ist dann wieder eingefroren).
+// Gesetzt am 10.08.2026 für 3 Tage. Zeitangabe in CEST (Schweiz, +02:00).
+const ADMIN_RETRO_OVERRIDE_UNTIL = new Date('2026-08-13T23:59:59.999+02:00')
 
 export function isScheduleDateEditable(date: Date, options?: ScheduleEditOptions): boolean {
   const today = new Date()
