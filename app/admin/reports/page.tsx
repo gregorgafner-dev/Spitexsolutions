@@ -82,7 +82,7 @@ export default async function ReportsPage() {
               PDF-Abrechnungen generieren
             </CardTitle>
             <CardDescription>
-              Ab dem 3. Tag des Folgemonats können Sie Abrechnungen für den Vormonat generieren.
+              Ab dem 3. Tag des Folgemonats können Sie die Abrechnung für den abgeschlossenen Monat generieren.
               Die Abrechnung enthält die gearbeitete Arbeitszeit, den aktuellen Stundensaldo und den Feriensaldo.
             </CardDescription>
           </CardHeader>

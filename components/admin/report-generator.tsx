@@ -147,7 +147,7 @@ export default function ReportGenerator({ employees, availableMonths }: ReportGe
       <div className="text-sm text-gray-600 space-y-2">
         <p className="font-semibold">Die Abrechnung enthält:</p>
         <ul className="list-disc list-inside space-y-1 ml-4">
-          <li>Gearbeitete Arbeitszeit vom Vormonat</li>
+          <li>Gearbeitete Arbeitszeit im gewählten Abrechnungsmonat</li>
           <li>Zeitzuschläge für Sonn-/Feiertage</li>
           <li>Soll-Stunden und Saldo</li>
           <li>Aktueller Stundensaldo</li>

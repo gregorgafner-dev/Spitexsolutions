@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { de } from 'date-fns/locale'
 
 export async function GET(request: NextRequest) {
@@ -47,17 +47,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
     }
 
-    // Hole Monatssaldo vom Vormonat
-    const previousMonthDate = subMonths(reportDate, 1)
-    const previousYear = previousMonthDate.getFullYear()
-    const previousMonth = previousMonthDate.getMonth() + 1
+    // Monatssaldo des GEWÄHLTEN Abrechnungsmonats (kein zusätzlicher Vormonats-Versatz).
+    const reportMonthDate = reportDate
 
     const monthlyBalance = await prisma.monthlyBalance.findUnique({
       where: {
         employeeId_year_month: {
           employeeId,
-          year: previousYear,
-          month: previousMonth,
+          year,
+          month: monthNum,
         },
       },
     })
@@ -88,16 +86,16 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Berechne gearbeitete Stunden vom Vormonat
-    const startOfPreviousMonth = startOfMonth(previousMonthDate)
-    const endOfPreviousMonth = endOfMonth(previousMonthDate)
+    // Berechne gearbeitete Stunden des Abrechnungsmonats
+    const startOfReportMonth = startOfMonth(reportMonthDate)
+    const endOfReportMonth = endOfMonth(reportMonthDate)
 
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
         employeeId,
         date: {
-          gte: startOfPreviousMonth,
-          lte: endOfPreviousMonth,
+          gte: startOfReportMonth,
+          lte: endOfReportMonth,
         },
         endTime: { not: null },
       },
@@ -143,11 +141,11 @@ export async function GET(request: NextRequest) {
     
     // Monat
     doc.setFontSize(14)
-    doc.text(`Abrechnungsmonat: ${format(previousMonthDate, 'MMMM yyyy', { locale: de })}`, 20, 90)
+    doc.text(`Abrechnungsmonat: ${format(reportMonthDate, 'MMMM yyyy', { locale: de })}`, 20, 90)
     
-    // Arbeitszeit vom Vormonat
+    // Arbeitszeit im Abrechnungsmonat
     doc.setFontSize(12)
-    doc.text('Arbeitszeit vom Vormonat:', 20, 110)
+    doc.text('Arbeitszeit im Abrechnungsmonat:', 20, 110)
     let currentY = 118
     
     // Normale Arbeitsstunden
@@ -238,7 +236,7 @@ export async function GET(request: NextRequest) {
     response.headers.set('Content-Type', 'application/pdf')
     response.headers.set(
       'Content-Disposition',
-      `attachment; filename="Abrechnung_${employee.user.lastName}_${format(previousMonthDate, 'yyyy-MM', { locale: de })}.pdf"`
+      `attachment; filename="Abrechnung_${employee.user.lastName}_${format(reportMonthDate, 'yyyy-MM', { locale: de })}.pdf"`
     )
     
     return response
