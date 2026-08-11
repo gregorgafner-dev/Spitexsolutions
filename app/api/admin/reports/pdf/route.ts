@@ -60,22 +60,8 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Hole aktuelles Monatssaldo (für Stundensaldo)
-    const currentDate = new Date()
-    const currentYear = currentDate.getFullYear()
-    const currentMonth = currentDate.getMonth() + 1
-
-    const currentMonthlyBalance = await prisma.monthlyBalance.findUnique({
-      where: {
-        employeeId_year_month: {
-          employeeId,
-          year: currentYear,
-          month: currentMonth,
-        },
-      },
-    })
-
     // Hole Feriensaldo
+    const currentDate = new Date()
     const currentYearVacation = currentDate.getFullYear()
     const vacationBalance = await prisma.vacationBalance.findUnique({
       where: {
@@ -91,26 +77,22 @@ export async function GET(request: NextRequest) {
     const endOfReportMonth = endOfMonth(reportMonthDate)
 
     // Manuelle Stundensaldo-Anpassungen (kind='SALDO', z.B. Auszahlung Plusstunden)
-    // einrechnen – analog zur Stundensaldi-Ansicht und zum Employee-Dashboard.
-    // Ohne diese wurde der Saldo im PDF zu hoch ausgewiesen.
+    // bis Ende des Abrechnungsmonats einrechnen – analog zur Stundensaldi-Ansicht.
+    // So ist der ausgewiesene Saldo eine Momentaufnahme PER ENDE des gewählten
+    // Monats (und nicht für alle Monate identisch "per heute").
     let adjHoursUpToReportMonth = 0
-    let adjHoursUpToNow = 0
     try {
-      const nowTs = new Date()
       const saldoAdjustments = await (prisma as any).hourBalanceAdjustment.findMany({
         where: { employeeId, kind: 'SALDO' },
         select: { minutes: true, effectiveDate: true },
       })
       for (const a of saldoAdjustments as Array<{ minutes: number; effectiveDate: Date }>) {
-        const m = Number(a.minutes || 0)
-        if (a.effectiveDate <= endOfReportMonth) adjHoursUpToReportMonth += m
-        if (a.effectiveDate <= nowTs) adjHoursUpToNow += m
+        if (a.effectiveDate <= endOfReportMonth) adjHoursUpToReportMonth += Number(a.minutes || 0)
       }
     } catch {
       // Tabelle evtl. nicht vorhanden -> Anpassungen ignorieren
     }
     adjHoursUpToReportMonth = adjHoursUpToReportMonth / 60
-    adjHoursUpToNow = adjHoursUpToNow / 60
 
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
@@ -182,12 +164,31 @@ export async function GET(request: NextRequest) {
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(0, 0, 0) // Schwarz
       currentY += 8
-      doc.text(`Gesamt Arbeitszeit: ${(actualWorkHours + surchargeHours).toFixed(2)}h`, 30, currentY)
-      currentY += 8
-    } else {
+    }
+
+    // Bezahlte Absenzen (Krankheit/Ferien) gem. Soll, die dem Ist gutgeschrieben
+    // wurden (Monatslohn: K+FE, Stundenlohn: nur K). Ohne diese Zeile würde der
+    // Monatssaldo rechnerisch nicht mit Ist/Soll aufgehen.
+    const creditedAbsenceHours = monthlyBalance
+      ? Math.max(0, Math.round((monthlyBalance.actualHours - actualWorkHours) * 100) / 100)
+      : 0
+    if (creditedAbsenceHours > 0) {
+      doc.text(`Bezahlte Absenzen (Kr./Fe.) gem. Soll: ${creditedAbsenceHours.toFixed(2)}h`, 30, currentY)
       currentY += 8
     }
-    
+
+    // Gesamt angerechnete Arbeitszeit (Ist + Zuschlag + bezahlte Absenzen)
+    if (surchargeHours > 0 || creditedAbsenceHours > 0) {
+      doc.setFont('helvetica', 'bold')
+      doc.text(
+        `Gesamt angerechnet: ${(actualWorkHours + surchargeHours + creditedAbsenceHours).toFixed(2)}h`,
+        30,
+        currentY
+      )
+      doc.setFont('helvetica', 'normal')
+      currentY += 8
+    }
+
     // Für Stundenlohnangestellte: Zuschläge besonders hervorheben
     if (employee.employmentType === 'HOURLY_WAGE' && surchargeHours > 0) {
       currentY += 4
@@ -204,54 +205,54 @@ export async function GET(request: NextRequest) {
       doc.setTextColor(0, 0, 0) // Schwarz
       currentY += 8
     }
-    
+
     if (monthlyBalance) {
       doc.text(`Soll-Stunden: ${monthlyBalance.targetHours.toFixed(2)}h`, 30, currentY)
       currentY += 8
-      const monthSaldo = monthlyBalance.balance + adjHoursUpToReportMonth
-      const monthSaldoText =
-        `Monatssaldo: ${monthSaldo >= 0 ? '+' : ''}${monthSaldo.toFixed(2)}h` +
-        (adjHoursUpToReportMonth !== 0 ? ` (inkl. ${adjHoursUpToReportMonth.toFixed(2)}h Anpassungen)` : '')
-      doc.text(monthSaldoText, 30, currentY)
+      // Saldo NUR dieses Monats (Ist inkl. Zuschlag/Absenzen − Soll), ohne Vormonate.
+      const monthDelta = Math.round((monthlyBalance.balance - monthlyBalance.previousBalance) * 100) / 100
+      doc.text(
+        `Saldo Abrechnungsmonat (Ist - Soll): ${monthDelta >= 0 ? '+' : ''}${monthDelta.toFixed(2)}h`,
+        30,
+        currentY
+      )
       currentY += 8
     }
-    
-    // Aktueller Stundensaldo (gem. Vormonaten)
-    // Im Employee Dashboard wird monthlyBalance.balance angezeigt, was bereits den Vormonatssaldo enthält
-    const saldoY = monthlyBalance && monthlyBalance.surchargeHours > 0 ? 170 : 154
-    doc.setFontSize(14)
-    doc.text('Aktueller Stundensaldo (gem. Vormonaten):', 20, saldoY)
-    doc.setFontSize(12)
-    
-    // Berechne Stundensaldo wie im Employee Dashboard
-    // Der balance im MonthlyBalance ist bereits (actualHours - targetHours) + previousBalance
-    let totalBalance = 0
-    if (currentMonthlyBalance) {
-      // Der balance enthält bereits den Vormonatssaldo
-      totalBalance = currentMonthlyBalance.balance
-    } else if (monthlyBalance) {
-      // Falls kein aktueller Monatssaldo existiert, verwende den Saldo vom Abrechnungsmonat
-      totalBalance = monthlyBalance.balance
-    }
-    // Manuelle Anpassungen (z.B. Auszahlung Plusstunden) bis heute einrechnen.
-    totalBalance += adjHoursUpToNow
 
-    const saldoText =
-      `${totalBalance >= 0 ? '+' : ''}${totalBalance.toFixed(2)}h` +
-      (adjHoursUpToNow !== 0 ? ` (inkl. ${adjHoursUpToNow.toFixed(2)}h Anpassungen)` : '')
-    doc.text(saldoText, 30, saldoY + 8)
-    
-    // Feriensaldo
-    const ferienY = saldoY + 20
+    // Kumulierter Stundensaldo PER ENDE des Abrechnungsmonats (inkl. Vormonate und
+    // manuelle Anpassungen bis zu diesem Zeitpunkt). Dadurch ist jede Monats-
+    // abrechnung eine Momentaufnahme dieses Monats – und nicht für alle Monate
+    // identisch "per heute".
+    currentY += 6
     doc.setFontSize(14)
-    doc.text('Feriensaldo:', 20, ferienY)
+    doc.text(
+      `Stundensaldo per Ende ${format(reportMonthDate, 'MMMM yyyy', { locale: de })} (inkl. Vormonate):`,
+      20,
+      currentY
+    )
+    currentY += 8
+    doc.setFontSize(12)
+    const cumulativeBalance = (monthlyBalance ? monthlyBalance.balance : 0) + adjHoursUpToReportMonth
+    const cumulativeText =
+      `${cumulativeBalance >= 0 ? '+' : ''}${cumulativeBalance.toFixed(2)}h` +
+      (adjHoursUpToReportMonth !== 0 ? ` (inkl. ${adjHoursUpToReportMonth.toFixed(2)}h Anpassungen)` : '')
+    doc.text(cumulativeText, 30, currentY)
+    currentY += 14
+
+    // Feriensaldo
+    doc.setFontSize(14)
+    doc.text('Feriensaldo:', 20, currentY)
+    currentY += 8
     doc.setFontSize(12)
     if (vacationBalance) {
       const remainingDays = vacationBalance.totalDays - vacationBalance.usedDays
-      doc.text(`Verbleibend: ${remainingDays.toFixed(1)} Tage`, 30, ferienY + 8)
-      doc.text(`Bezogen: ${vacationBalance.usedDays.toFixed(1)} Tage`, 30, ferienY + 16)
+      doc.text(`Verbleibend: ${remainingDays.toFixed(1)} Tage`, 30, currentY)
+      currentY += 8
+      doc.text(`Bezogen: ${vacationBalance.usedDays.toFixed(1)} Tage`, 30, currentY)
+      currentY += 8
     } else {
-      doc.text('Keine Daten verfügbar', 30, ferienY + 8)
+      doc.text('Keine Daten verfügbar', 30, currentY)
+      currentY += 8
     }
     
     // Footer
