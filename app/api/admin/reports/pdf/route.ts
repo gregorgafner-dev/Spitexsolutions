@@ -90,6 +90,28 @@ export async function GET(request: NextRequest) {
     const startOfReportMonth = startOfMonth(reportMonthDate)
     const endOfReportMonth = endOfMonth(reportMonthDate)
 
+    // Manuelle Stundensaldo-Anpassungen (kind='SALDO', z.B. Auszahlung Plusstunden)
+    // einrechnen – analog zur Stundensaldi-Ansicht und zum Employee-Dashboard.
+    // Ohne diese wurde der Saldo im PDF zu hoch ausgewiesen.
+    let adjHoursUpToReportMonth = 0
+    let adjHoursUpToNow = 0
+    try {
+      const nowTs = new Date()
+      const saldoAdjustments = await (prisma as any).hourBalanceAdjustment.findMany({
+        where: { employeeId, kind: 'SALDO' },
+        select: { minutes: true, effectiveDate: true },
+      })
+      for (const a of saldoAdjustments as Array<{ minutes: number; effectiveDate: Date }>) {
+        const m = Number(a.minutes || 0)
+        if (a.effectiveDate <= endOfReportMonth) adjHoursUpToReportMonth += m
+        if (a.effectiveDate <= nowTs) adjHoursUpToNow += m
+      }
+    } catch {
+      // Tabelle evtl. nicht vorhanden -> Anpassungen ignorieren
+    }
+    adjHoursUpToReportMonth = adjHoursUpToReportMonth / 60
+    adjHoursUpToNow = adjHoursUpToNow / 60
+
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
         employeeId,
@@ -186,7 +208,11 @@ export async function GET(request: NextRequest) {
     if (monthlyBalance) {
       doc.text(`Soll-Stunden: ${monthlyBalance.targetHours.toFixed(2)}h`, 30, currentY)
       currentY += 8
-      doc.text(`Monatssaldo: ${monthlyBalance.balance >= 0 ? '+' : ''}${monthlyBalance.balance.toFixed(2)}h`, 30, currentY)
+      const monthSaldo = monthlyBalance.balance + adjHoursUpToReportMonth
+      const monthSaldoText =
+        `Monatssaldo: ${monthSaldo >= 0 ? '+' : ''}${monthSaldo.toFixed(2)}h` +
+        (adjHoursUpToReportMonth !== 0 ? ` (inkl. ${adjHoursUpToReportMonth.toFixed(2)}h Anpassungen)` : '')
+      doc.text(monthSaldoText, 30, currentY)
       currentY += 8
     }
     
@@ -204,11 +230,16 @@ export async function GET(request: NextRequest) {
       // Der balance enthält bereits den Vormonatssaldo
       totalBalance = currentMonthlyBalance.balance
     } else if (monthlyBalance) {
-      // Falls kein aktueller Monatssaldo existiert, verwende den Saldo vom Vormonat
+      // Falls kein aktueller Monatssaldo existiert, verwende den Saldo vom Abrechnungsmonat
       totalBalance = monthlyBalance.balance
     }
-    
-    doc.text(`${totalBalance >= 0 ? '+' : ''}${totalBalance.toFixed(2)}h`, 30, saldoY + 8)
+    // Manuelle Anpassungen (z.B. Auszahlung Plusstunden) bis heute einrechnen.
+    totalBalance += adjHoursUpToNow
+
+    const saldoText =
+      `${totalBalance >= 0 ? '+' : ''}${totalBalance.toFixed(2)}h` +
+      (adjHoursUpToNow !== 0 ? ` (inkl. ${adjHoursUpToNow.toFixed(2)}h Anpassungen)` : '')
+    doc.text(saldoText, 30, saldoY + 8)
     
     // Feriensaldo
     const ferienY = saldoY + 20
