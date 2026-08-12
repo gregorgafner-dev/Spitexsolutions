@@ -15,7 +15,9 @@
  * READ-ONLY im Default (Dry-Run). Schreibt nur mit --apply.
  * Aufruf:
  *   npx tsx scripts/repair-balance-chain.ts figueiro                 # Dry-Run (Dez 2025–Aug 2026)
- *   npx tsx scripts/repair-balance-chain.ts figueiro --apply         # schreibt
+ *   npx tsx scripts/repair-balance-chain.ts figueiro --apply         # schreibt (1 MA)
+ *   npx tsx scripts/repair-balance-chain.ts --all                    # Dry-Run alle MA
+ *   npx tsx scripts/repair-balance-chain.ts --all --apply            # schreibt alle MA
  *   npx tsx scripts/repair-balance-chain.ts figueiro --from=2026-03 --to=2026-07
  */
 process.env.TZ = 'Europe/Zurich'
@@ -62,6 +64,7 @@ function monthSeq(fromKey: string, toKey: string): Array<{ y: number; m: number 
 
 async function main() {
   const apply = process.argv.includes('--apply')
+  const all = process.argv.includes('--all')
   const filter = (process.argv.slice(2).find((a) => !a.startsWith('--')) || 'figueiro').toLowerCase()
   const fromKey = arg('from', '2025-12')
   const toKey = arg('to', '2026-08')
@@ -72,11 +75,16 @@ async function main() {
   const client = new pg.Client({ connectionString: url })
   await client.connect()
 
-  const emps = await client.query(
-    `SELECT e.id, u."firstName", u."lastName" FROM employees e JOIN users u ON u.id = e."userId"
-     WHERE lower(u."lastName") LIKE $1 OR lower(u."firstName") LIKE $1 ORDER BY u."lastName"`,
-    [`%${filter}%`]
-  )
+  const emps = all
+    ? await client.query(
+        `SELECT e.id, u."firstName", u."lastName" FROM employees e JOIN users u ON u.id = e."userId"
+         ORDER BY u."lastName"`
+      )
+    : await client.query(
+        `SELECT e.id, u."firstName", u."lastName" FROM employees e JOIN users u ON u.id = e."userId"
+         WHERE lower(u."lastName") LIKE $1 OR lower(u."firstName") LIKE $1 ORDER BY u."lastName"`,
+        [`%${filter}%`]
+      )
   if (emps.rows.length === 0) {
     console.log(`Keine MA gefunden für "${filter}".`)
     await client.end()
