@@ -142,7 +142,7 @@ async function main() {
     console.log('-'.repeat(110))
 
     let prevBalance = 0
-    let cumAdjToMonthEnd = 0
+    const anomalies: string[] = []
     const adjMinutesByMonthEnd = (key: string) => {
       // Summe aller SALDO-Anpassungen mit effectiveDate <= Ende des Monats key
       const [yy, mm] = key.split('-').map(Number)
@@ -169,6 +169,18 @@ async function main() {
       const workH = te ? Number(te.work_h) : 0
       const interrH = te ? Number(te.interr_h) : 0
       const kfe = `${abs['K'] ?? 0}/${abs['FE'] ?? 0}`
+
+      // Rechnerisch erklärbares Monatsdelta aus gespeicherten Werten:
+      const honestDelta = r2(Number(b.actualHours) + Number(b.surchargeHours) - Number(b.targetHours))
+      if (Math.abs(honestDelta - delta) > 0.1) {
+        anomalies.push(
+          `${p.label}: Saldo-Sprung ${f(delta)}h, aber Ist+Zuschlag-Soll erklärt nur ${f(honestDelta)}h ` +
+            `=> ${f(r2(delta - honestDelta))}h unerklärt`
+        )
+      }
+      if (Math.abs(chk) >= 0.01) {
+        anomalies.push(`${p.label}: Ketten-Bruch – Vortrag ${Number(b.previousBalance).toFixed(2)} ≠ Vormonatssaldo ${prevBalance.toFixed(2)} (${f(chk)}h)`)
+      }
       console.log(
         [
           p.label.padEnd(8),
@@ -188,6 +200,13 @@ async function main() {
     }
 
     console.log('-'.repeat(110))
+    if (anomalies.length) {
+      console.log('\n!!! GEFUNDENE ANOMALIEN (hier stimmt die Kette nicht):')
+      for (const a of anomalies) console.log('   - ' + a)
+    } else {
+      console.log('\nKeine Ketten-Anomalien gefunden (Kette in sich schlüssig).')
+    }
+    console.log('')
     console.log('Angezeigter KUMULIERTER Saldo per Monatsende (Saldo(DB) + SALDO-Anpassungen bis Monatsende):')
     for (const p of SEQ) {
       const b = balByKey.get(p.key)
