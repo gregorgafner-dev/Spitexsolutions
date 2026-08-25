@@ -67,6 +67,8 @@ async function main() {
     nameFilters.length === 0 ||
     nameFilters.some((f) => e.firstName.toLowerCase().includes(f) || e.lastName.toLowerCase().includes(f))
 
+  const matched: Array<{ id: string; name: string }> = []
+
   console.log(`\n=== Gutgeschriebene bezahlte Absenzen (K/FE) — ${YEAR}-${String(MONTH).padStart(2, '0')} ===`)
   console.log(`Wochenstunden-Basis: ${weeklyHours}\n`)
   console.log(
@@ -77,6 +79,7 @@ async function main() {
 
   for (const e of emps.rows) {
     if (!match(e)) continue
+    matched.push({ id: e.id, name: `${e.firstName} ${e.lastName}` })
 
     // Zeiterfassung des Monats
     const te = await client.query(
@@ -139,6 +142,30 @@ async function main() {
   console.log('-'.repeat(90))
   console.log('Hinweis: "gutgeschr." = bezahlte Absenzstunden, die dem Stundensaldo als Ist gutgeschrieben werden.')
   console.log('(Bei Stundenlohn zählt nur K; Ferien FE werden dort über den Lohn abgegolten.)')
+
+  // Vorhandene MANUELLE Anpassungen (hour_balance_adjustments) je Mitarbeiter –
+  // um Doppelbuchungen (manuelle 80%-Gutschrift zusätzlich zur automatischen
+  // "gem. Soll"-Gutschrift) zu erkennen.
+  console.log('\n=== Manuelle Anpassungen (hour_balance_adjustments) der ausgewählten MA ===')
+  for (const m of matched) {
+    const adj = await client.query(
+      `SELECT id, to_char("effectiveDate",'YYYY-MM-DD') AS d, minutes, kind, reason
+       FROM hour_balance_adjustments WHERE "employeeId" = $1 ORDER BY "effectiveDate"`,
+      [m.id]
+    )
+    console.log(`\n- ${m.name}:`)
+    if (adj.rows.length === 0) {
+      console.log('    keine manuellen Anpassungen')
+      continue
+    }
+    for (const a of adj.rows) {
+      console.log(
+        `    ${a.d}  ${String(a.kind).padEnd(6)} ${(Number(a.minutes) / 60).toFixed(2).padStart(9)} h  ` +
+          `[id ${a.id}]  "${a.reason}"`
+      )
+    }
+  }
+
   await client.end()
 }
 
