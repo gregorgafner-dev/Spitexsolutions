@@ -11,7 +11,6 @@ export type HotelInvoiceRenderParams = {
 
   workMonthlySalary: number
   workHourlyWage: number
-  paidAbsenceWorkHours: number
   totalSleepHours: number
 
   productivity: number
@@ -242,10 +241,9 @@ export function renderHotelInvoicePdf(opts: {
 
   line("Std M'Arb Monatslohn", params.workMonthlySalary.toFixed(2), '0.00')
   line("Std M'Arb Stundenlohn", params.workHourlyWage.toFixed(2), params.totalSleepHours.toFixed(2))
-  line('Std bez. Absenzen (Kr./Fe.) gem. Soll', params.paidAbsenceWorkHours.toFixed(2), '')
   line(
     'Std Total',
-    (params.workMonthlySalary + params.workHourlyWage + params.paidAbsenceWorkHours).toFixed(2),
+    (params.workMonthlySalary + params.workHourlyWage).toFixed(2),
     params.totalSleepHours.toFixed(2),
     { bold: true }
   )
