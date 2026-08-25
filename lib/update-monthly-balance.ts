@@ -167,5 +167,54 @@ export async function updateMonthlyBalance(employeeId: string, date: Date) {
       plannedHours: 0,
     },
   })
+
+  // WICHTIG (Zukunftssicherung gegen Ketten-Brüche):
+  // Ein Monatssaldo ist kumulativ (balance = Ist + Zuschlag − Soll + Vortrag).
+  // Wird ein (auch rückwirkender) Monat neu berechnet, müssen ALLE Folgemonate
+  // "nachgezogen" werden, sonst zeigt deren Vortrag noch den alten Wert und die
+  // Kette bricht (genau das war die Ursache der zu hohen Salden).
+  // Wir verketten hier nur neu (previousBalance/balance) und lassen Ist/Zuschlag/
+  // Soll der Folgemonate unangetastet – es werden also keine Absenzen o.ä.
+  // rückwirkend verändert.
+  await cascadeForward(employeeId, year, month, balance)
+}
+
+/**
+ * Zieht die Vortrags-Kette ab dem Monat NACH (afterYear/afterMonth) neu durch:
+ * Für jeden bereits existierenden Folgemonat gilt
+ *   previousBalance = Saldo des (neu verketteten) Vormonats
+ *   balance         = previousBalance + (gespeichertes Ist + Zuschlag − Soll)
+ * Ist/Zuschlag/Soll bleiben unverändert. Es werden keine neuen Monatszeilen
+ * angelegt (nur vorhandene aktualisiert).
+ */
+async function cascadeForward(
+  employeeId: string,
+  afterYear: number,
+  afterMonth: number,
+  startingBalance: number
+) {
+  const laterRows = await prisma.monthlyBalance.findMany({
+    where: {
+      employeeId,
+      OR: [{ year: { gt: afterYear } }, { year: afterYear, month: { gt: afterMonth } }],
+    },
+    orderBy: [{ year: 'asc' }, { month: 'asc' }],
+  })
+
+  let runningPrev = startingBalance
+  for (const row of laterRows) {
+    const monthDelta = row.actualHours + row.surchargeHours - row.targetHours
+    const newBalance = runningPrev + monthDelta
+    if (
+      Math.abs(newBalance - row.balance) > 0.005 ||
+      Math.abs(runningPrev - row.previousBalance) > 0.005
+    ) {
+      await prisma.monthlyBalance.update({
+        where: { id: row.id },
+        data: { previousBalance: runningPrev, balance: newBalance },
+      })
+    }
+    runningPrev = newBalance
+  }
 }
 
