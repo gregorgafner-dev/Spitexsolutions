@@ -67,6 +67,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ungültige Stunden KLV-verrechnet.' }, { status: 400 })
     }
 
+    // Optionale manuelle Überschreibung der aus der Datenbank berechneten Stunden.
+    // Wird ein Wert (>= 0) übergeben, ersetzt er den berechneten Wert – ohne die
+    // gebuchten Stunden in der Datenbank zu verändern (einmalige Korrektur).
+    const invalidOverride: string[] = []
+    const parseOptionalHours = (raw: unknown, label: string): number | null => {
+      if (raw === undefined || raw === null || raw === '') return null
+      const value = Number(raw)
+      if (!Number.isFinite(value) || value < 0) {
+        invalidOverride.push(label)
+        return null
+      }
+      return value
+    }
+
+    const overrideWorkMonthlySalary = parseOptionalHours(
+      body?.workMonthlySalaryHours,
+      "Std M'Arb Monatslohn (Arbeit)"
+    )
+    const overrideWorkHourlyWage = parseOptionalHours(
+      body?.workHourlyWageHours,
+      "Std M'Arb Stundenlohn (Arbeit)"
+    )
+    const overrideSleepHours = parseOptionalHours(body?.sleepHours, 'Schlafstunden')
+
+    if (invalidOverride.length > 0) {
+      return NextResponse.json(
+        { error: `Ungültige manuelle Werte: ${invalidOverride.join(', ')}.` },
+        { status: 400 }
+      )
+    }
+
     const monthDate = new Date(year, monthIndex, 1)
     const periodStart = startOfMonth(monthDate)
     const periodEnd = endOfMonth(monthDate)
@@ -138,8 +169,14 @@ export async function POST(request: NextRequest) {
     // Effektive Schlafzeit (Stundenlöhner): Brutto-Schlaf abzüglich Unterbrechungen.
     const sleepHourlyWage = Math.max(0, sleepHourlyWageGross - sleepInterruptionHoursHourlyWage)
 
-    const totalWorkHours = workMonthlySalary + workHourlyWage
-    const totalSleepHours = sleepHourlyWage
+    // Manuelle Korrektur anwenden (falls übergeben), sonst DB-Berechnung verwenden.
+    const effectiveWorkMonthlySalary =
+      overrideWorkMonthlySalary !== null ? overrideWorkMonthlySalary : workMonthlySalary
+    const effectiveWorkHourlyWage =
+      overrideWorkHourlyWage !== null ? overrideWorkHourlyWage : workHourlyWage
+
+    const totalWorkHours = effectiveWorkMonthlySalary + effectiveWorkHourlyWage
+    const totalSleepHours = overrideSleepHours !== null ? overrideSleepHours : sleepHourlyWage
 
     const productivity = totalWorkHours > 0 ? (klvHours / totalWorkHours) * 100 : 0
     const leerstundenWork = totalWorkHours - klvHours
@@ -167,8 +204,8 @@ export async function POST(request: NextRequest) {
       periodStart,
       periodEnd,
       klvHours,
-      workMonthlySalary,
-      workHourlyWage,
+      workMonthlySalary: effectiveWorkMonthlySalary,
+      workHourlyWage: effectiveWorkHourlyWage,
       totalSleepHours,
       productivity,
       leerstundenWork,
