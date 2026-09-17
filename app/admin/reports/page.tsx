@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { format, subMonths, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { FileText } from 'lucide-react'
+import { FileText, TrendingUp } from 'lucide-react'
 import ReportGenerator from '@/components/admin/report-generator'
+import HourBalanceHistory from '@/components/admin/hour-balance-history'
 
 export default async function ReportsPage() {
   const session = await getSession()
@@ -88,6 +89,22 @@ export default async function ReportsPage() {
           </CardHeader>
           <CardContent>
             <ReportGenerator employees={employees} availableMonths={availableMonths} />
+          </CardContent>
+        </Card>
+
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <TrendingUp className="mr-2 h-5 w-5" />
+              Stundensaldoverlauf (mehrere Monate)
+            </CardTitle>
+            <CardDescription>
+              Zeigt den Stundensaldo eines Mitarbeiters über einen frei wählbaren Zeitraum – pro Monat mit Vortrag, Ist,
+              Zuschlag, Soll, Anpassungen und kumuliertem Saldo. Als Tabelle, PDF oder CSV.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <HourBalanceHistory employees={employees} />
           </CardContent>
         </Card>
       </div>
