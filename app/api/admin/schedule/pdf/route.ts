@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDaysInMonth } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { isHolidayOrSunday } from '@/lib/calculations'
+import { employeesForMonthWhere } from '@/lib/employee-status'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 
@@ -19,8 +20,10 @@ export async function GET(request: NextRequest) {
     const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
     const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
 
-    // Hole alle Mitarbeiter
+    // Hole die im gewählten Monat sichtbaren Mitarbeiter (bis und mit Austrittsmonat),
+    // damit das PDF der Bildschirmansicht entspricht.
     const employees = await prisma.employee.findMany({
+      where: employeesForMonthWhere(year, month),
       include: {
         user: true,
       },

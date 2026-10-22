@@ -59,3 +59,42 @@ export function archivedEmployeeWhere(ref: Date = new Date()) {
     exitDate: { not: null, lte: today },
   }
 }
+
+/** Beginn des angegebenen Monats (Ortszeit). `month` ist 1-basiert (1 = Januar). */
+export function startOfMonthLocal(year: number, month: number): Date {
+  const d = new Date(year, month - 1, 1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/**
+ * true, wenn der Mitarbeiter im angegebenen Monat im Dienstplan sichtbar sein soll.
+ *
+ * Regel (monatsgenau): sichtbar bis und mit Austrittsmonat.
+ *   - exitDate == null            -> immer sichtbar
+ *   - exitDate >= Monatsbeginn    -> sichtbar (Austritt in diesem oder einem späteren Monat)
+ *   - exitDate <  Monatsbeginn    -> nicht sichtbar (bereits vor diesem Monat ausgetreten)
+ *
+ * `month` ist 1-basiert (1 = Januar).
+ */
+export function isEmployeeVisibleInMonth(
+  employee: EmployeeExitInfo,
+  year: number,
+  month: number
+): boolean {
+  if (!employee.exitDate) return true
+  const exit = new Date(employee.exitDate)
+  if (Number.isNaN(exit.getTime())) return true
+  return exit.getTime() >= startOfMonthLocal(year, month).getTime()
+}
+
+/**
+ * Prisma-`where`-Fragment für "im angegebenen Monat sichtbar" (bis und mit Austrittsmonat).
+ * `month` ist 1-basiert (1 = Januar).
+ */
+export function employeesForMonthWhere(year: number, month: number) {
+  const monthStart = startOfMonthLocal(year, month)
+  return {
+    OR: [{ exitDate: null }, { exitDate: { gte: monthStart } }],
+  }
+}

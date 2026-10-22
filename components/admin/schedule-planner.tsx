@@ -15,11 +15,13 @@ import {
 import { ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import { isHolidayOrSunday } from '@/lib/calculations'
 import { isScheduleDateEditable } from '@/lib/schedule-date-validation'
+import { isEmployeeVisibleInMonth } from '@/lib/employee-status'
 
 interface Employee {
   id: string
   pensum: number
   employmentType: string
+  exitDate?: string | Date | null
   user: {
     firstName: string
     lastName: string
@@ -79,7 +81,14 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
   const monthEnd = endOfMonth(currentDate)
   const daysInMonth = getDaysInMonth(currentDate)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
-  
+
+  // Nur Mitarbeiter anzeigen, die im gewählten Monat (bis und mit Austrittsmonat)
+  // sichtbar sein sollen. Ausgetretene bleiben so in Vormonaten und ihrem
+  // Austrittsmonat sichtbar, verschwinden aber in Folgemonaten.
+  const visibleEmployees = employees.filter((e) =>
+    isEmployeeVisibleInMonth(e, year, month)
+  )
+
   // Keine leeren Zellen - Tage beginnen direkt
   const emptyCells: Date[] = []
 
@@ -376,7 +385,7 @@ export default function SchedulePlanner({ employees, services }: SchedulePlanner
             </tr>
           </thead>
           <tbody>
-            {employees.map((employee) => {
+            {visibleEmployees.map((employee) => {
               const balance = getBalanceForEmployee(employee.id)
               const plannedHours = calculatePlannedHours(employee.id)
               const isHourlyWage = employee.employmentType === 'HOURLY_WAGE'
