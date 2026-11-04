@@ -3,6 +3,8 @@ import { getSession } from '@/lib/get-session'
 import { prisma } from '@/lib/db'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { de } from 'date-fns/locale'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,6 +130,26 @@ export async function GET(request: NextRequest) {
     const doc = new jsPDF()
     
     // Logo/Header
+    // Logo oben rechts einfügen (Spitex Domus Logo, Fallback auf Spitex Solutions)
+    const logoPaths = [
+      { path: join(process.cwd(), 'public', 'logo-spitex-domus.png'), ratio: 913 / 3204 },
+      { path: join(process.cwd(), 'public', 'logo.png'), ratio: 1 },
+    ]
+    for (const { path: logoPath, ratio } of logoPaths) {
+      try {
+        const logoData = await readFile(logoPath)
+        const logoBase64 = logoData.toString('base64')
+        const logoWidth = 55
+        const logoHeight = logoWidth * ratio
+        // Rechtsbündig platzieren (Seitenbreite A4 = 210mm, rechter Rand 20mm)
+        doc.addImage(logoBase64, 'PNG', 190 - logoWidth, 12, logoWidth, logoHeight)
+        break
+      } catch (error) {
+        // Versuche nächsten Logo-Pfad
+        continue
+      }
+    }
+
     doc.setFontSize(20)
     doc.text('Spitex Domus', 20, 20)
     doc.setFontSize(12)
@@ -206,7 +228,13 @@ export async function GET(request: NextRequest) {
       currentY += 8
     }
 
-    if (monthlyBalance) {
+    // Stundenlohnangestellte haben kein Soll/keinen fortlaufenden Saldo – daher
+    // werden für sie weder die Differenz zum Soll noch der Vormonats-Saldo gezeigt.
+    const isHourlyWage = employee.employmentType === 'HOURLY_WAGE'
+
+    // Soll-Stunden und Differenz zum Soll nur für Mitarbeiter im Monatslohn
+    // ausweisen – für Stundenlöhner sind diese Angaben irreführend.
+    if (monthlyBalance && !isHourlyWage) {
       doc.text(`Soll-Stunden: ${monthlyBalance.targetHours.toFixed(2)}h`, 30, currentY)
       currentY += 8
       // Saldo NUR dieses Monats (Ist inkl. Zuschlag/Absenzen − Soll), ohne Vormonate.
@@ -222,22 +250,24 @@ export async function GET(request: NextRequest) {
     // Kumulierter Stundensaldo PER ENDE des Abrechnungsmonats (inkl. Vormonate und
     // manuelle Anpassungen bis zu diesem Zeitpunkt). Dadurch ist jede Monats-
     // abrechnung eine Momentaufnahme dieses Monats – und nicht für alle Monate
-    // identisch "per heute".
-    currentY += 6
-    doc.setFontSize(14)
-    doc.text(
-      `Stundensaldo per Ende ${format(reportMonthDate, 'MMMM yyyy', { locale: de })} (inkl. Vormonate):`,
-      20,
-      currentY
-    )
-    currentY += 8
-    doc.setFontSize(12)
-    const cumulativeBalance = (monthlyBalance ? monthlyBalance.balance : 0) + adjHoursUpToReportMonth
-    const cumulativeText =
-      `${cumulativeBalance >= 0 ? '+' : ''}${cumulativeBalance.toFixed(2)}h` +
-      (adjHoursUpToReportMonth !== 0 ? ` (inkl. ${adjHoursUpToReportMonth.toFixed(2)}h Anpassungen)` : '')
-    doc.text(cumulativeText, 30, currentY)
-    currentY += 14
+    // identisch "per heute". Für Stundenlohnangestellte entfällt dieser Block.
+    if (!isHourlyWage) {
+      currentY += 6
+      doc.setFontSize(14)
+      doc.text(
+        `Stundensaldo per Ende ${format(reportMonthDate, 'MMMM yyyy', { locale: de })} (inkl. Vormonate):`,
+        20,
+        currentY
+      )
+      currentY += 8
+      doc.setFontSize(12)
+      const cumulativeBalance = (monthlyBalance ? monthlyBalance.balance : 0) + adjHoursUpToReportMonth
+      const cumulativeText =
+        `${cumulativeBalance >= 0 ? '+' : ''}${cumulativeBalance.toFixed(2)}h` +
+        (adjHoursUpToReportMonth !== 0 ? ` (inkl. ${adjHoursUpToReportMonth.toFixed(2)}h Anpassungen)` : '')
+      doc.text(cumulativeText, 30, currentY)
+      currentY += 14
+    }
 
     // Feriensaldo
     doc.setFontSize(14)
