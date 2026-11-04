@@ -132,7 +132,9 @@ export async function POST(request: NextRequest) {
 
     // Erstelle PDF
     const { default: jsPDF } = await import('jspdf')
-    const doc = new jsPDF()
+    // compress: true deflatet die Streams (v.a. eingebettete Logos) – ohne dies
+    // werden Bilder als unkomprimierte Rohbitmap gespeichert (PDF wird riesig).
+    const doc = new jsPDF({ compress: true })
     
     // Logo einfügen - Spitex Solutions Logo
     let logoLoaded = false

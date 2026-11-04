@@ -87,7 +87,9 @@ export async function GET(request: NextRequest) {
 
     // Erstelle PDF
     const { default: jsPDF } = await import('jspdf')
-    const doc = new jsPDF('landscape', 'mm', 'a4')
+    // compress: true deflatet die Streams (v.a. eingebettete Logos) – ohne dies
+    // werden Bilder als unkomprimierte Rohbitmap gespeichert (PDF wird riesig).
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true })
     
     // Logo einfügen - versuche zuerst das Logo von spitex-domus.ch
     let logoLoaded = false

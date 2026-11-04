@@ -127,7 +127,9 @@ export async function GET(request: NextRequest) {
 
     // Erstelle PDF (dynamischer Import für Next.js)
     const { default: jsPDF } = await import('jspdf')
-    const doc = new jsPDF()
+    // compress: true deflatet die Streams (v.a. eingebettete Logos) – ohne dies
+    // werden Bilder als unkomprimierte Rohbitmap gespeichert (PDF wird riesig).
+    const doc = new jsPDF({ compress: true })
     
     // Logo/Header
     // Logo oben rechts einfügen (Spitex Domus Logo, Fallback auf Spitex Solutions)

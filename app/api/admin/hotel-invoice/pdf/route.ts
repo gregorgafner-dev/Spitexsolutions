@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     const pauschaleTotal = PAUSCHALE_CHF + mwstBetrag
 
     const { default: jsPDF } = await import('jspdf')
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
     const hotelLogoBase64 = await loadHotelLogoBase64()
 
     const renderParams: HotelInvoiceRenderParams = {

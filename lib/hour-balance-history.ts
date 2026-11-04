@@ -151,7 +151,7 @@ export async function renderHourBalanceHistoryPdf(opts: {
 }) {
   const { employee, from, to, rows } = opts
   const { default: jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape', compress: true })
 
   doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
