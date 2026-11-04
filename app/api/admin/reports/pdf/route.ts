@@ -163,7 +163,10 @@ export async function GET(request: NextRequest) {
     doc.setFontSize(12)
     doc.text(`Mitarbeiter: ${employee.user.firstName} ${employee.user.lastName}`, 20, 60)
     doc.text(`Email: ${employee.user.email}`, 20, 68)
-    doc.text(`Pensum: ${employee.pensum}%`, 20, 76)
+    // Pensum nur für Monatslohn ausweisen – für Stundenlöhner nicht relevant.
+    if (employee.employmentType !== 'HOURLY_WAGE') {
+      doc.text(`Pensum: ${employee.pensum}%`, 20, 76)
+    }
     
     // Monat
     doc.setFontSize(14)
