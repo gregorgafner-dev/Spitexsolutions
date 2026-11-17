@@ -19,6 +19,7 @@ interface Employee {
   id: string
   employmentType: 'MONTHLY_SALARY' | 'HOURLY_WAGE'
   pensum: number // 0-100 (Prozent)
+  entryDate?: string | null
   exitDate?: string | null
   user: {
     id: string
@@ -70,6 +71,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
     passwordConfirm: '',
     employmentType: 'HOURLY_WAGE' as 'MONTHLY_SALARY' | 'HOURLY_WAGE',
     pensum: '100',
+    entryDate: '',
     exitDate: '',
   })
   const [error, setError] = useState('')
@@ -94,6 +96,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
       passwordConfirm: '',
       employmentType: 'HOURLY_WAGE',
       pensum: '100',
+      entryDate: '',
       exitDate: '',
     })
     setEditingEmployee(null)
@@ -115,6 +118,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
       passwordConfirm: '',
       employmentType: employee.employmentType,
       pensum: employee.pensum.toString(),
+      entryDate: employee.entryDate ? String(employee.entryDate).slice(0, 10) : '',
       exitDate: employee.exitDate ? String(employee.exitDate).slice(0, 10) : '',
     })
     setIsDialogOpen(true)
@@ -152,6 +156,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
         password: formData.password || undefined,
         employmentType: formData.employmentType,
         pensum: parseFloat(formData.pensum),
+        entryDate: formData.entryDate || null,
       }
       // Austrittsdatum nur beim Bearbeiten übertragen (leer = Austritt zurücknehmen)
       if (editingEmployee) {
@@ -325,6 +330,7 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
                   <p className="text-sm text-gray-500 mt-1">
                     {employee.employmentType === 'MONTHLY_SALARY' ? 'Monatslohn' : 'Stundenlohn'} | 
                     Pensum: {employee.pensum.toFixed(0)}%
+                    {employee.entryDate ? ` | Eintritt: ${formatDate(employee.entryDate)}` : ''}
                   </p>
                 </div>
                 <div className="flex space-x-2">
@@ -433,6 +439,16 @@ export default function EmployeeList({ employees: initialEmployees }: EmployeeLi
             )}
 
             <div className="space-y-4">
+              <div>
+                <Label htmlFor="entryDate">Eintrittsdatum</Label>
+                <Input
+                  id="entryDate"
+                  type="date"
+                  value={formData.entryDate}
+                  onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
+                />
+              </div>
+
               <div>
                 <Label htmlFor="pensum">Pensum (%)</Label>
                 <Input

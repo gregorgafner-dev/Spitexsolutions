@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { firstName, lastName, email, password, employmentType, pensum } = body
+    const { firstName, lastName, email, password, employmentType, pensum, entryDate } = body
 
     if (!firstName || !lastName || !email || !password || !employmentType || pensum === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
           create: {
             employmentType,
             pensum: parseFloat(pensum), // Pensum als Prozent (0-100)
+            entryDate: entryDate ? new Date(`${String(entryDate).slice(0, 10)}T00:00:00`) : null,
           },
         },
       },

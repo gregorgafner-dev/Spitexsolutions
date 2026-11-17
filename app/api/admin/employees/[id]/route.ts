@@ -60,9 +60,13 @@ export async function PUT(
     // Austrittsdatum: nur ändern, wenn das Feld im Request enthalten ist.
     // - leerer String / null  -> Austritt zurücknehmen (Reaktivierung)
     // - Datum (yyyy-MM-dd)     -> Austritt setzen (Archivierung ab diesem Tag)
-    const employeeData: { employmentType: string; pensum: number; exitDate?: Date | null } = {
+    const employeeData: { employmentType: string; pensum: number; entryDate?: Date | null; exitDate?: Date | null } = {
       employmentType,
       pensum: parseFloat(pensum), // Pensum als Prozent (0-100)
+    }
+    if ('entryDate' in body) {
+      const raw = body.entryDate
+      employeeData.entryDate = raw ? new Date(`${String(raw).slice(0, 10)}T00:00:00`) : null
     }
     if ('exitDate' in body) {
       const raw = body.exitDate
